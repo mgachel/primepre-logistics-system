@@ -5,15 +5,15 @@ const API_URL = 'http://localhost:8000'; // Change this to your Django server UR
 export const authService = {
   // Register a new user
   register: async (userData) => {
-    // Rename confirmPassword to password2 to match backend expectation
+    // Rename confirmPassword to confirm_password to match backend expectation
     const apiData = {
       ...userData,
-      password2: userData.confirmPassword
+      confirm_password: userData.confirmPassword
     };
     delete apiData.confirmPassword;
 
     try {
-      const response = await fetch(`${API_URL}/register/`, {
+      const response = await fetch(`${API_URL}/api/auth/register/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -23,7 +23,7 @@ export const authService = {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.email || errorData.error || 'Registration failed');
+        throw new Error(errorData.detail || errorData.phone || errorData.email || 'Registration failed');
       }
 
       return await response.json();
@@ -33,72 +33,27 @@ export const authService = {
     }
   },
 
-  // Verify account with code
-  verifyAccount: async (email, code) => {
-    try {
-      const response = await fetch(`${API_URL}/verify/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, code }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Verification failed');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Verification error:', error);
-      throw error;
-    }
-  },
-
-  // Resend verification code
-  resendVerificationCode: async (email) => {
-    try {
-      const response = await fetch(`${API_URL}/resend-verification/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to resend code');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Resend code error:', error);
-      throw error;
-    }
-  },
-
   // Login user
-  login: async (email, password) => {
+  login: async (phone, password) => {
     try {
-      const response = await fetch(`${API_URL}/login/`, {
+      const response = await fetch(`${API_URL}/api/auth/login/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ phone, password }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
+        throw new Error(errorData.detail || 'Login failed');
       }
 
       const data = await response.json();
       
-      // Store the token in localStorage
-      localStorage.setItem('token', data.token);
+      // Store the tokens in localStorage
+      localStorage.setItem('accessToken', data.access);
+      localStorage.setItem('refreshToken', data.refresh);
       localStorage.setItem('user', JSON.stringify(data.user));
       
       return data;
@@ -110,7 +65,8 @@ export const authService = {
 
   // Logout user
   logout: () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
   },
 
@@ -122,7 +78,12 @@ export const authService = {
 
   // Check if user is authenticated
   isAuthenticated: () => {
-    return !!localStorage.getItem('token');
+    return !!localStorage.getItem('accessToken');
+  },
+  
+  // Get auth token
+  getToken: () => {
+    return localStorage.getItem('accessToken');
   }
 };
 
