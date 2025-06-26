@@ -1,6 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import SignUp from './pages/Signup';
-import VerificationPage from './pages/VerificationPage';
 import Login from './pages/Login';
 import authService from './services/authService';
 
@@ -23,7 +22,6 @@ function App() {
         {/* Public routes */}
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/signup" element={<SignUp />} />
-        <Route path="/verify" element={<VerificationPage />} />
         <Route path="/login" element={<Login />} />
         
         {/* Protected routes - will redirect to login if not authenticated */}
@@ -33,7 +31,18 @@ function App() {
             <ProtectedRoute>
               <div className="p-8">
                 <h1 className="text-3xl font-bold">Dashboard</h1>
-                <p>Welcome to Primepre Logistics!</p>
+                <div className="mb-4">
+                  {authService.getCurrentUser() && (
+                    <div className="mt-4">
+                      <p className="text-lg"><strong>Welcome,</strong> {authService.getCurrentUser().first_name} {authService.getCurrentUser().last_name}</p>
+                      {authService.getCurrentUser().shipping_mark && (
+                        <p className="text-md mt-2"><strong>Shipping Mark:</strong> {authService.getCurrentUser().shipping_mark}</p>
+                      )}
+                      <p className="text-md mt-1"><strong>User Type:</strong> {authService.getCurrentUser().user_type}</p>
+                      <p className="text-md"><strong>Role:</strong> {authService.getCurrentUser().user_role}</p>
+                    </div>
+                  )}
+                </div>
                 <button 
                   onClick={() => {
                     authService.logout();
