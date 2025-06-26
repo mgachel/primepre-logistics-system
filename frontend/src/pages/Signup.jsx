@@ -10,13 +10,14 @@ import authService from "../services/authService";
 function SignUp() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
+    first_name: "",
+    last_name: "",
     phone: "",
+    email: "",
     region: "",
-    companyName: "",
-    role: "",
+    company_name: "",
+    user_type: "INDIVIDUAL",
+    user_role: "CUSTOMER",
     password: "",
     confirmPassword: "",
   });
@@ -42,24 +43,13 @@ function SignUp() {
 
     try {
       setLoading(true);
+      await authService.register(formData);
 
-      // Map formData to match backend field names
-      const userData = {
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        region: formData.region,
-        company_name: formData.companyName || null, // Optional field
-        role: formData.role,
-        password: formData.password,
-        confirmPassword: formData.confirmPassword, // Will be converted to password2 in authService
-      };
+      // Store phone for verification page
+      sessionStorage.setItem("registrationPhone", formData.phone);
 
-      await authService.register(userData);
-
-      // Redirect to verification page with email
-      navigate(`/verify?email=${encodeURIComponent(formData.email)}`);
+      // Navigate to dashboard after successful registration
+      navigate("/dashboard");
     } catch (error) {
       console.error("Registration error:", error);
       setError(error.message || "Registration failed. Please try again.");
@@ -86,27 +76,20 @@ function SignUp() {
 
         <TextInput
           label="First Name"
-          name="firstName"
-          value={formData.firstName}
+          name="first_name"
+          value={formData.first_name}
           onChange={handleChange}
           placeholder="Enter your first name"
+          required
         />
 
         <TextInput
           label="Last Name"
-          name="lastName"
-          value={formData.lastName}
+          name="last_name"
+          value={formData.last_name}
           onChange={handleChange}
           placeholder="Enter your last name"
-        />
-
-        <TextInput
-          label="Email"
-          name="email"
-          type="email"
-          value={formData.email}
-          onChange={handleChange}
-          placeholder="example@mail.com"
+          required
         />
 
         <TextInput
@@ -115,7 +98,17 @@ function SignUp() {
           type="tel"
           value={formData.phone}
           onChange={handleChange}
-          placeholder="000-0000-000"
+          placeholder="e.g., 0244123456"
+          required
+        />
+
+        <TextInput
+          label="Email (Optional)"
+          name="email"
+          type="email"
+          value={formData.email}
+          onChange={handleChange}
+          placeholder="example@mail.com"
         />
 
         <div className="mb-4">
@@ -136,25 +129,23 @@ function SignUp() {
 
         <TextInput
           label="Company Name (optional)"
-          name="companyName"
-          value={formData.companyName}
+          name="company_name"
+          value={formData.company_name}
           onChange={handleChange}
           placeholder="Prime Logistics Ltd."
         />
 
         <div className="mb-4">
-          <label className="block text-sm text-gray-700 mb-1">Role</label>
+          <label className="block text-sm text-gray-700 mb-1">User Type</label>
           <select
-            name="role"
-            value={formData.role}
+            name="user_type"
+            value={formData.user_type}
             onChange={handleChange}
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           >
-            <option value="">Select role</option>
-            <option value="Staff">Staff</option>
-            <option value="Admin">Admin</option>
-            <option value="Customer">Customer</option>
+            <option value="INDIVIDUAL">Individual</option>
+            <option value="BUSINESS">Business</option>
           </select>
         </div>
 
@@ -163,6 +154,7 @@ function SignUp() {
           name="password"
           value={formData.password}
           onChange={handleChange}
+          required
         />
 
         <PasswordInput
@@ -170,9 +162,13 @@ function SignUp() {
           name="confirmPassword"
           value={formData.confirmPassword}
           onChange={handleChange}
+          required
         />
 
-        <FormButton label={loading ? "Signing up..." : "Sign up"} disabled={loading} />
+        <FormButton
+          label={loading ? "Signing up..." : "Sign up"}
+          disabled={loading}
+        />
 
         <div className="text-sm text-center mt-4">
           Already have an account?{" "}

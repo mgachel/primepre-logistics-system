@@ -10,7 +10,7 @@ import authService from "../services/authService";
 function Login() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    email: "",
+    phone: "",
     password: "",
   });
   const [loading, setLoading] = useState(false);
@@ -30,7 +30,7 @@ function Login() {
 
     try {
       setLoading(true);
-      const response = await authService.login(formData.email, formData.password);
+      const response = await authService.login(formData.phone, formData.password);
       console.log("Login successful:", response);
       
       // Redirect to dashboard or home page after successful login
@@ -60,12 +60,12 @@ function Login() {
         )}
 
         <TextInput
-          label="Email"
-          name="email"
-          type="email"
-          value={formData.email}
+          label="Phone Number"
+          name="phone"
+          type="tel"
+          value={formData.phone}
           onChange={handleChange}
-          placeholder="example@mail.com"
+          placeholder="Enter your phone number"
           required
         />
 
