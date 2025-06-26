@@ -1,34 +1,57 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import SignUp from './pages/Signup';
+import VerificationPage from './pages/VerificationPage';
+import Login from './pages/Login';
+import authService from './services/authService';
+
+// Protected route component
+const ProtectedRoute = ({ children }) => {
+  const isAuthenticated = authService.isAuthenticated();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+  
+  return children;
+};
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <Router>
+      
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/verify" element={<VerificationPage />} />
+        <Route path="/login" element={<Login />} />
+        
+        {/* Protected routes - will redirect to login if not authenticated */}
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute>
+              <div className="p-8">
+                <h1 className="text-3xl font-bold">Dashboard</h1>
+                <p>Welcome to Primepre Logistics!</p>
+                <button 
+                  onClick={() => {
+                    authService.logout();
+                    window.location.href = '/login';
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 mt-4 rounded"
+                >
+                  Logout
+                </button>
+              </div>
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* 404 route */}
+        <Route path="*" element={<div className="p-8 text-center">Page not found</div>} />
+      </Routes>
+    </Router>
   )
 }
 
