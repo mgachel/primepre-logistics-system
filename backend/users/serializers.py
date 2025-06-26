@@ -1,79 +1,56 @@
 from rest_framework import serializers
-from django.contrib.auth import get_user_model 
-from rest_framework.validators import UniqueValidator 
-from django.core.mail import send_mail 
-from django.contrib.auth.password_validation import validate_password
-import random  
-from .utils import generate_shipping_mark
-
-User = get_user_model()
-
+from .models import CustomerUser
 
 class RegisterSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(required=True, validators=[UniqueValidator(queryset=User.objects.all())])
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
-    password2 = serializers.CharField(write_only=True, required=True)
-    
-    class Meta: 
-        model = User
-        fields = ['first_name', 'last_name', 'email', 'password', 'password2', 'role', 'phone', 'company_name', 'region']
-    
-    def validate(self, attrs):
-        if attrs['password'] != attrs['password2']:
-            raise serializers.ValidationError("Passwords do not match")
-        return attrs
-    
-    def create(self, validated_data):
-        validated_data.pop('password2')
-        shipping_mark = generate_shipping_mark(
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
-            region=validated_data['region']
-        )
-        
-        validated_data['shipping_mark'] = shipping_mark 
-        
-        user = User.objects.create_user(**validated_data)
-        user.is_active = False
-        user.verification_code = str(random.randint(100000, 999999))
-        user.save()
-        
-        send_mail(
-            subject='Primepre Account Verification',
-            message=f'Your verification code is: {user.verification_code}',
-            from_email='Primepre <no-reply@primepre.com>',
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
-        
-        return user
-    
-    
-class LoginSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(required=True) 
-    password = serializers.CharField(write_only=True, required=True)
-    
+    confirm_password = serializers.CharField(write_only=True)
+
     class Meta:
-        model = User
-        fields = ['email', 'password']
+        model = CustomerUser
+        fields = ['first_name', 'last_name', 'nickname', 'email', 'phone', 'region', 'password', 'confirm_password']
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def validate(self, data): 
+        if data['password'] != data['confirm_password']:
+            raise serializers.ValidationError("Passwords do not match.")
+        return data
     
-    def validate(self, attrs):
-        email = attrs.get('email')
-        password = attrs.get('password')
-        
-        user = User.objects.filter(email=email).first()
-        if not user:
-            raise serializers.ValidationError("No account with this email exists")
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        return value
+    
+    def validate_phone(self, value):
+        if not value.isdigit() or len(value) < 10:
+            raise serializers.ValidationError("Phone number must be at least 10 digits.")
+        return value
+    
+    def validate_email(self, value):
+        if value and '@' not in value:
+            raise serializers.ValidationError("Invalid email format.")
+        return value
 
-        if not user.is_verified:
-            raise serializers.ValidationError("Account not verified")
+    def create(self, validated_data):
+        validated_data.pop('confirm_password')
+        return CustomerUser.objects.create_user(**validated_data)
 
-        if not user.is_active:
-            raise serializers.ValidationError("Account not active")
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomerUser
+        fields = ['id', 'first_name', 'last_name', 'nickname', 'email', 'phone', 'region', 'shipping_mark']
 
-        if not user.check_password(password):
-            raise serializers.ValidationError("Incorrect password")
-        
-        return {'user': user}
+class PasswordResetSerializer(serializers.Serializer):
+    phone = serializers.CharField()
+    new_password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
 
-
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError("Passwords do not match.")
+        return data
+    
+    def validate_new_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        return value
+    
+    

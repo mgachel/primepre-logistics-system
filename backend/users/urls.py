@@ -1,15 +1,9 @@
 from django.urls import path
-from . import views
-from rest_framework.authtoken.views import obtain_auth_token
+from .views import RegisterView, LoginView, PasswordResetView, ProfileView
 
 urlpatterns = [
-    # User registration endpoint
-    path('register/', views.RegisterView.as_view(), name='register'),
-    
-    # Account verification endpoints
-    path('verify/', views.verify_account, name='verify-account'),
-    path('resend-verification/', views.resend_verification_code, name='resend-verification'),
-    
-    # Login endpoint
-    path('login/', views.LoginView.as_view(), name='login'),
+    path('register/', RegisterView.as_view(), name='register'),
+    path('login/', LoginView.as_view(), name='login'),
+    path('password-reset/', PasswordResetView.as_view(), name='password_reset'),
+    path('profile/', ProfileView.as_view(), name='profile'),
 ]
