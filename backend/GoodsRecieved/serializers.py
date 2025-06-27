@@ -15,104 +15,102 @@ MAX_QUANTITY_LIMIT = 100000
 MAX_VALUE_LIMIT = 1000000  # 1 million USD
 
 
-class GoodsReceivedChinaSerializer(serializers.ModelSerializer):
+class BaseGoodsReceivedSerializer(serializers.ModelSerializer):
+    """
+    Base serializer for GoodsReceived models with common validation logic.
+    """
+    days_in_warehouse = serializers.ReadOnlyField()
+    is_flagged = serializers.ReadOnlyField()
+    
+    class Meta:
+        abstract = True
+        read_only_fields = ['item_id', 'date_received', 'created_at', 'updated_at']
+    
+    def validate_cbm(self, value):
+        """Validate CBM is within reasonable limits"""
+        if value > MAX_CBM_LIMIT:
+            raise serializers.ValidationError(f"CBM seems too large (max {MAX_CBM_LIMIT}). Please verify.")
+        return value
+    
+    def validate_weight(self, value):
+        """Validate weight is within reasonable limits"""
+        if value and value > MAX_WEIGHT_LIMIT:
+            raise serializers.ValidationError(f"Weight seems too large (max {MAX_WEIGHT_LIMIT} kg). Please verify.")
+        return value
+    
+    def validate_quantity(self, value):
+        """Validate quantity is reasonable"""
+        if value and value <= 0:
+            raise serializers.ValidationError("Quantity must be greater than 0.")
+        if value and value > MAX_QUANTITY_LIMIT:
+            raise serializers.ValidationError(f"Quantity seems too large (max {MAX_QUANTITY_LIMIT}). Please verify.")
+        return value
+    
+    def validate_estimated_value(self, value):
+        """Validate estimated value is reasonable"""
+        if value and value > MAX_VALUE_LIMIT:
+            raise serializers.ValidationError(f"Estimated value seems too high (max ${MAX_VALUE_LIMIT:,}). Please verify.")
+        return value
+    
+    def validate(self, data):
+        """Cross-field validation"""
+        # Validate customer's shipping mark matches if provided
+        if 'customer' in data and 'shipping_mark' in data:
+            customer = data['customer']
+            shipping_mark = data['shipping_mark']
+            if customer and hasattr(customer, 'shipping_mark') and customer.shipping_mark != shipping_mark:
+                raise serializers.ValidationError({
+                    'shipping_mark': f'Shipping mark must match customer\'s shipping mark: {customer.shipping_mark}'
+                })
+        return data
+
+
+class GoodsReceivedChinaSerializer(BaseGoodsReceivedSerializer):
     """
     Serializer for GoodsReceivedChina model with validation and business logic.
     """
-    days_in_warehouse = serializers.ReadOnlyField()
     is_ready_for_shipping = serializers.ReadOnlyField()
-    is_flagged = serializers.ReadOnlyField()
     
     class Meta:
         model = GoodsReceivedChina
         fields = [
-            'id', 'item_id', 'shipping_mark', 'supply_tracking',
+            'id', 'item_id', 'customer', 'shipping_mark', 'supply_tracking',
             'cbm', 'weight', 'quantity', 'description', 'location',
-            'status', 'supplier_name', 'estimated_value', 'notes',
+            'status', 'method_of_shipping', 'supplier_name', 'estimated_value', 'notes',
             'date_received', 'created_at', 'updated_at',
             'days_in_warehouse', 'is_ready_for_shipping', 'is_flagged'
         ]
         read_only_fields = ['item_id', 'date_received', 'created_at', 'updated_at']
-    
-    def validate_cbm(self, value):
-        """Validate CBM is within reasonable limits"""
-        if value > 1000:  # 1000 cubic meters seems excessive for a single item
-            raise serializers.ValidationError("CBM seems too large. Please verify.")
-        return value
-    
-    def validate_weight(self, value):
-        """Validate weight is within reasonable limits"""
-        if value and value > 50000:  # 50 tons
-            raise serializers.ValidationError("Weight seems too large. Please verify.")
-        return value
-    
-    def validate_quantity(self, value):
-        """Validate quantity is reasonable"""
-        if value > 100000:  # 100k pieces
-            raise serializers.ValidationError("Quantity seems too large. Please verify.")
-        return value
-    
-    def validate_estimated_value(self, value):
-        """Validate estimated value is reasonable"""
-        if value and value > 1000000:  # 1 million USD
-            raise serializers.ValidationError("Estimated value seems too high. Please verify.")
-        return value
 
 
-class GoodsReceivedGhanaSerializer(serializers.ModelSerializer):
+class GoodsReceivedGhanaSerializer(BaseGoodsReceivedSerializer):
     """
     Serializer for GoodsReceivedGhana model with validation and business logic.
     """
-    days_in_warehouse = serializers.ReadOnlyField()
-    is_ready_for_shipping = serializers.ReadOnlyField()
-    is_flagged = serializers.ReadOnlyField()
+    is_ready_for_delivery = serializers.ReadOnlyField()
     
     class Meta:
         model = GoodsReceivedGhana
         fields = [
-            'id', 'item_id', 'shipping_mark', 'supply_tracking',
+            'id', 'item_id', 'customer', 'shipping_mark', 'supply_tracking',
             'cbm', 'weight', 'quantity', 'description', 'location',
-            'status', 'supplier_name', 'estimated_value', 'notes',
+            'status', 'method_of_shipping', 'supplier_name', 'estimated_value', 'notes',
             'date_received', 'created_at', 'updated_at',
-            'days_in_warehouse', 'is_ready_for_shipping', 'is_flagged'
+            'days_in_warehouse', 'is_ready_for_delivery', 'is_flagged'
         ]
         read_only_fields = ['item_id', 'date_received', 'created_at', 'updated_at']
-    
-    def validate_cbm(self, value):
-        """Validate CBM is within reasonable limits"""
-        if value > 1000:  # 1000 cubic meters seems excessive for a single item
-            raise serializers.ValidationError("CBM seems too large. Please verify.")
-        return value
-    
-    def validate_weight(self, value):
-        """Validate weight is within reasonable limits"""
-        if value and value > 50000:  # 50 tons
-            raise serializers.ValidationError("Weight seems too large. Please verify.")
-        return value
-    
-    def validate_quantity(self, value):
-        """Validate quantity is reasonable"""
-        if value > 100000:  # 100k pieces
-            raise serializers.ValidationError("Quantity seems too large. Please verify.")
-        return value
-    
-    def validate_estimated_value(self, value):
-        """Validate estimated value is reasonable"""
-        if value and value > 1000000:  # 1 million USD
-            raise serializers.ValidationError("Estimated value seems too high. Please verify.")
-        return value
 
 
 class StatusUpdateSerializer(serializers.Serializer):
     """
     Serializer for status updates with optional reason.
     """
-    status = serializers.ChoiceField(choices=GoodsReceivedChina.STATUS_CHOICES)
+    status = serializers.CharField(max_length=20)  # Will validate against model choices
     reason = serializers.CharField(max_length=500, required=False, allow_blank=True)
     
     def validate_status(self, value):
         """Validate status transition is allowed"""
-        # Add business logic for valid status transitions if needed
+        # This should be validated in the view based on the specific model
         return value
 
 
@@ -125,7 +123,7 @@ class BulkStatusUpdateSerializer(serializers.Serializer):
         min_length=1,
         max_length=100  # Limit bulk operations
     )
-    status = serializers.ChoiceField(choices=GoodsReceivedChina.STATUS_CHOICES)
+    status = serializers.CharField(max_length=20)  # Will validate against model choices
     reason = serializers.CharField(max_length=500, required=False, allow_blank=True)
 
 
@@ -135,14 +133,12 @@ class GoodsSearchSerializer(serializers.Serializer):
     """
     shipping_mark = serializers.CharField(max_length=20, required=False)
     supply_tracking = serializers.CharField(max_length=50, required=False)
-    status = serializers.ChoiceField(
-        choices=GoodsReceivedChina.STATUS_CHOICES, 
-        required=False
-    )
+    status = serializers.CharField(max_length=20, required=False)  # Generic status field
     location = serializers.CharField(max_length=20, required=False)
     date_from = serializers.DateTimeField(required=False)
     date_to = serializers.DateTimeField(required=False)
     supplier_name = serializers.CharField(max_length=100, required=False)
+    customer_id = serializers.IntegerField(required=False)  # Added customer search
 
 
 class GoodsStatsSerializer(serializers.Serializer):
@@ -185,7 +181,7 @@ class ExcelUploadSerializer(serializers.Serializer):
         
         # Define expected column mappings for China warehouse
         china_column_mapping = {
-            'SHIPPIN MARK/CLIENT': 'shipping_mark',
+            'SHIPPING MARK/CLIENT': 'shipping_mark',
             'DATE OF RECEIPT': 'date_received',  # Optional
             'DATE OF LOADING': 'date_loading',   # Optional (can be null)
             'DESCRIPTION': 'description',        # Optional
@@ -256,8 +252,8 @@ class ExcelUploadSerializer(serializers.Serializer):
                             cbm = Decimal(str(cbm_value))
                             if cbm <= 0:
                                 row_error.append(f"Row {index + 2}: CBM must be greater than 0")
-                            elif cbm > 1000:
-                                row_error.append(f"Row {index + 2}: CBM seems too large ({cbm})")
+                            elif cbm > MAX_CBM_LIMIT:
+                                row_error.append(f"Row {index + 2}: CBM seems too large ({cbm}, max {MAX_CBM_LIMIT})")
                             else:
                                 row_data['cbm'] = cbm
                     except (ValueError, InvalidOperation):
@@ -295,8 +291,8 @@ class ExcelUploadSerializer(serializers.Serializer):
                         if not pd.isna(weight_value) and weight_value != '':
                             weight = Decimal(str(weight_value))
                             if weight > 0:
-                                if weight > 50000:  # 50 tons limit
-                                    row_error.append(f"Row {index + 2}: Weight seems too large ({weight} kg)")
+                                if weight > MAX_WEIGHT_LIMIT:
+                                    row_error.append(f"Row {index + 2}: Weight seems too large ({weight} kg, max {MAX_WEIGHT_LIMIT} kg)")
                                 else:
                                     row_data['weight'] = weight
                     except (ValueError, InvalidOperation):
