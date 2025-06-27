@@ -26,11 +26,22 @@ class GoodsReceivedChina(models.Model):
         ("OTHER", "Other")
     ]
     
+    
+    
+    # Customer relationship
+    customer = models.ForeignKey(
+        'users.CustomerUser',
+        on_delete=models.CASCADE,
+        related_name='china_goods',
+        help_text="Customer who owns this shipment",
+        default=None,
+        null=True,
+    )
+    
     # Unique identifiers
     item_id = models.CharField(max_length=50, unique=True, editable=False)
     shipping_mark = models.CharField(
         max_length=20, 
-        unique=True,
         help_text="Customer's shipping mark identifier"
     )
     supply_tracking = models.CharField(
@@ -80,6 +91,16 @@ class GoodsReceivedChina(models.Model):
         db_index=True
     )
     
+    method_of_shipping = models.CharField(
+        max_length=20, 
+        choices=[
+            ("AIR", "Air"),
+            ("SEA", "Sea"),
+        ],
+        default="SEA",
+        help_text="Method of shipping for the goods"
+    )
+    
     # Timestamps
     date_received = models.DateTimeField(
         auto_now_add=True,
@@ -117,6 +138,8 @@ class GoodsReceivedChina(models.Model):
             models.Index(fields=['status', 'date_received']),
             models.Index(fields=['shipping_mark']),
             models.Index(fields=['supply_tracking']),
+            models.Index(fields=['customer', 'status']),
+            models.Index(fields=['customer', 'date_received']),
         ]
     
     def __str__(self):
@@ -132,6 +155,41 @@ class GoodsReceivedChina(models.Model):
             unique_suffix = str(uuid.uuid4())[:8].upper()
             self.item_id = f"CHN{timestamp}{unique_suffix}"
         super().save(*args, **kwargs)
+    
+    def clean(self):
+        """Validate the model"""
+        super().clean()
+        
+        # Validate that shipping_mark matches customer's shipping_mark
+        if self.customer and self.shipping_mark and self.shipping_mark != self.customer.shipping_mark:
+            from django.core.exceptions import ValidationError
+            raise ValidationError({
+                'shipping_mark': f'Shipping mark must match customer\'s shipping mark: {self.customer.shipping_mark}'
+            })
+        
+        # Validate status transitions
+        if self.pk:  # Only validate for existing records
+            try:
+                old_instance = GoodsReceivedChina.objects.get(pk=self.pk)
+                old_status = old_instance.status
+                new_status = self.status
+                
+                # Define valid transitions
+                valid_transitions = {
+                    'PENDING': ['READY_FOR_SHIPPING', 'FLAGGED', 'CANCELLED'],
+                    'READY_FOR_SHIPPING': ['SHIPPED', 'FLAGGED', 'CANCELLED'],
+                    'FLAGGED': ['PENDING', 'READY_FOR_SHIPPING', 'CANCELLED'],
+                    'SHIPPED': [],  # Final state
+                    'CANCELLED': []  # Final state
+                }
+                
+                if old_status != new_status and new_status not in valid_transitions.get(old_status, []):
+                    from django.core.exceptions import ValidationError
+                    raise ValidationError({
+                        'status': f'Invalid status transition from {old_status} to {new_status}'
+                    })
+            except GoodsReceivedChina.DoesNotExist:
+                pass
     
     @property
     def is_ready_for_shipping(self):
@@ -177,9 +235,9 @@ class GoodsReceivedGhana(models.Model):
     
     STATUS_CHOICES = [
         ("PENDING", "Pending"),
-        ("READY_FOR_SHIPPING", "Ready for Shipping"),
+        ("READY_FOR_DELIVERY", "Ready for Delivery"),
         ("FLAGGED", "Flagged"),
-        ("SHIPPED", "Shipped"),
+        ("DELIVERED", "Delivered"),
         ("CANCELLED", "Cancelled")
     ]
     
@@ -190,11 +248,20 @@ class GoodsReceivedGhana(models.Model):
         ("OTHER", "Other")
     ]
     
+    # Customer relationship
+    customer = models.ForeignKey(
+        'users.CustomerUser',
+        on_delete=models.CASCADE,
+        related_name='ghana_goods',
+        help_text="Customer who owns this shipment",
+        default=None,
+        null=True,
+    )
+    
     # Unique identifiers
     item_id = models.CharField(max_length=50, unique=True, editable=False)
     shipping_mark = models.CharField(
         max_length=20, 
-        unique=True,
         help_text="Customer's shipping mark identifier"
     )
     supply_tracking = models.CharField(
@@ -244,6 +311,16 @@ class GoodsReceivedGhana(models.Model):
         db_index=True
     )
     
+    method_of_shipping = models.CharField(
+        max_length=20, 
+        choices=[
+            ("AIR", "Air"),
+            ("SEA", "Sea"),
+        ],
+        default="SEA",
+        help_text="Method of shipping for the goods"
+    )
+    
     # Timestamps
     date_received = models.DateTimeField(
         auto_now_add=True,
@@ -281,6 +358,8 @@ class GoodsReceivedGhana(models.Model):
             models.Index(fields=['status', 'date_received']),
             models.Index(fields=['shipping_mark']),
             models.Index(fields=['supply_tracking']),
+            models.Index(fields=['customer', 'status']),
+            models.Index(fields=['customer', 'date_received']),
         ]
     
     def __str__(self):
@@ -297,10 +376,45 @@ class GoodsReceivedGhana(models.Model):
             self.item_id = f"GHA{timestamp}{unique_suffix}"
         super().save(*args, **kwargs)
     
+    def clean(self):
+        """Validate the model"""
+        super().clean()
+        
+        # Validate that shipping_mark matches customer's shipping_mark
+        if self.customer and self.shipping_mark and self.shipping_mark != self.customer.shipping_mark:
+            from django.core.exceptions import ValidationError
+            raise ValidationError({
+                'shipping_mark': f'Shipping mark must match customer\'s shipping mark: {self.customer.shipping_mark}'
+            })
+        
+        # Validate status transitions
+        if self.pk:  # Only validate for existing records
+            try:
+                old_instance = GoodsReceivedGhana.objects.get(pk=self.pk)
+                old_status = old_instance.status
+                new_status = self.status
+                
+                # Define valid transitions
+                valid_transitions = {
+                    'PENDING': ['READY_FOR_DELIVERY', 'FLAGGED', 'CANCELLED'],
+                    'READY_FOR_DELIVERY': ['DELIVERED', 'FLAGGED', 'CANCELLED'],
+                    'FLAGGED': ['PENDING', 'READY_FOR_DELIVERY', 'CANCELLED'],
+                    'DELIVERED': [],  # Final state
+                    'CANCELLED': []  # Final state
+                }
+                
+                if old_status != new_status and new_status not in valid_transitions.get(old_status, []):
+                    from django.core.exceptions import ValidationError
+                    raise ValidationError({
+                        'status': f'Invalid status transition from {old_status} to {new_status}'
+                    })
+            except GoodsReceivedGhana.DoesNotExist:
+                pass
+    
     @property
-    def is_ready_for_shipping(self):
-        """Check if goods are ready for shipping"""
-        return self.status == "READY_FOR_SHIPPING"
+    def is_ready_for_delivery(self):
+        """Check if goods are ready for delivery"""
+        return self.status == "READY_FOR_DELIVERY"
     
     @property
     def is_flagged(self):
@@ -312,9 +426,9 @@ class GoodsReceivedGhana(models.Model):
         """Calculate days since goods were received"""
         return (timezone.now() - self.date_received).days
     
-    def mark_ready_for_shipping(self):
+    def mark_ready_for_delivery(self):
         """Mark goods as ready for shipping"""
-        self.status = "READY_FOR_SHIPPING"
+        self.status = "READY_FOR_DELIVERY"
         self.save(update_fields=['status', 'updated_at'])
     
     def flag_goods(self, reason=None):
@@ -325,9 +439,9 @@ class GoodsReceivedGhana(models.Model):
             self.notes = f"{current_notes}\nFlagged: {reason}".strip()
         self.save(update_fields=['status', 'notes', 'updated_at'])
     
-    def mark_shipped(self):
-        """Mark goods as shipped"""
-        self.status = "SHIPPED"
+    def mark_delivered(self):
+        """Mark goods as delivered"""
+        self.status = "DELIVERED"
         self.save(update_fields=['status', 'updated_at'])
 
 
