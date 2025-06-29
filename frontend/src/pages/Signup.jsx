@@ -23,6 +23,52 @@ function SignUp() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [passwordStrength, setPasswordStrength] = useState({
+    length: false,
+    uppercase: false,
+    lowercase: false,
+    number: false,
+    common: true
+  });
+
+  // Common weak passwords list
+  const commonPasswords = [
+    'password', 'password123', '123456', '123456789', 'qwerty', 'abc123',
+    'admin', 'admin123', 'test', 'test123', 'user', 'user123', 'welcome',
+    'welcome123', 'login', 'login123', 'pass', 'pass123', '111111', '000000'
+  ];
+
+  const validatePassword = (password) => {
+    const strength = {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /\d/.test(password),
+      common: !commonPasswords.includes(password.toLowerCase())
+    };
+    setPasswordStrength(strength);
+    return strength;
+  };
+
+  const getPasswordErrors = (password) => {
+    const errors = [];
+    if (password.length > 0 && password.length < 8) {
+      errors.push("Password must be at least 8 characters long");
+    }
+    if (password.length > 0 && !/[A-Z]/.test(password)) {
+      errors.push("Password must contain at least one uppercase letter");
+    }
+    if (password.length > 0 && !/[a-z]/.test(password)) {
+      errors.push("Password must contain at least one lowercase letter");
+    }
+    if (password.length > 0 && !/\d/.test(password)) {
+      errors.push("Password must contain at least one number");
+    }
+    if (password.length > 0 && commonPasswords.includes(password.toLowerCase())) {
+      errors.push("This password is too common. Please choose a more secure password");
+    }
+    return errors;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -30,11 +76,29 @@ function SignUp() {
       ...formData,
       [name]: value,
     });
+
+    // Real-time password validation
+    if (name === 'password') {
+      validatePassword(value);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+
+    // Validate required fields
+    if (!formData.first_name || !formData.last_name || !formData.phone || !formData.region || !formData.password) {
+      setError("Please fill in all required fields");
+      return;
+    }
+
+    // Password validation with specific error messages
+    const passwordErrors = getPasswordErrors(formData.password);
+    if (passwordErrors.length > 0) {
+      setError(passwordErrors[0]); // Show the first error
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
@@ -43,6 +107,7 @@ function SignUp() {
 
     try {
       setLoading(true);
+      console.log('Form data being submitted:', formData);
       await authService.register(formData);
 
       // Store phone for verification page
@@ -157,6 +222,69 @@ function SignUp() {
           required
         />
 
+        <div className="mb-4 text-sm">
+          <p className="font-medium mb-2 text-gray-700">Password requirements:</p>
+          <ul className="space-y-1">
+            <li className={`flex items-center ${passwordStrength.length ? 'text-green-600' : 'text-red-500'}`}>
+              <span className="mr-2">{passwordStrength.length ? '✓' : '✗'}</span>
+              At least 8 characters long
+            </li>
+            <li className={`flex items-center ${passwordStrength.uppercase ? 'text-green-600' : 'text-red-500'}`}>
+              <span className="mr-2">{passwordStrength.uppercase ? '✓' : '✗'}</span>
+              At least one uppercase letter (A-Z)
+            </li>
+            <li className={`flex items-center ${passwordStrength.lowercase ? 'text-green-600' : 'text-red-500'}`}>
+              <span className="mr-2">{passwordStrength.lowercase ? '✓' : '✗'}</span>
+              At least one lowercase letter (a-z)
+            </li>
+            <li className={`flex items-center ${passwordStrength.number ? 'text-green-600' : 'text-red-500'}`}>
+              <span className="mr-2">{passwordStrength.number ? '✓' : '✗'}</span>
+              At least one number (0-9)
+            </li>
+            <li className={`flex items-center ${passwordStrength.common ? 'text-green-600' : 'text-red-500'}`}>
+              <span className="mr-2">{passwordStrength.common ? '✓' : '✗'}</span>
+              Not a common password
+            </li>
+          </ul>
+          
+          {formData.password && (
+            <div className="mt-2">
+              <div className="text-xs text-gray-500 mb-1">Password strength:</div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    Object.values(passwordStrength).filter(Boolean).length === 5 
+                      ? 'bg-green-500 w-full' 
+                      : Object.values(passwordStrength).filter(Boolean).length >= 3
+                      ? 'bg-yellow-500 w-3/5'
+                      : 'bg-red-500 w-2/5'
+                  }`}
+                ></div>
+              </div>
+              <div className="text-xs mt-1">
+                {Object.values(passwordStrength).filter(Boolean).length === 5 && (
+                  <span className="text-green-600 font-medium">Strong password!</span>
+                )}
+                {Object.values(passwordStrength).filter(Boolean).length >= 3 && Object.values(passwordStrength).filter(Boolean).length < 5 && (
+                  <span className="text-yellow-600">Moderate strength</span>
+                )}
+                {Object.values(passwordStrength).filter(Boolean).length < 3 && formData.password && (
+                  <span className="text-red-600">Weak password</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-xs font-medium text-blue-800 mb-1">💡 Password Tips:</p>
+          <ul className="text-xs text-blue-700 space-y-1">
+            <li>• Use a mix of personal words + numbers (e.g., "MyDog2025!")</li>
+            <li>• Replace letters with numbers (e.g., "H0us3Number123")</li>
+            <li>• Combine unrelated words (e.g., "Coffee7Table")</li>
+          </ul>
+        </div>
+
         <PasswordInput
           label="Confirm password"
           name="confirmPassword"
@@ -165,9 +293,25 @@ function SignUp() {
           required
         />
 
+        {formData.confirmPassword && (
+          <div className="mb-4 text-sm">
+            {formData.password === formData.confirmPassword ? (
+              <div className="flex items-center text-green-600">
+                <span className="mr-2">✓</span>
+                Passwords match
+              </div>
+            ) : (
+              <div className="flex items-center text-red-500">
+                <span className="mr-2">✗</span>
+                Passwords do not match
+              </div>
+            )}
+          </div>
+        )}
+
         <FormButton
           label={loading ? "Signing up..." : "Sign up"}
-          disabled={loading}
+          disabled={loading || !Object.values(passwordStrength).every(Boolean) || formData.password !== formData.confirmPassword}
         />
 
         <div className="text-sm text-center mt-4">
