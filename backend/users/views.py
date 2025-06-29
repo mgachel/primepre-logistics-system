@@ -7,13 +7,16 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.db.models import Q, Count
 from django.utils import timezone
+from django.core.mail import send_mail
+from django.conf import settings
 from datetime import timedelta
 from .serializers import (
-    RegisterSerializer, UserSerializer, PasswordResetSerializer,
+    RegisterSerializer, UserSerializer, PasswordResetRequestSerializer,
+    PasswordResetCodeVerifySerializer, PasswordResetConfirmSerializer,
     AdminUserCreateSerializer, AdminUserUpdateSerializer, 
-    UserStatsSerializer, PasswordChangeSerializer
+    UserStatsSerializer, PasswordResetSerializer, PasswordChangeSerializer
 )
-from .models import CustomerUser
+from .models import CustomerUser, PasswordResetToken
 from .permissions import IsAdminUser, IsSuperAdminUser, CanManageUsers
 import logging
 
@@ -267,36 +270,196 @@ class PasswordChangeView(APIView):
             user.set_password(serializer.validated_data['new_password'])
             user.save()
             
-            logger.info(f"Password changed for user {user.phone}")
+            # Refresh user instance to invalidate sessions
+            user.refresh_from_db()
             
-            return Response({'message': 'Password changed successfully'})
+            logger.info(f"Password changed for user {user.phone or user.email}")
+            
+            return Response({
+                'message': 'Password changed successfully',
+                'note': 'Please log in again with your new password'
+            })
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class PasswordResetView(APIView):
+class PasswordResetRequestView(APIView):
+    """Request password reset - sends 6-digit code to email"""
     permission_classes = [AllowAny]
     
     def post(self, request):
-        serializer = PasswordResetSerializer(data=request.data)
+        serializer = PasswordResetRequestSerializer(data=request.data)
         if serializer.is_valid():
-            phone = serializer.validated_data['phone']
+            email = serializer.validated_data['email']
+            
+            try:
+                user = CustomerUser.objects.get(email=email)
+                if not user.is_active:
+                    return Response(
+                        {'detail': 'Account is inactive'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Create reset token
+                reset_token = PasswordResetToken.create_for_user(user)
+                
+                # Send email
+                self.send_reset_email(user, reset_token.token)
+                
+                logger.info(f"Password reset code sent to {email}")
+                return Response({
+                    'message': 'If this email exists, a verification code has been sent.',
+                    'detail': 'Please check your email for the 6-digit verification code.'
+                })
+                
+            except CustomerUser.DoesNotExist:
+                # Don't reveal if email exists - always return success
+                logger.warning(f"Password reset attempted for non-existent email: {email}")
+                return Response({
+                    'message': 'If this email exists, a verification code has been sent.',
+                    'detail': 'Please check your email for the 6-digit verification code.'
+                })
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def send_reset_email(self, user, code):
+        """Send password reset email with 6-digit code"""
+        subject = 'Primepre Password Reset - Verification Code'
+        message = f"""
+Hello {user.get_full_name()},
+
+You requested a password reset for your Primepre account.
+
+Your verification code is: {code}
+
+This code will expire in 15 minutes.
+
+If you didn't request this password reset, please ignore this email.
+
+Best regards,
+Primepre Team
+        """
+        
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send reset email to {user.email}: {str(e)}")
+            raise
+
+
+class PasswordResetVerifyView(APIView):
+    """Verify the 6-digit code"""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        serializer = PasswordResetCodeVerifySerializer(data=request.data)
+        if serializer.is_valid():
+            return Response({
+                'message': 'Verification code is valid. You can now reset your password.',
+                'valid': True
+            })
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetConfirmView(APIView):
+    """Confirm password reset with code and new password"""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            code = serializer.validated_data['code']
             new_password = serializer.validated_data['new_password']
             
             try:
-                user = CustomerUser.objects.get(phone=phone)
+                user = CustomerUser.objects.get(email=email)
+                reset_token = PasswordResetToken.objects.filter(
+                    user=user,
+                    token=code,
+                    is_used=False
+                ).first()
+                
+                if not reset_token or not reset_token.is_valid():
+                    return Response(
+                        {'detail': 'Invalid or expired verification code.'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Reset password
                 user.set_password(new_password)
                 user.save()
                 
-                logger.info(f"Password reset for user {phone}")
-                return Response({'message': 'Password reset successfully'})
+                # Mark token as used
+                reset_token.mark_used()
+                
+                # Send confirmation email
+                self.send_confirmation_email(user)
+                
+                logger.info(f"Password reset successful for user {email}")
+                return Response({
+                    'message': 'Password has been reset successfully. You can now login with your new password.'
+                })
+                
             except CustomerUser.DoesNotExist:
                 return Response(
-                    {'detail': 'User not found'}, 
-                    status=status.HTTP_404_NOT_FOUND
+                    {'detail': 'Invalid email address.'}, 
+                    status=status.HTTP_400_BAD_REQUEST
                 )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def send_confirmation_email(self, user):
+        """Send password reset confirmation email"""
+        subject = 'Primepre Password Reset - Successful'
+        message = f"""
+Hello {user.get_full_name()},
+
+Your password has been successfully reset for your Primepre account.
+
+If you didn't make this change, please contact our support team immediately.
+
+Best regards,
+Primepre Team
+        """
+        
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=True,  # Don't fail if confirmation email fails
+            )
+        except Exception as e:
+            logger.error(f"Failed to send confirmation email to {user.email}: {str(e)}")
+
+
+# DEPRECATED - Keep for backward compatibility but mark as insecure
+class PasswordResetView(APIView):
+    """DEPRECATED: This method is insecure. Use PasswordResetRequestView instead."""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        return Response(
+            {
+                'error': 'This endpoint is deprecated for security reasons.',
+                'message': 'Please use the new secure password reset flow.',
+                'endpoints': {
+                    'request_reset': '/api/auth/password-reset/request/',
+                    'verify_code': '/api/auth/password-reset/verify/',
+                    'confirm_reset': '/api/auth/password-reset/confirm/'
+                }
+            },
+            status=status.HTTP_410_GONE
+        )
 
 
 class ProfileView(APIView):
@@ -332,22 +495,3 @@ class ProfileView(APIView):
             return Response(serializer.data)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def post(self, request):
-        serializer = PasswordResetSerializer(data=request.data)
-        if serializer.is_valid():
-            phone = serializer.validated_data['phone']
-            try:
-                user = CustomerUser.objects.get(phone=phone)
-                user.set_password(serializer.validated_data['new_password'])
-                user.save()
-                return Response({"detail": "Password reset successful"})
-            except CustomerUser.DoesNotExist:
-                return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class ProfileView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        return Response(UserSerializer(request.user).data)

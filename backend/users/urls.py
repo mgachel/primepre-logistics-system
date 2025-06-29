@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     RegisterView, LoginView, PasswordResetView, ProfileView,
+    PasswordResetRequestView, PasswordResetVerifyView, PasswordResetConfirmView,
     UserViewSet, PasswordChangeView
 )
 
@@ -13,7 +14,16 @@ urlpatterns = [
     # Authentication endpoints
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
-    path('password-reset/', PasswordResetView.as_view(), name='password_reset'),
+    
+    # Secure Password Reset Flow
+    path('password-reset/request/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('password-reset/verify/', PasswordResetVerifyView.as_view(), name='password_reset_verify'),
+    path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    
+    # Deprecated endpoint (kept for backward compatibility)
+    path('password-reset/', PasswordResetView.as_view(), name='password_reset_deprecated'),
+    
+    # Password change for authenticated users
     path('password-change/', PasswordChangeView.as_view(), name='password_change'),
     
     # Profile endpoints
