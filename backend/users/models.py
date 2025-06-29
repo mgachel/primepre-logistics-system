@@ -2,7 +2,10 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+from datetime import timedelta
 import random
+import secrets
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, phone, password=None, **extra_fields):
@@ -246,3 +249,52 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
                 raise ValidationError({
                     'accessible_warehouses': f'Invalid warehouses: {invalid_warehouses}. Valid options: {valid_warehouses}'
                 })
+
+
+class PasswordResetToken(models.Model):
+    """Model to handle secure password reset tokens"""
+    user = models.ForeignKey(CustomerUser, on_delete=models.CASCADE)
+    token = models.CharField(max_length=6)  # 6-digit code
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    
+    class Meta:
+        verbose_name = "Password Reset Token"
+        verbose_name_plural = "Password Reset Tokens"
+        ordering = ['-created_at']
+        unique_together = ['user', 'token']  # Prevent duplicate codes for same user
+    
+    def save(self, *args, **kwargs):
+        if not self.token:
+            # Generate 6-digit code
+            self.token = str(random.randint(100000, 999999))
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(minutes=15)  # 15 minutes expiry
+        super().save(*args, **kwargs)
+    
+    def is_valid(self):
+        """Check if token is still valid"""
+        return not self.is_used and timezone.now() <= self.expires_at
+    
+    def mark_used(self):
+        """Mark token as used"""
+        self.is_used = True
+        self.save(update_fields=['is_used'])
+    
+    @classmethod
+    def cleanup_expired(cls):
+        """Remove expired tokens"""
+        expired_tokens = cls.objects.filter(expires_at__lt=timezone.now())
+        count = expired_tokens.count()
+        expired_tokens.delete()
+        return count
+    
+    @classmethod
+    def create_for_user(cls, user):
+        """Create a new reset token for user (invalidate existing ones)"""
+        # Remove existing unused tokens for this user
+        cls.objects.filter(user=user, is_used=False).delete()
+        
+        # Create new token
+        return cls.objects.create(user=user)

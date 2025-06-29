@@ -136,11 +136,61 @@ class UserStatsSerializer(serializers.Serializer):
     recent_registrations = serializers.IntegerField()
 
 
-class PasswordResetSerializer(serializers.Serializer):
-    phone = serializers.CharField()
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Serializer for requesting password reset via email"""
+    email = serializers.EmailField()
+    
+    def validate_email(self, value):
+        """Verify that user exists with this email"""
+        try:
+            from .models import CustomerUser
+            user = CustomerUser.objects.get(email=value)
+            if not user.is_active:
+                raise serializers.ValidationError("This account is inactive.")
+            return value
+        except CustomerUser.DoesNotExist:
+            # Don't reveal if email exists for security
+            # But we'll still validate the format
+            return value
+
+
+class PasswordResetCodeVerifySerializer(serializers.Serializer):
+    """Serializer for verifying 6-digit reset code"""
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6, min_length=6)
+    
+    def validate_code(self, value):
+        """Validate that code is 6 digits"""
+        if not value.isdigit():
+            raise serializers.ValidationError("Code must be 6 digits.")
+        return value
+    
+    def validate(self, data):
+        """Validate the reset code"""
+        try:
+            from .models import PasswordResetToken, CustomerUser
+            user = CustomerUser.objects.get(email=data['email'])
+            reset_token = PasswordResetToken.objects.filter(
+                user=user, 
+                token=data['code'],
+                is_used=False
+            ).first()
+            
+            if not reset_token or not reset_token.is_valid():
+                raise serializers.ValidationError("Invalid or expired verification code.")
+            
+            return data
+        except CustomerUser.DoesNotExist:
+            raise serializers.ValidationError("Invalid email address.")
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """Serializer for confirming password reset with verified code"""
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6, min_length=6)
     new_password = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
-
+    
     def validate(self, data):
         if data['new_password'] != data['confirm_password']:
             raise serializers.ValidationError("Passwords do not match.")
@@ -148,6 +198,14 @@ class PasswordResetSerializer(serializers.Serializer):
     
     def validate_new_password(self, value):
         validate_password(value)
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        return value
+    
+    def validate_code(self, value):
+        """Validate that code is 6 digits"""
+        if not value.isdigit():
+            raise serializers.ValidationError("Code must be 6 digits.")
         return value
 
 
@@ -170,11 +228,23 @@ class PasswordChangeSerializer(serializers.Serializer):
     
     def validate_new_password(self, value):
         validate_password(value)
-        return value
-    
-    def validate_new_password(self, value):
         if len(value) < 8:
             raise serializers.ValidationError("Password must be at least 8 characters long.")
         return value
+
+
+class PasswordResetSerializer(serializers.Serializer):
+    """DEPRECATED: Use PasswordResetRequestSerializer and PasswordResetConfirmSerializer instead"""
+    phone = serializers.CharField()
+    new_password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError("Passwords do not match.")
+        return data
     
-    
+    def validate_new_password(self, value):
+        validate_password(value)
+        return value
+
