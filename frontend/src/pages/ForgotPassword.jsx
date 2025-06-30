@@ -24,6 +24,7 @@ function ForgotPassword() {
 
     try {
       setLoading(true);
+      console.log("Sending password reset request to backend...");
       const response = await authService.requestPasswordReset(email);
       console.log("Password reset request successful:", response);
       setSuccess(true);
@@ -32,7 +33,14 @@ function ForgotPassword() {
       navigate("/verify-reset-code", { state: { email } });
     } catch (error) {
       console.error("Password reset request error:", error);
-      setError(error.message || "Failed to send reset code. Please try again.");
+      
+      // Check if the error response contains the deprecated endpoint message
+      if (error.message && error.message.includes('deprecated')) {
+        setError("The system is using an outdated API endpoint. Please contact support.");
+      } else {
+        // Show user-friendly message but log detailed error
+        setError(error.message || "Failed to send reset code. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
