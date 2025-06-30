@@ -89,7 +89,7 @@ export const authService = {
   // Request password reset
   requestPasswordReset: async (email) => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/password-reset/`, {
+      const response = await fetch(`${API_URL}/api/auth/password-reset/request/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -143,7 +143,8 @@ export const authService = {
         body: JSON.stringify({ 
           email, 
           code, 
-          new_password: newPassword 
+          new_password: newPassword,
+          confirm_password: newPassword // Adding confirm_password field required by backend
         }),
       });
 
