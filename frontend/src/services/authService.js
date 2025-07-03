@@ -84,6 +84,80 @@ export const authService = {
   // Get auth token
   getToken: () => {
     return localStorage.getItem('accessToken');
+  },
+
+  // Request password reset
+  requestPasswordReset: async (email) => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/password-reset/request/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || errorData.email || 'Password reset request failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Password reset request error:', error);
+      throw error;
+    }
+  },
+
+  // Verify password reset code
+  verifyResetCode: async (email, code) => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/password-reset/verify/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, code }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || errorData.code || 'Code verification failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Code verification error:', error);
+      throw error;
+    }
+  },
+
+  // Confirm password reset with new password
+  confirmPasswordReset: async (email, code, newPassword) => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/password-reset/confirm/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email, 
+          code, 
+          new_password: newPassword,
+          confirm_password: newPassword // Adding confirm_password field required by backend
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || errorData.new_password || 'Password reset failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Password reset confirmation error:', error);
+      throw error;
+    }
   }
 };
 
