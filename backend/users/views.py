@@ -270,9 +270,6 @@ class PasswordChangeView(APIView):
             user.set_password(serializer.validated_data['new_password'])
             user.save()
             
-            # Refresh user instance to invalidate sessions
-            user.refresh_from_db()
-            
             logger.info(f"Password changed for user {user.phone or user.email}")
             
             return Response({
