@@ -16,9 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from .admin import admin_site
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('admin/', admin_site.urls),  # Use our custom admin
+    path('django-admin/', admin.site.urls),  # Keep default admin as backup
     path('api/auth/', include('users.urls')),
     path('api/cargo/', include('cargo.urls')),
     path('', include('GoodsRecieved.urls')),
