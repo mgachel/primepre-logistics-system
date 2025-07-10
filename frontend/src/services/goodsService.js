@@ -157,15 +157,17 @@ class GoodsService {
   }
 
   async createGhanaGoods(goodsData) {
-    const response = await fetch(`${API_BASE_URL}/api/goods/ghana/`, {
+    console.log('Sending Ghana goods data:', goodsData); // Debug log
+    
+    const response = await this.authenticatedFetch(`${API_BASE_URL}/api/goods/ghana/`, {
       method: 'POST',
-      headers: await this.getAuthHeaders(),
       body: JSON.stringify(goodsData)
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || `Failed to create Ghana goods: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Ghana goods creation error:', errorData); // Debug log
+      throw new Error(errorData.detail || errorData.message || JSON.stringify(errorData) || `Failed to create Ghana goods: ${response.statusText}`);
     }
     
     return response.json();
