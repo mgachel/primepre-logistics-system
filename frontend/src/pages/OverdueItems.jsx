@@ -25,10 +25,19 @@ const OverdueItems = () => {
         goodsService.getGhanaOverdueItems(overdueThreshold)
       ]);
       
-      setChinaGoods(chinaData.items || chinaData.results || chinaData);
-      setGhanaGoods(ghanaData.items || ghanaData.results || ghanaData);
+      // Ensure we always set arrays, handle different response formats
+      const chinaItems = Array.isArray(chinaData) ? chinaData : 
+                        (chinaData.items || chinaData.results || []);
+      const ghanaItems = Array.isArray(ghanaData) ? ghanaData : 
+                        (ghanaData.items || ghanaData.results || []);
+      
+      setChinaGoods(chinaItems);
+      setGhanaGoods(ghanaItems);
     } catch (err) {
       setError(err.message);
+      // Set empty arrays on error to prevent map errors
+      setChinaGoods([]);
+      setGhanaGoods([]);
     } finally {
       setLoading(false);
     }
@@ -65,6 +74,11 @@ const OverdueItems = () => {
   };
 
   const filteredGoods = (goods) => {
+    // Ensure goods is always an array
+    if (!Array.isArray(goods)) {
+      return [];
+    }
+    
     if (!filters.search && !filters.location && !filters.supplier_name) {
       return goods;
     }
@@ -283,7 +297,7 @@ const OverdueItems = () => {
 
             {/* Enhanced Table with Overdue Information */}
             <div className="space-y-4">
-              {currentGoods.map((item) => {
+              {Array.isArray(currentGoods) && currentGoods.map((item) => {
                 const daysOverdue = getDaysOverdue(item.date_received);
                 const severityClass = getSeverityColor(daysOverdue);
                 
@@ -345,7 +359,7 @@ const OverdueItems = () => {
             </div>
 
             {/* Empty State */}
-            {!loading && currentGoods.length === 0 && !error && (
+            {!loading && Array.isArray(currentGoods) && currentGoods.length === 0 && !error && (
               <div className="text-center py-12">
                 <Clock className="mx-auto h-12 w-12 text-green-400" />
                 <h3 className="mt-2 text-sm font-medium text-gray-900">
