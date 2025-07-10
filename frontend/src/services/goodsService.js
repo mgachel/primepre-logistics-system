@@ -1,21 +1,19 @@
-import authService from './authService';
+import { authenticatedFetch, getAuthHeaders, getAuthHeadersForFile } from '../utils/authUtils';
 
 const API_BASE_URL = 'http://localhost:8000';
 
 class GoodsService {
   async getAuthHeaders() {
-    const token = authService.getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
+    return getAuthHeaders();
   }
 
   async getAuthHeadersForFile() {
-    const token = authService.getToken();
-    return {
-      'Authorization': `Bearer ${token}`
-    };
+    return getAuthHeadersForFile();
+  }
+
+  // Helper method for authenticated requests
+  async authenticatedFetch(url, options = {}) {
+    return authenticatedFetch(url, options);
   }
 
   // China Warehouse Methods
@@ -23,9 +21,7 @@ class GoodsService {
     const queryString = new URLSearchParams(params).toString();
     const url = `${API_BASE_URL}/api/goods/china/${queryString ? `?${queryString}` : ''}`;
     
-    const response = await fetch(url, {
-      headers: await this.getAuthHeaders()
-    });
+    const response = await this.authenticatedFetch(url);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch China goods: ${response.statusText}`);
@@ -35,9 +31,8 @@ class GoodsService {
   }
 
   async createChinaGoods(goodsData) {
-    const response = await fetch(`${API_BASE_URL}/api/goods/china/`, {
+    const response = await this.authenticatedFetch(`${API_BASE_URL}/api/goods/china/`, {
       method: 'POST',
-      headers: await this.getAuthHeaders(),
       body: JSON.stringify(goodsData)
     });
     
@@ -106,9 +101,7 @@ class GoodsService {
   }
 
   async getChinaStatistics() {
-    const response = await fetch(`${API_BASE_URL}/api/goods/china/statistics/`, {
-      headers: await this.getAuthHeaders()
-    });
+    const response = await this.authenticatedFetch(`${API_BASE_URL}/api/goods/china/statistics/`);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch China statistics: ${response.statusText}`);
@@ -118,9 +111,7 @@ class GoodsService {
   }
 
   async getChinaFlaggedItems() {
-    const response = await fetch(`${API_BASE_URL}/api/goods/china/flagged_items/`, {
-      headers: await this.getAuthHeaders()
-    });
+    const response = await this.authenticatedFetch(`${API_BASE_URL}/api/goods/china/flagged_items/`);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch flagged items: ${response.statusText}`);
@@ -130,9 +121,7 @@ class GoodsService {
   }
 
   async getChinaReadyForShipping() {
-    const response = await fetch(`${API_BASE_URL}/api/goods/china/ready_for_shipping/`, {
-      headers: await this.getAuthHeaders()
-    });
+    const response = await this.authenticatedFetch(`${API_BASE_URL}/api/goods/china/ready_for_shipping/`);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch ready for shipping items: ${response.statusText}`);
@@ -142,9 +131,7 @@ class GoodsService {
   }
 
   async getChinaOverdueItems(days = 30) {
-    const response = await fetch(`${API_BASE_URL}/api/goods/china/overdue_items/?days=${days}`, {
-      headers: await this.getAuthHeaders()
-    });
+    const response = await this.authenticatedFetch(`${API_BASE_URL}/api/goods/china/overdue_items/?days=${days}`);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch overdue items: ${response.statusText}`);
@@ -241,9 +228,7 @@ class GoodsService {
   }
 
   async getGhanaStatistics() {
-    const response = await fetch(`${API_BASE_URL}/api/goods/ghana/statistics/`, {
-      headers: await this.getAuthHeaders()
-    });
+    const response = await this.authenticatedFetch(`${API_BASE_URL}/api/goods/ghana/statistics/`);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch Ghana statistics: ${response.statusText}`);
@@ -253,9 +238,7 @@ class GoodsService {
   }
 
   async getGhanaFlaggedItems() {
-    const response = await fetch(`${API_BASE_URL}/api/goods/ghana/flagged_items/`, {
-      headers: await this.getAuthHeaders()
-    });
+    const response = await this.authenticatedFetch(`${API_BASE_URL}/api/goods/ghana/flagged_items/`);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch flagged items: ${response.statusText}`);
