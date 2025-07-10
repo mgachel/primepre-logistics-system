@@ -5,54 +5,54 @@ const StatusBadge = ({ status, size = 'md', showIcon = true }) => {
   const getStatusConfig = (status) => {
     const configs = {
       'PENDING': {
-        color: 'bg-yellow-100 text-yellow-800',
+        color: 'bg-amber-50 text-amber-700 border-amber-200',
         icon: Clock,
         label: 'Pending'
       },
       'PROCESSING': {
-        color: 'bg-blue-100 text-blue-800',
+        color: 'bg-blue-50 text-blue-700 border-blue-200',
         icon: Package,
         label: 'Processing'
       },
       'READY': {
-        color: 'bg-green-100 text-green-800',
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         icon: CheckCircle,
         label: 'Ready'
       },
       'READY_FOR_SHIPPING': {
-        color: 'bg-green-100 text-green-800',
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         icon: CheckCircle,
         label: 'Ready for Shipping'
       },
       'READY_FOR_DELIVERY': {
-        color: 'bg-green-100 text-green-800',
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         icon: CheckCircle,
         label: 'Ready for Delivery'
       },
       'SHIPPED': {
-        color: 'bg-blue-100 text-blue-800',
+        color: 'bg-blue-50 text-blue-700 border-blue-200',
         icon: Truck,
         label: 'Shipped'
       },
       'DELIVERED': {
-        color: 'bg-blue-100 text-blue-800',
+        color: 'bg-green-50 text-green-700 border-green-200',
         icon: Truck,
         label: 'Delivered'
       },
       'FLAGGED': {
-        color: 'bg-red-100 text-red-800',
+        color: 'bg-red-50 text-red-700 border-red-200',
         icon: AlertTriangle,
         label: 'Flagged'
       },
       'CANCELLED': {
-        color: 'bg-gray-100 text-gray-800',
+        color: 'bg-gray-50 text-gray-700 border-gray-200',
         icon: XCircle,
         label: 'Cancelled'
       }
     };
     
     return configs[status] || {
-      color: 'bg-gray-100 text-gray-800',
+      color: 'bg-gray-50 text-gray-700 border-gray-200',
       icon: Package,
       label: status
     };
@@ -62,21 +62,21 @@ const StatusBadge = ({ status, size = 'md', showIcon = true }) => {
   const Icon = config.icon;
   
   const sizeClasses = {
-    'sm': 'px-2 py-1 text-xs',
-    'md': 'px-2.5 py-1.5 text-sm',
-    'lg': 'px-3 py-2 text-base'
+    'sm': 'px-2 py-0.5 text-xs',
+    'md': 'px-2.5 py-1 text-xs',
+    'lg': 'px-3 py-1.5 text-sm'
   };
 
   const iconSizes = {
     'sm': 'h-3 w-3',
-    'md': 'h-4 w-4',
-    'lg': 'h-5 w-5'
+    'md': 'h-3.5 w-3.5',
+    'lg': 'h-4 w-4'
   };
 
   return (
-    <span className={`inline-flex items-center font-medium rounded-full ${config.color} ${sizeClasses[size]}`}>
+    <span className={`inline-flex items-center font-medium rounded-full border ${config.color} ${sizeClasses[size]} shadow-sm`}>
       {showIcon && (
-        <Icon className={`${iconSizes[size]} mr-1.5`} />
+        <Icon className={`${iconSizes[size]} mr-1`} strokeWidth={2} />
       )}
       {config.label}
     </span>
