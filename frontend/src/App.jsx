@@ -10,11 +10,15 @@ import GhanaWarehouse from './pages/GhanaWarehouse';
 import ReadyForShipping from './pages/ReadyForShipping';
 import FlaggedItems from './pages/FlaggedItems';
 import OverdueItems from './pages/OverdueItems';
-import authService from './services/authService';
+import { useAuth } from './hooks/useAuth';
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
-  const isAuthenticated = authService.isAuthenticated();
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
   
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
