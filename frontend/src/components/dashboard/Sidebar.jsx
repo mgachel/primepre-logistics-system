@@ -1,12 +1,14 @@
 import SidebarItem from "./SidebarItem";
 import { FaTachometerAlt, FaBox, FaTruck, FaCalculator, FaMapMarkerAlt, FaStore, FaFileAlt, FaCog } from "react-icons/fa";
+import LogoHeader from "../LogoHeader";
 
 function Sidebar() {
   return (
     <div className="w-64 h-screen bg-blue-600 text-white fixed top-0 left-0 flex flex-col items-center py-6">
-      <div className="mb-8">
-        {/* Replace with your logo image */}
-        <div className="w-12 h-12 bg-white rounded-full mb-2"></div>
+      <div className="mb-8 px-4 w-full">
+        <div className="scale-90 transform text-center">
+          <LogoHeader />
+        </div>
       </div>
 
       <SidebarItem icon={<FaTachometerAlt />} label="Dashboard" active />
