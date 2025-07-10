@@ -21,7 +21,7 @@ const ChinaWarehouse = () => {
       setError(null);
       
       const response = await goodsService.getChinaGoods(filters);
-      setGoods(response.results || response);
+      setGoods(response.items || response.results || response);
     } catch (err) {
       setError(err.message);
     } finally {

@@ -292,6 +292,7 @@ class GoodsService {
   async uploadChinaExcel(file) {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('warehouse', 'china');
     
     const response = await fetch(`${API_BASE_URL}/api/goods/china/upload_excel/`, {
       method: 'POST',
@@ -310,6 +311,7 @@ class GoodsService {
   async uploadGhanaExcel(file) {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('warehouse', 'ghana');
     
     const response = await fetch(`${API_BASE_URL}/api/goods/ghana/upload_excel/`, {
       method: 'POST',

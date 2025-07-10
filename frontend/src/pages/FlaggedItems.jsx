@@ -23,8 +23,8 @@ const FlaggedItems = () => {
         goodsService.getGhanaFlaggedItems()
       ]);
       
-      setChinaGoods(chinaData.results || chinaData);
-      setGhanaGoods(ghanaData.results || ghanaData);
+      setChinaGoods(chinaData.items || chinaData.results || chinaData);
+      setGhanaGoods(ghanaData.items || ghanaData.results || ghanaData);
     } catch (err) {
       setError(err.message);
     } finally {
