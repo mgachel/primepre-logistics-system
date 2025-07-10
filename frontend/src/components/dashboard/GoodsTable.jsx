@@ -37,6 +37,8 @@ const GoodsTable = ({
   };
 
   const handleSelectAll = () => {
+    if (!Array.isArray(goods)) return;
+    
     if (selectedItems.size === goods.length) {
       setSelectedItems(new Set());
     } else {
@@ -72,7 +74,7 @@ const GoodsTable = ({
   };
 
   const sortedGoods = React.useMemo(() => {
-    if (!sortConfig.key) return goods;
+    if (!Array.isArray(goods) || !sortConfig.key) return Array.isArray(goods) ? goods : [];
 
     return [...goods].sort((a, b) => {
       const aValue = a[sortConfig.key];
