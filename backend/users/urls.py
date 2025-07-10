@@ -1,5 +1,9 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import (
+    TokenRefreshView,
+    TokenVerifyView,
+)
 from .views import (
     RegisterView, LoginView, PasswordResetView, ProfileView,
     PasswordResetRequestView, PasswordResetVerifyView, PasswordResetConfirmView,
@@ -14,6 +18,10 @@ urlpatterns = [
     # Authentication endpoints
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
+    
+    # JWT token management
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
     
     # Secure Password Reset Flow
     path('password-reset/request/', PasswordResetRequestView.as_view(), name='password_reset_request'),

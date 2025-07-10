@@ -86,6 +86,87 @@ export const authService = {
     return localStorage.getItem('accessToken');
   },
 
+  // Get refresh token
+  getRefreshToken: () => {
+    return localStorage.getItem('refreshToken');
+  },
+
+  // Refresh access token
+  refreshToken: async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/auth/token/refresh/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh: refreshToken }),
+      });
+
+      if (!response.ok) {
+        // If refresh fails, clear tokens and redirect to login
+        authService.logout();
+        throw new Error('Token refresh failed');
+      }
+
+      const data = await response.json();
+      
+      // Update tokens in localStorage
+      localStorage.setItem('accessToken', data.access);
+      if (data.refresh) {
+        // If a new refresh token is provided (token rotation enabled)
+        localStorage.setItem('refreshToken', data.refresh);
+      }
+      
+      return data.access;
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      authService.logout();
+      throw error;
+    }
+  },
+
+  // Make authenticated API request with automatic token refresh
+  authenticatedFetch: async (url, options = {}) => {
+    const makeRequest = async (token) => {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      };
+      
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      return fetch(url, {
+        ...options,
+        headers,
+      });
+    };
+
+    let token = authService.getToken();
+    let response = await makeRequest(token);
+
+    // If we get a 401, try to refresh the token
+    if (response.status === 401 && authService.getRefreshToken()) {
+      try {
+        token = await authService.refreshToken();
+        response = await makeRequest(token);
+      } catch (refreshError) {
+        // Refresh failed, redirect to login
+        console.error('Auto-refresh failed:', refreshError);
+        window.location.href = '/login';
+        throw refreshError;
+      }
+    }
+
+    return response;
+  },
+
   // Request password reset
   requestPasswordReset: async (email) => {
     try {
