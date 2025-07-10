@@ -5,7 +5,9 @@ import StatsDashboard from '../components/dashboard/StatsDashboard';
 import SearchAndFilter from '../components/dashboard/SearchAndFilter';
 import GoodsTable from '../components/dashboard/GoodsTable';
 import ExcelOperations from '../components/dashboard/ExcelOperations';
+import AddItemModal from '../components/dashboard/AddItemModal';
 import goodsService from '../services/goodsService';
+import authService from '../services/authService';
 
 const ChinaWarehouse = () => {
   const [goods, setGoods] = useState([]);
@@ -14,6 +16,8 @@ const ChinaWarehouse = () => {
   const [filters, setFilters] = useState({});
   const [showExcelOps, setShowExcelOps] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addingItem, setAddingItem] = useState(false);
 
   const loadGoods = useCallback(async () => {
     try {
@@ -21,9 +25,13 @@ const ChinaWarehouse = () => {
       setError(null);
       
       const response = await goodsService.getChinaGoods(filters);
-      setGoods(response.items || response.results || response);
+      // Ensure we always set an array
+      const goodsData = Array.isArray(response) ? response : 
+                       (response.items || response.results || []);
+      setGoods(goodsData);
     } catch (err) {
       setError(err.message);
+      setGoods([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -79,6 +87,27 @@ const ChinaWarehouse = () => {
     loadGoods();
   };
 
+  const handleAddItem = async (itemData) => {
+    try {
+      setAddingItem(true);
+      
+      // For manual item addition, don't include customer to avoid shipping mark validation
+      // Users should be able to add items with any shipping mark manually
+      const dataWithoutCustomer = {
+        ...itemData,
+        customer: null  // Set to null to bypass customer shipping mark validation
+      };
+      
+      await goodsService.createChinaGoods(dataWithoutCustomer);
+      setShowAddModal(false);
+      await loadGoods();
+    } catch (err) {
+      alert(`Failed to add item: ${err.message}`);
+    } finally {
+      setAddingItem(false);
+    }
+  };
+
   return (
     <DashboardLayout title="China Warehouse">
       <div className="space-y-6">
@@ -106,7 +135,7 @@ const ChinaWarehouse = () => {
               {showExcelOps ? 'Hide' : 'Show'} Excel Operations
             </button>
             <button
-              onClick={() => {/* TODO: Implement add new item */}}
+              onClick={() => setShowAddModal(true)}
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -154,7 +183,7 @@ const ChinaWarehouse = () => {
         />
 
         {/* Empty State */}
-        {!loading && goods.length === 0 && !error && (
+        {!loading && Array.isArray(goods) && goods.length === 0 && !error && (
           <div className="text-center py-12 bg-white rounded-lg shadow">
             <div className="max-w-md mx-auto">
               <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -172,7 +201,7 @@ const ChinaWarehouse = () => {
                   Upload Excel
                 </button>
                 <button
-                  onClick={() => {/* TODO: Implement add new item */}}
+                  onClick={() => setShowAddModal(true)}
                   className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -183,6 +212,15 @@ const ChinaWarehouse = () => {
           </div>
         )}
       </div>
+
+      {/* Add Item Modal */}
+      <AddItemModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSubmit={handleAddItem}
+        warehouse="china"
+        loading={addingItem}
+      />
     </DashboardLayout>
   );
 };
