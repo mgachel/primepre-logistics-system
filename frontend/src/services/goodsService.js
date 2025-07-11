@@ -86,9 +86,8 @@ class GoodsService {
   }
 
   async bulkUpdateChinaStatus(ids, status) {
-    const response = await fetch(`${API_BASE_URL}/api/goods/china/bulk_status_update/`, {
+    const response = await this.authenticatedFetch(`${API_BASE_URL}/api/goods/china/bulk_status_update/`, {
       method: 'POST',
-      headers: await this.getAuthHeaders(),
       body: JSON.stringify({ ids, status })
     });
     
@@ -215,9 +214,8 @@ class GoodsService {
   }
 
   async bulkUpdateGhanaStatus(ids, status) {
-    const response = await fetch(`${API_BASE_URL}/api/goods/ghana/bulk_status_update/`, {
+    const response = await this.authenticatedFetch(`${API_BASE_URL}/api/goods/ghana/bulk_status_update/`, {
       method: 'POST',
-      headers: await this.getAuthHeaders(),
       body: JSON.stringify({ ids, status })
     });
     

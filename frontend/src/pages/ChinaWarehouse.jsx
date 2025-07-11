@@ -6,8 +6,8 @@ import SearchAndFilter from '../components/dashboard/SearchAndFilter';
 import GoodsTable from '../components/dashboard/GoodsTable';
 import ExcelOperations from '../components/dashboard/ExcelOperations';
 import AddItemModal from '../components/dashboard/AddItemModal';
+import EditItemModal from '../components/dashboard/EditItemModal';
 import goodsService from '../services/goodsService';
-import authService from '../services/authService';
 
 const ChinaWarehouse = () => {
   const [goods, setGoods] = useState([]);
@@ -18,6 +18,9 @@ const ChinaWarehouse = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [updatingItem, setUpdatingItem] = useState(false);
 
   const loadGoods = useCallback(async () => {
     try {
@@ -68,8 +71,22 @@ const ChinaWarehouse = () => {
   };
 
   const handleEdit = (item) => {
-    // TODO: Implement edit functionality
-    console.log('Edit item:', item);
+    setEditingItem(item);
+    setShowEditModal(true);
+  };
+
+  const handleEditItem = async (id, itemData) => {
+    try {
+      setUpdatingItem(true);
+      await goodsService.updateChinaGoods(id, itemData);
+      setShowEditModal(false);
+      setEditingItem(null);
+      await loadGoods();
+    } catch (err) {
+      alert(`Failed to update item: ${err.message}`);
+    } finally {
+      setUpdatingItem(false);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -220,6 +237,19 @@ const ChinaWarehouse = () => {
         onSubmit={handleAddItem}
         warehouse="china"
         loading={addingItem}
+      />
+
+      {/* Edit Item Modal */}
+      <EditItemModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingItem(null);
+        }}
+        onSubmit={handleEditItem}
+        warehouse="china"
+        loading={updatingItem}
+        item={editingItem}
       />
     </DashboardLayout>
   );
