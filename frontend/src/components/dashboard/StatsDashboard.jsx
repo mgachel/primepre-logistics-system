@@ -142,8 +142,6 @@ const StatsDashboard = ({ warehouse = 'china' }) => {
     gray: '#6B7280'
   };
 
-  const pieColors = [colors.warning, colors.success, colors.primary, colors.danger];
-
   // Prepare data for charts
   const getStatusData = () => {
     if (warehouse === 'china') {
