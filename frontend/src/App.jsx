@@ -10,6 +10,14 @@ import GhanaWarehouse from './pages/GhanaWarehouse';
 import ReadyForShipping from './pages/ReadyForShipping';
 import FlaggedItems from './pages/FlaggedItems';
 import OverdueItems from './pages/OverdueItems';
+// Cargo Management Pages
+import CargoDashboard from './pages/CargoDashboard';
+import ContainerManagement from './pages/ContainerManagement';
+import ContainerDetail from './pages/ContainerDetail';
+import SeaCargoDashboard from './pages/SeaCargoDashboard';
+import AirCargoDashboard from './pages/AirCargoDashboard';
+import CargoItemsManagement from './pages/CargoItemsManagement';
+import ClientSummaries from './pages/ClientSummaries';
 import { useAuth } from './hooks/useAuth';
 
 // Protected route component
@@ -85,6 +93,72 @@ function App() {
           element={
             <ProtectedRoute>
               <OverdueItems />
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* Cargo Management Routes */}
+        <Route 
+          path="/cargo/dashboard" 
+          element={
+            <ProtectedRoute>
+              <CargoDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/cargo/containers" 
+          element={
+            <ProtectedRoute>
+              <ContainerManagement />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/cargo/containers/:containerId" 
+          element={
+            <ProtectedRoute>
+              <ContainerDetail />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/cargo/containers/:containerId/edit" 
+          element={
+            <ProtectedRoute>
+              <ContainerManagement showEditModal={true} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/cargo/sea" 
+          element={
+            <ProtectedRoute>
+              <SeaCargoDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/cargo/air" 
+          element={
+            <ProtectedRoute>
+              <AirCargoDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/cargo/items" 
+          element={
+            <ProtectedRoute>
+              <CargoItemsManagement />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/cargo/client-summaries" 
+          element={
+            <ProtectedRoute>
+              <ClientSummaries />
             </ProtectedRoute>
           } 
         />
