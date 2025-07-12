@@ -60,7 +60,8 @@ const BulkCargoUpload = ({ onClose, onSuccess, containerId }) => {
         onSuccess();
       }
     } catch (err) {
-      setError(err.message);
+      console.error('Bulk upload failed:', err);
+      setError(`Upload failed: ${err.message}. Please check your authentication and try again.`);
     } finally {
       setLoading(false);
     }

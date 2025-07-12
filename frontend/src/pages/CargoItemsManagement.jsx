@@ -3,13 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import cargoService from '../services/cargoService';
 import BulkCargoUpload from '../components/BulkCargoUpload';
 
-const CargoItemsManagement = () => {
+const CargoItemsManagement = ({ showCreateModal: initialShowCreateModal = false }) => {
   const [cargoItems, setCargoItems] = useState([]);
   const [containers, setContainers] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(initialShowCreateModal);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterContainer, setFilterContainer] = useState('');
@@ -21,6 +21,11 @@ const CargoItemsManagement = () => {
   useEffect(() => {
     const container = searchParams.get('container');
     if (container) setFilterContainer(container);
+    
+    // If showCreateModal prop is true, show the create modal
+    if (initialShowCreateModal) {
+      setShowCreateModal(true);
+    }
     
     // Define and call fetch function within useEffect
     const loadData = async () => {
@@ -49,7 +54,7 @@ const CargoItemsManagement = () => {
     };
 
     loadData();
-  }, [searchParams]);
+  }, [searchParams, initialShowCreateModal]);
 
   const fetchData = async () => {
     try {
@@ -410,24 +415,24 @@ const CargoItemsManagement = () => {
         {/* Create Item Modal */}
         {showCreateModal && (
           <CreateCargoItemModal
-            onClose={() => setShowCreateModal(false)}
+            onClose={() => {
+              setShowCreateModal(false);
+              // If we came from the create route, navigate back to items list
+              if (initialShowCreateModal) {
+                navigate('/cargo/items');
+              }
+            }}
             onSuccess={() => {
               setShowCreateModal(false);
               fetchData();
+              // If we came from the create route, navigate back to items list
+              if (initialShowCreateModal) {
+                navigate('/cargo/items');
+              }
             }}
             containers={containers}
             customers={customers}
-          />
-        )}
-
-        {/* Bulk Upload Modal */}
-        {showBulkUpload && (
-          <BulkCargoUpload
-            onClose={() => setShowBulkUpload(false)}
-            onSuccess={() => {
-              setShowBulkUpload(false);
-              fetchData();
-            }}
+            defaultContainer={searchParams.get('container')}
           />
         )}
 
@@ -447,9 +452,9 @@ const CargoItemsManagement = () => {
 };
 
 // Create Cargo Item Modal Component
-const CreateCargoItemModal = ({ onClose, onSuccess, containers, customers }) => {
+const CreateCargoItemModal = ({ onClose, onSuccess, containers, customers, defaultContainer = '' }) => {
   const [formData, setFormData] = useState({
-    container: '',
+    container: defaultContainer || '',
     client: '',
     item_description: '',
     quantity: 1,
@@ -518,7 +523,7 @@ const CreateCargoItemModal = ({ onClose, onSuccess, containers, customers }) => 
               <label className="block text-sm font-medium text-gray-700 mb-2">Container *</label>
               <select
                 name="container"
-                value={formData.container}
+                value={formData.container || ''}
                 onChange={handleChange}
                 required
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -535,7 +540,7 @@ const CreateCargoItemModal = ({ onClose, onSuccess, containers, customers }) => 
               <label className="block text-sm font-medium text-gray-700 mb-2">Client *</label>
               <select
                 name="client"
-                value={formData.client}
+                value={formData.client || ''}
                 onChange={handleChange}
                 required
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -554,7 +559,7 @@ const CreateCargoItemModal = ({ onClose, onSuccess, containers, customers }) => 
             <label className="block text-sm font-medium text-gray-700 mb-2">Item Description *</label>
             <textarea
               name="item_description"
-              value={formData.item_description}
+              value={formData.item_description || ''}
               onChange={handleChange}
               required
               rows={3}
@@ -569,7 +574,7 @@ const CreateCargoItemModal = ({ onClose, onSuccess, containers, customers }) => 
               <input
                 type="number"
                 name="quantity"
-                value={formData.quantity}
+                value={formData.quantity || 1}
                 onChange={handleChange}
                 required
                 min="1"
@@ -581,7 +586,7 @@ const CreateCargoItemModal = ({ onClose, onSuccess, containers, customers }) => 
               <input
                 type="number"
                 name="weight"
-                value={formData.weight}
+                value={formData.weight || ''}
                 onChange={handleChange}
                 step="0.01"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -592,7 +597,7 @@ const CreateCargoItemModal = ({ onClose, onSuccess, containers, customers }) => 
               <input
                 type="number"
                 name="cbm"
-                value={formData.cbm}
+                value={formData.cbm || ''}
                 onChange={handleChange}
                 required
                 step="0.01"
@@ -607,7 +612,7 @@ const CreateCargoItemModal = ({ onClose, onSuccess, containers, customers }) => 
               <input
                 type="number"
                 name="unit_value"
-                value={formData.unit_value}
+                value={formData.unit_value || ''}
                 onChange={handleChange}
                 step="0.01"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -618,7 +623,7 @@ const CreateCargoItemModal = ({ onClose, onSuccess, containers, customers }) => 
               <input
                 type="number"
                 name="total_value"
-                value={formData.total_value}
+                value={formData.total_value || ''}
                 onChange={handleChange}
                 step="0.01"
                 readOnly
@@ -629,7 +634,7 @@ const CreateCargoItemModal = ({ onClose, onSuccess, containers, customers }) => 
               <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
               <select
                 name="status"
-                value={formData.status}
+                value={formData.status || 'pending'}
                 onChange={handleChange}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >

@@ -151,6 +151,10 @@ export const cargoService = {
     formData.append('container_id', containerId);
 
     const token = getAuthToken();
+    console.log('Bulk upload - Token available:', !!token);
+    console.log('Bulk upload - Container ID:', containerId);
+    console.log('Bulk upload - File:', file ? file.name : 'No file');
+    
     const headers = {};
     if (token) {
       headers.Authorization = token;
@@ -164,7 +168,8 @@ export const cargoService = {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ detail: 'Upload failed' }));
-      throw new Error(errorData.detail || 'Bulk upload failed');
+      console.error('Bulk upload error:', response.status, errorData);
+      throw new Error(errorData.detail || errorData.error || JSON.stringify(errorData) || 'Bulk upload failed');
     }
 
     return response.json();
