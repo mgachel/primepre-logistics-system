@@ -423,17 +423,79 @@ const OverviewDashboard = () => {
             </Link>
             
             <Link
-              to="/dashboard/overdue"
-              className="group flex items-center p-4 border border-gray-200 rounded-lg hover:bg-yellow-50 hover:border-yellow-300 transition-all duration-200"
+              to="/cargo/dashboard"
+              className="group flex items-center p-4 border border-gray-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-all duration-200"
             >
-              <div className="p-3 bg-yellow-100 rounded-lg group-hover:bg-yellow-200 transition-colors">
-                <AlertTriangle className="h-6 w-6 text-yellow-600" />
+              <div className="p-3 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                <Ship className="h-6 w-6 text-purple-600" />
               </div>
               <div className="ml-4">
-                <div className="font-medium text-gray-900">Overdue Items</div>
-                <div className="text-sm text-gray-500">Review pending items</div>
+                <div className="font-medium text-gray-900">Cargo Management</div>
+                <div className="text-sm text-gray-500">Manage containers & shipments</div>
               </div>
-              <ArrowRight className="h-5 w-5 text-gray-400 ml-auto group-hover:text-yellow-600 transition-colors" />
+              <ArrowRight className="h-5 w-5 text-gray-400 ml-auto group-hover:text-purple-600 transition-colors" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Cargo Management Section */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Cargo Management</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link
+              to="/cargo/containers"
+              className="group flex items-center p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all duration-200"
+            >
+              <div className="p-3 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                <Package className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <div className="font-medium text-gray-900">Containers</div>
+                <div className="text-sm text-gray-500">Manage all containers</div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-gray-400 ml-auto group-hover:text-blue-600 transition-colors" />
+            </Link>
+            
+            <Link
+              to="/cargo/sea"
+              className="group flex items-center p-4 border border-gray-200 rounded-lg hover:bg-teal-50 hover:border-teal-300 transition-all duration-200"
+            >
+              <div className="p-3 bg-teal-100 rounded-lg group-hover:bg-teal-200 transition-colors">
+                <Ship className="h-6 w-6 text-teal-600" />
+              </div>
+              <div className="ml-4">
+                <div className="font-medium text-gray-900">Sea Cargo</div>
+                <div className="text-sm text-gray-500">Ocean freight management</div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-gray-400 ml-auto group-hover:text-teal-600 transition-colors" />
+            </Link>
+            
+            <Link
+              to="/cargo/air"
+              className="group flex items-center p-4 border border-gray-200 rounded-lg hover:bg-sky-50 hover:border-sky-300 transition-all duration-200"
+            >
+              <div className="p-3 bg-sky-100 rounded-lg group-hover:bg-sky-200 transition-colors">
+                <Package className="h-6 w-6 text-sky-600" />
+              </div>
+              <div className="ml-4">
+                <div className="font-medium text-gray-900">Air Cargo</div>
+                <div className="text-sm text-gray-500">Air freight management</div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-gray-400 ml-auto group-hover:text-sky-600 transition-colors" />
+            </Link>
+            
+            <Link
+              to="/cargo/client-summaries"
+              className="group flex items-center p-4 border border-gray-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-all duration-200"
+            >
+              <div className="p-3 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                <AlertTriangle className="h-6 w-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <div className="font-medium text-gray-900">Client Summaries</div>
+                <div className="text-sm text-gray-500">Client shipment tracking</div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-gray-400 ml-auto group-hover:text-purple-600 transition-colors" />
             </Link>
           </div>
         </div>
