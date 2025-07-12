@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Upload Test</title>
+</head>
+<body>
+    <h1>Bulk Upload Debug Test</h1>
+    
+    <div>
+        <h2>Authentication Status</h2>
+        <p>Access Token: <span id="token-status"></span></p>
+        <p>User: <span id="user-status"></span></p>
+    </div>
+    
+    <div>
+        <h2>Test API Calls</h2>
+        <button onclick="testContainers()">Test Get Containers</button>
+        <button onclick="testBulkUpload()">Test Bulk Upload</button>
+        <div id="results"></div>
+    </div>
+    
+    <div>
+        <h2>File Upload</h2>
+        <input type="file" id="file-input" accept=".xlsx,.xls">
+        <select id="container-select">
+            <option value="">Select Container</option>
+            <option value="356375">Container 356375</option>
+        </select>
+        <button onclick="performBulkUpload()">Upload File</button>
+    </div>
+
+    <script>
+        // Check authentication status
+        const token = localStorage.getItem('accessToken');
+        const user = localStorage.getItem('user');
+        
+        document.getElementById('token-status').textContent = token ? 'Available (' + token.substring(0, 20) + '...)' : 'Not found';
+        document.getElementById('user-status').textContent = user ? JSON.parse(user).first_name : 'Not logged in';
+        
+        async function testContainers() {
+            const results = document.getElementById('results');
+            try {
+                const response = await fetch('http://localhost:8000/api/cargo/api/containers/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                results.innerHTML = '<h3>Containers API Test - SUCCESS</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                results.innerHTML = '<h3>Containers API Test - ERROR</h3><p>' + error.message + '</p>';
+            }
+        }
+        
+        async function testBulkUpload() {
+            const results = document.getElementById('results');
+            
+            // Create a simple test file
+            const testData = 'shipping_mark,item_description,quantity,cbm,package_type,package_count\nPMTEST,Test Item,1,1.5,Carton,1';
+            const blob = new Blob([testData], { type: 'text/csv' });
+            const file = new File([blob], 'test.csv', { type: 'text/csv' });
+            
+            const formData = new FormData();
+            formData.append('excel_file', file);
+            formData.append('container_id', '356375');
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/cargo/api/bulk-upload/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                const responseText = await response.text();
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${responseText}`);
+                }
+                
+                results.innerHTML = '<h3>Bulk Upload Test - SUCCESS</h3><pre>' + responseText + '</pre>';
+            } catch (error) {
+                results.innerHTML = '<h3>Bulk Upload Test - ERROR</h3><p>' + error.message + '</p>';
+            }
+        }
+        
+        async function performBulkUpload() {
+            const fileInput = document.getElementById('file-input');
+            const containerSelect = document.getElementById('container-select');
+            const results = document.getElementById('results');
+            
+            if (!fileInput.files[0]) {
+                alert('Please select a file');
+                return;
+            }
+            
+            if (!containerSelect.value) {
+                alert('Please select a container');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('excel_file', fileInput.files[0]);
+            formData.append('container_id', containerSelect.value);
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/cargo/api/bulk-upload/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                const responseText = await response.text();
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${responseText}`);
+                }
+                
+                results.innerHTML = '<h3>File Upload - SUCCESS</h3><pre>' + responseText + '</pre>';
+            } catch (error) {
+                results.innerHTML = '<h3>File Upload - ERROR</h3><p>' + error.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>

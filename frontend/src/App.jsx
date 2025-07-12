@@ -155,6 +155,14 @@ function App() {
           } 
         />
         <Route 
+          path="/cargo/items/create" 
+          element={
+            <ProtectedRoute>
+              <CargoItemsManagement showCreateModal={true} />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
           path="/cargo/client-summaries" 
           element={
             <ProtectedRoute>

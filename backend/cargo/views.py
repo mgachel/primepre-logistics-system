@@ -217,8 +217,7 @@ class BulkCargoItemUploadView(APIView):
             
             # Expected columns
             required_columns = [
-                'shipping_mark', 'item_description', 'quantity', 'cbm',
-                'package_type', 'package_count'
+                'shipping_mark', 'item_description', 'quantity', 'cbm'
             ]
             
             # Check if required columns exist
@@ -254,8 +253,6 @@ class BulkCargoItemUploadView(APIView):
                         weight=float(row.get('weight', 0)) if pd.notna(row.get('weight')) else None,
                         unit_value=float(row.get('unit_value', 0)) if pd.notna(row.get('unit_value')) else None,
                         total_value=float(row.get('total_value', 0)) if pd.notna(row.get('total_value')) else None,
-                        package_type=row.get('package_type', 'Carton'),
-                        package_count=int(row.get('package_count', 1)),
                         status=row.get('status', 'pending')
                     )
                     
