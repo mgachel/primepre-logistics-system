@@ -114,13 +114,6 @@ const ReadyForShipping = () => {
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </button>
-            <button
-              onClick={() => {/* TODO: Export functionality */}}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-100 border border-blue-300 rounded-md hover:bg-blue-200"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export List
-            </button>
           </div>
         </div>
 
