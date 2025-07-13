@@ -1,6 +1,6 @@
 // Authentication service for handling API calls to the backend
 
-const API_URL = 'http://localhost:8000'; // Change this to your Django server URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'; // Use env variable or fallback to localhost
 
 export const authService = {
   // Register a new user
