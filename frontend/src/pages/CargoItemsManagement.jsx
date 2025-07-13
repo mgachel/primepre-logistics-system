@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import cargoService from '../services/cargoService';
 import BulkCargoUpload from '../components/BulkCargoUpload';
+import DashboardLayout from '../components/dashboard/DashboardLayout';
 
 const CargoItemsManagement = ({ showCreateModal: initialShowCreateModal = false }) => {
   const [cargoItems, setCargoItems] = useState([]);
@@ -105,18 +106,21 @@ const CargoItemsManagement = ({ showCreateModal: initialShowCreateModal = false 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading cargo items...</p>
+      <DashboardLayout title="Cargo Items Management">
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading cargo items...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <DashboardLayout title="Cargo Items Management">
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex justify-between items-center">
@@ -446,8 +450,9 @@ const CargoItemsManagement = ({ showCreateModal: initialShowCreateModal = false 
             }}
           />
         )}
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 
