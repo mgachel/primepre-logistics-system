@@ -194,6 +194,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:5173",  # Vite dev server
     "http://127.0.0.1:5173",
+    "https://dvs9g2wx-5173.uks1.devtunnels.ms",  # Dev tunnel frontend
 ]
 
 CORS_ALLOW_CREDENTIALS = True
