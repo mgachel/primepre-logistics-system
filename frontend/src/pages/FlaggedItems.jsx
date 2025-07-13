@@ -138,13 +138,6 @@ const FlaggedItems = () => {
               Refresh
             </button>
             <button
-              onClick={() => {/* TODO: Export functionality */}}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-100 border border-blue-300 rounded-md hover:bg-blue-200"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export List
-            </button>
-            <button
               onClick={() => handleBulkResolve(activeTab)}
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700"
               disabled={currentGoods.length === 0}
