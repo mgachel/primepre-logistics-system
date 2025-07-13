@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import cargoService from '../services/cargoService';
+import DashboardLayout from '../components/dashboard/DashboardLayout';
 
 const CargoDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
@@ -26,29 +27,33 @@ const CargoDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading cargo dashboard...</p>
+      <DashboardLayout title="Cargo Dashboard">
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading cargo dashboard...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-600 text-lg mb-4">Error loading dashboard</div>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={fetchDashboardData}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            Try Again
-          </button>
+      <DashboardLayout title="Cargo Dashboard">
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-red-600 text-lg mb-4">Error loading dashboard</div>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button
+              onClick={fetchDashboardData}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
@@ -98,8 +103,9 @@ const CargoDashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <DashboardLayout title="Cargo Dashboard">
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Cargo Management Dashboard</h1>
@@ -234,8 +240,9 @@ const CargoDashboard = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 
