@@ -4,6 +4,60 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bulk Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input[type="file"], select {
+            display: block;
+            width: 100%;
+            max-width: 300px;
+            padding: 8px;
+            margin-bottom: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        small {
+            display: block;
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        #results {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+    </style>
 </head>
 <body>
     <h1>Bulk Upload Debug Test</h1>
@@ -23,11 +77,17 @@
     
     <div>
         <h2>File Upload</h2>
-        <input type="file" id="file-input" accept=".xlsx,.xls">
-        <select id="container-select">
+        <label for="file-input">Choose Excel file:</label>
+        <input type="file" id="file-input" accept=".xlsx,.xls" aria-describedby="file-help">
+        <small id="file-help">Select an Excel file (.xlsx or .xls) containing cargo items</small>
+        
+        <label for="container-select">Container:</label>
+        <select id="container-select" aria-describedby="container-help">
             <option value="">Select Container</option>
             <option value="356375">Container 356375</option>
         </select>
+        <small id="container-help">Choose the container for the cargo items</small>
+        
         <button onclick="performBulkUpload()">Upload File</button>
     </div>
 
@@ -42,7 +102,7 @@
         async function testContainers() {
             const results = document.getElementById('results');
             try {
-                const response = await fetch('http://localhost:8000/api/cargo/api/containers/', {
+                const response = await fetch('https://dvs9g2wx-8000.uks1.devtunnels.ms/api/cargo/api/containers/', {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
@@ -73,7 +133,7 @@
             formData.append('container_id', '356375');
             
             try {
-                const response = await fetch('http://localhost:8000/api/cargo/api/bulk-upload/', {
+                const response = await fetch('https://dvs9g2wx-8000.uks1.devtunnels.ms/api/cargo/api/bulk-upload/', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -113,7 +173,7 @@
             formData.append('container_id', containerSelect.value);
             
             try {
-                const response = await fetch('http://localhost:8000/api/cargo/api/bulk-upload/', {
+                const response = await fetch('https://dvs9g2wx-8000.uks1.devtunnels.ms/api/cargo/api/bulk-upload/', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`
