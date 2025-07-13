@@ -106,6 +106,6 @@ class BulkCargoItemSerializer(serializers.Serializer):
     container_id = serializers.CharField()
     
     def validate_excel_file(self, value):
-        if not value.name.endswith(('.xlsx', '.xls')):
-            raise serializers.ValidationError("Only Excel files (.xlsx, .xls) are allowed.")
+        if not value.name.endswith(('.xlsx', '.xls', '.csv')):
+            raise serializers.ValidationError("Only Excel files (.xlsx, .xls) or CSV files (.csv) are allowed.")
         return value
