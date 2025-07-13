@@ -159,6 +159,7 @@ export const cargoService = {
     if (token) {
       headers.Authorization = token;
     }
+    // Note: Don't set Content-Type for FormData, browser will set it automatically with boundary
 
     const response = await fetch(`${API_URL}/api/cargo/api/bulk-upload/`, {
       method: 'POST',

@@ -212,8 +212,11 @@ class BulkCargoItemUploadView(APIView):
             # Get container
             container = get_object_or_404(CargoContainer, container_id=container_id)
             
-            # Read Excel file
-            df = pd.read_excel(excel_file)
+            # Read Excel or CSV file
+            if excel_file.name.endswith('.csv'):
+                df = pd.read_csv(excel_file)
+            else:
+                df = pd.read_excel(excel_file)
             
             # Expected columns
             required_columns = [
