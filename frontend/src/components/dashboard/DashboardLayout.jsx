@@ -12,7 +12,9 @@ import {
   User,
   Building2,
   Ship,
-  Plane
+  Plane,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import authService from '../../services/authService';
 import LogoHeader from '../LogoHeader';
@@ -25,6 +27,12 @@ const DashboardLayout = ({ children, title }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    'Dashboard': true,
+    'Inventory Management': false,
+    'Logistics Operations': false,
+    'Cargo Management': true // Default open for cargo management
+  });
 
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
@@ -36,7 +44,17 @@ const DashboardLayout = ({ children, title }) => {
       { id: 2, type: 'warning', message: 'Items flagged for review', time: '2h ago' },
       { id: 3, type: 'success', message: 'Order #4759 delivered', time: '5h ago' }
     ]);
-  }, []);
+
+    // Auto-expand sections based on current route
+    const path = location.pathname;
+    const newExpandedSections = {
+      'Dashboard': path.startsWith('/dashboard') && !path.startsWith('/dashboard/'),
+      'Inventory Management': path.startsWith('/dashboard/china') || path.startsWith('/dashboard/ghana'),
+      'Logistics Operations': path.startsWith('/dashboard/ready') || path.startsWith('/dashboard/flagged') || path.startsWith('/dashboard/overdue'),
+      'Cargo Management': path.startsWith('/cargo')
+    };
+    setExpandedSections(newExpandedSections);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     authService.logout();
@@ -101,11 +119,65 @@ const DashboardLayout = ({ children, title }) => {
           description: 'Items past their deadlines'
         }
       ]
+    },
+    {
+      category: 'Cargo Management',
+      items: [
+        {
+          name: 'Cargo Dashboard',
+          href: '/cargo/dashboard',
+          icon: BarChart3,
+          current: location.pathname === '/cargo/dashboard',
+          description: 'Cargo management overview'
+        },
+        {
+          name: 'Container Management',
+          href: '/cargo/containers',
+          icon: Package,
+          current: location.pathname.startsWith('/cargo/containers'),
+          description: 'Manage shipping containers'
+        },
+        {
+          name: 'Cargo Items',
+          href: '/cargo/items',
+          icon: Package,
+          current: location.pathname.startsWith('/cargo/items'),
+          description: 'Track individual cargo items'
+        },
+        {
+          name: 'Sea Cargo',
+          href: '/cargo/sea',
+          icon: Ship,
+          current: location.pathname === '/cargo/sea',
+          description: 'Sea freight operations'
+        },
+        {
+          name: 'Air Cargo',
+          href: '/cargo/air',
+          icon: Plane,
+          current: location.pathname === '/cargo/air',
+          description: 'Air freight operations'
+        },
+        {
+          name: 'Client Summaries',
+          href: '/cargo/client-summaries',
+          icon: User,
+          current: location.pathname === '/cargo/client-summaries',
+          description: 'Client shipment reports'
+        }
+      ]
     }
   ];
 
   const classNames = (...classes) => {
     return classes.filter(Boolean).join(' ');
+  };
+  
+  const toggleSection = (sectionName) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionName]: !prev[sectionName]
+    }));
   };
   
   const handleSearch = (e) => {
@@ -150,32 +222,42 @@ const DashboardLayout = ({ children, title }) => {
           <div className="space-y-4">
             {navigation.map((section) => (
               <div key={section.category}>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">
-                  {section.category}
-                </h3>
-                <div className="space-y-1">
-                  {section.items.map((item) => (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      className={classNames(
-                        item.current ? 'sidebar-active' : 'sidebar-inactive',
-                        'sidebar-item'
-                      )}
-                      onClick={() => setSidebarOpen(false)}
-                      title={item.description}
-                    >
-                      <item.icon
+                <button
+                  onClick={() => toggleSection(section.category)}
+                  className="w-full flex items-center justify-between text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2 hover:text-gray-700 transition-colors"
+                >
+                  <span>{section.category}</span>
+                  {expandedSections[section.category] ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+                {expandedSections[section.category] && (
+                  <div className="space-y-1 mt-2">
+                    {section.items.map((item) => (
+                      <Link
+                        key={item.name}
+                        to={item.href}
                         className={classNames(
-                          item.current ? 'text-white' : 'text-gray-500',
-                          'mr-3 h-5 w-5 flex-shrink-0'
+                          item.current ? 'sidebar-active' : 'sidebar-inactive',
+                          'sidebar-item'
                         )}
-                        aria-hidden="true"
-                      />
-                      <span className="truncate">{item.name}</span>
-                    </Link>
-                  ))}
-                </div>
+                        onClick={() => setSidebarOpen(false)}
+                        title={item.description}
+                      >
+                        <item.icon
+                          className={classNames(
+                            item.current ? 'text-white' : 'text-gray-500',
+                            'mr-3 h-5 w-5 flex-shrink-0'
+                          )}
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">{item.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -221,31 +303,41 @@ const DashboardLayout = ({ children, title }) => {
           <div className="flex-1 flex flex-col p-4 space-y-5">
             {navigation.map((section) => (
               <div key={section.category}>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-3">
-                  {section.category}
-                </h3>
-                <div className="space-y-1">
-                  {section.items.map((item) => (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      className={classNames(
-                        item.current ? 'sidebar-active' : 'sidebar-inactive',
-                        'sidebar-item group'
-                      )}
-                      title={item.description}
-                    >
-                      <item.icon
+                <button
+                  onClick={() => toggleSection(section.category)}
+                  className="w-full flex items-center justify-between text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2 hover:text-gray-700 transition-colors"
+                >
+                  <span>{section.category}</span>
+                  {expandedSections[section.category] ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+                {expandedSections[section.category] && (
+                  <div className="space-y-1 mt-2">
+                    {section.items.map((item) => (
+                      <Link
+                        key={item.name}
+                        to={item.href}
                         className={classNames(
-                          item.current ? 'text-white' : 'text-gray-500 group-hover:text-primary-600',
-                          'mr-3 h-5 w-5 flex-shrink-0 transition-colors'
+                          item.current ? 'sidebar-active' : 'sidebar-inactive',
+                          'sidebar-item group'
                         )}
-                        aria-hidden="true"
-                      />
-                      <span className="truncate">{item.name}</span>
-                    </Link>
-                  ))}
-                </div>
+                        title={item.description}
+                      >
+                        <item.icon
+                          className={classNames(
+                            item.current ? 'text-white' : 'text-gray-500 group-hover:text-primary-600',
+                            'mr-3 h-5 w-5 flex-shrink-0 transition-colors'
+                          )}
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">{item.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -406,20 +498,6 @@ const DashboardLayout = ({ children, title }) => {
                   </svg>
                   {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
-              </div>
-              <div className="mt-4 flex md:mt-0 md:ml-4 gap-3">
-                <button className="btn-secondary inline-flex items-center">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                  </svg>
-                  Export
-                </button>
-                <button className="btn-primary inline-flex items-center">
-                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                  </svg>
-                  New Item
-                </button>
               </div>
             </div>
             
