@@ -121,11 +121,14 @@ class CargoItemViewSet(viewsets.ModelViewSet):
         container_id = self.request.query_params.get('container_id')
         shipping_mark = self.request.query_params.get('shipping_mark')
         status_filter = self.request.query_params.get('status')
+        client_id = self.request.query_params.get('client')
         
         if container_id:
             queryset = queryset.filter(container__container_id=container_id)
         if shipping_mark:
-            queryset = queryset.filter(shipping_mark__shipping_mark=shipping_mark)
+            queryset = queryset.filter(client__shipping_mark=shipping_mark)
+        if client_id:
+            queryset = queryset.filter(client_id=client_id)
         if status_filter:
             queryset = queryset.filter(status=status_filter)
         
