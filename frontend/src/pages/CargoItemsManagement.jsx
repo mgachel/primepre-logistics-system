@@ -16,12 +16,18 @@ const CargoItemsManagement = ({ showCreateModal: initialShowCreateModal = false 
   const [filterContainer, setFilterContainer] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterClient, setFilterClient] = useState('');
+  const [filterShippingMark, setFilterShippingMark] = useState('');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const container = searchParams.get('container');
+    const client = searchParams.get('client');
+    const shippingMark = searchParams.get('shipping_mark');
+    
     if (container) setFilterContainer(container);
+    if (client) setFilterClient(client);
+    if (shippingMark) setFilterShippingMark(shippingMark);
     
     // If showCreateModal prop is true, show the create modal
     if (initialShowCreateModal) {
@@ -37,6 +43,8 @@ const CargoItemsManagement = ({ showCreateModal: initialShowCreateModal = false 
         const params = {};
         if (searchParams.get('container')) params.container = searchParams.get('container');
         if (searchParams.get('status')) params.status = searchParams.get('status');
+        if (searchParams.get('client')) params.client = searchParams.get('client');
+        if (searchParams.get('shipping_mark')) params.shipping_mark = searchParams.get('shipping_mark');
         
         const [itemsData, containersData, customersData] = await Promise.all([
           cargoService.getCargoItems(params),
@@ -65,6 +73,8 @@ const CargoItemsManagement = ({ showCreateModal: initialShowCreateModal = false 
       const params = {};
       if (searchParams.get('container')) params.container = searchParams.get('container');
       if (searchParams.get('status')) params.status = searchParams.get('status');
+      if (searchParams.get('client')) params.client = searchParams.get('client');
+      if (searchParams.get('shipping_mark')) params.shipping_mark = searchParams.get('shipping_mark');
       
       const [itemsData, containersData, customersData] = await Promise.all([
         cargoService.getCargoItems(params),
@@ -99,9 +109,10 @@ const CargoItemsManagement = ({ showCreateModal: initialShowCreateModal = false 
                          item.client_name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesContainer = !filterContainer || item.container === filterContainer;
     const matchesStatus = !filterStatus || item.status === filterStatus;
-    const matchesClient = !filterClient || item.client === filterClient;
+    const matchesClient = !filterClient || item.client === parseInt(filterClient);
+    const matchesShippingMark = !filterShippingMark || item.client_shipping_mark === filterShippingMark;
     
-    return matchesSearch && matchesContainer && matchesStatus && matchesClient;
+    return matchesSearch && matchesContainer && matchesStatus && matchesClient && matchesShippingMark;
   });
 
   if (loading) {
@@ -272,6 +283,7 @@ const CargoItemsManagement = ({ showCreateModal: initialShowCreateModal = false 
                   setFilterContainer('');
                   setFilterStatus('');
                   setFilterClient('');
+                  setFilterShippingMark('');
                 }}
                 className="w-full bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
               >
@@ -407,7 +419,7 @@ const CargoItemsManagement = ({ showCreateModal: initialShowCreateModal = false 
               {filteredItems.length === 0 && (
                 <div className="text-center py-12">
                   <p className="text-gray-500 text-lg">No cargo items found</p>
-                  {(searchTerm || filterContainer || filterStatus || filterClient) && (
+                  {(searchTerm || filterContainer || filterStatus || filterClient || filterShippingMark) && (
                     <p className="text-gray-400 mt-2">Try adjusting your filters</p>
                   )}
                 </div>

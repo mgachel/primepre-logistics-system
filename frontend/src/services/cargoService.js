@@ -81,7 +81,7 @@ export const cargoService = {
   // Cargo Items Management
   getCargoItems: async (params = {}) => {
     const queryParams = new URLSearchParams(params).toString();
-    const endpoint = `/api/cargo/api/cargo-items/${queryParams ? `?${queryParams}` : ''}`;
+    const endpoint = queryParams ? `/api/cargo/api/cargo-items/?${queryParams}` : '/api/cargo/api/cargo-items/';
     return apiRequest(endpoint);
   },
 
