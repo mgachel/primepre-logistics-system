@@ -132,7 +132,8 @@ class ClientShipmentSummary(models.Model):
         )
         self.total_cbm = sum(item.cbm for item in items)
         self.total_quantity = sum(item.quantity for item in items)
-        self.total_packages = sum(item.package_count for item in items)
+        # Since package_count doesn't exist in CargoItem, we'll use quantity as a proxy
+        self.total_packages = sum(item.quantity for item in items)
         
         # Update status based on cargo items
         if all(item.status == 'delivered' for item in items):

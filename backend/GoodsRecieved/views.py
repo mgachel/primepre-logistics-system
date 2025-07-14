@@ -3,8 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, Count, Sum, Avg
+from django.db.models import Q, Count, Sum, Avg, F, ExpressionWrapper, IntegerField
+from django.db.models.functions import Extract
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.db import transaction
@@ -88,18 +90,34 @@ class BaseGoodsReceivedViewSet(AdvancedAnalyticsMixin, SmartNotificationMixin, P
         """
         Helper method to update status of a single goods item.
         """
-        if new_status == 'READY_FOR_SHIPPING':
-            goods.mark_ready_for_shipping()
-        elif new_status == 'FLAGGED':
-            goods.flag_goods(reason)
-        elif new_status == 'SHIPPED':
-            goods.mark_shipped()
+        # Handle warehouse-specific status updates
+        if hasattr(self, 'warehouse_type') and self.warehouse_type == 'ghana':
+            if new_status == 'READY_FOR_DELIVERY':
+                goods.mark_ready_for_delivery()
+            elif new_status == 'DELIVERED':
+                goods.mark_delivered()
+            elif new_status == 'FLAGGED':
+                goods.flag_goods(reason)
+            else:
+                goods.status = new_status
+                if reason:
+                    current_notes = goods.notes or ""
+                    goods.notes = f"{current_notes}\nStatus changed to {new_status}: {reason}".strip()
+                goods.save(update_fields=['status', 'notes', 'updated_at'])
         else:
-            goods.status = new_status
-            if reason:
-                current_notes = goods.notes or ""
-                goods.notes = f"{current_notes}\nStatus changed to {new_status}: {reason}".strip()
-            goods.save(update_fields=['status', 'notes', 'updated_at'])
+            # China warehouse
+            if new_status == 'READY_FOR_SHIPPING':
+                goods.mark_ready_for_shipping()
+            elif new_status == 'FLAGGED':
+                goods.flag_goods(reason)
+            elif new_status == 'SHIPPED':
+                goods.mark_shipped()
+            else:
+                goods.status = new_status
+                if reason:
+                    current_notes = goods.notes or ""
+                    goods.notes = f"{current_notes}\nStatus changed to {new_status}: {reason}".strip()
+                goods.save(update_fields=['status', 'notes', 'updated_at'])
     
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None):
@@ -165,28 +183,77 @@ class BaseGoodsReceivedViewSet(AdvancedAnalyticsMixin, SmartNotificationMixin, P
         """
         queryset = self.get_queryset()
         
+        # Define status names based on warehouse type
+        if hasattr(self, 'warehouse_type') and self.warehouse_type == 'ghana':
+            ready_status = 'READY_FOR_DELIVERY'
+            completed_status = 'DELIVERED'
+        else:
+            ready_status = 'READY_FOR_SHIPPING'
+            completed_status = 'SHIPPED'
+        
         # Use database aggregation for better performance
         stats = queryset.aggregate(
-            total_items=Count('id'),
+            total_count=Count('id'),
             pending_count=Count('id', filter=Q(status='PENDING')),
-            ready_for_shipping_count=Count('id', filter=Q(status='READY_FOR_SHIPPING')),
             flagged_count=Count('id', filter=Q(status='FLAGGED')),
-            shipped_count=Count('id', filter=Q(status='SHIPPED')),
             cancelled_count=Count('id', filter=Q(status='CANCELLED')),
             total_cbm=Sum('cbm'),
             total_weight=Sum('weight'),
             total_estimated_value=Sum('estimated_value'),
-            # Calculate average days in warehouse using database aggregation
-            average_days_in_warehouse=Avg('days_in_warehouse', filter=~Q(status='SHIPPED'))
         )
+        
+        # Add warehouse-specific status counts
+        stats[f'{ready_status.lower()}_count'] = queryset.filter(status=ready_status).count()
+        stats[f'{completed_status.lower()}_count'] = queryset.filter(status=completed_status).count()
+        
+        # For backwards compatibility, also include the generic names
+        if self.warehouse_type == 'ghana':
+            stats['ready_for_delivery_count'] = stats[f'{ready_status.lower()}_count']
+            stats['delivered_count'] = stats[f'{completed_status.lower()}_count']
+        else:
+            stats['ready_for_shipping_count'] = stats[f'{ready_status.lower()}_count']
+            stats['shipped_count'] = stats[f'{completed_status.lower()}_count']
         
         # Handle None values
         for key, value in stats.items():
             if value is None:
                 stats[key] = 0
         
-        serializer = GoodsStatsSerializer(stats)
-        return Response(serializer.data)
+        # Calculate average days in warehouse using a simpler database calculation
+        non_completed_items = queryset.exclude(status=completed_status)
+        if non_completed_items.exists():
+            # Use a more database-agnostic approach
+            current_date = timezone.now().date()
+            from django.db.models import Value, DateField
+            from django.db.models.functions import Cast
+            
+            # Calculate the average days more efficiently
+            total_count = non_completed_items.count()
+            if total_count <= 1000:  # For smaller datasets, use Python calculation
+                total_days = sum((current_date - item.date_received.date()).days for item in non_completed_items)
+                stats['average_days_in_warehouse'] = round(total_days / total_count, 1)
+            else:
+                # For larger datasets, use a simpler approximation
+                oldest_item = non_completed_items.order_by('date_received').first()
+                newest_item = non_completed_items.order_by('-date_received').first()
+                if oldest_item and newest_item:
+                    oldest_days = (current_date - oldest_item.date_received.date()).days
+                    newest_days = (current_date - newest_item.date_received.date()).days
+                    stats['average_days_in_warehouse'] = round((oldest_days + newest_days) / 2, 1)
+                else:
+                    stats['average_days_in_warehouse'] = 0
+        else:
+            stats['average_days_in_warehouse'] = 0
+        
+        # Calculate processing rate
+        total_items = stats['total_count']
+        if total_items > 0:
+            processed_items = stats[f'{completed_status.lower()}_count'] + stats[f'{ready_status.lower()}_count']
+            stats['processing_rate'] = (processed_items / total_items) * 100
+        else:
+            stats['processing_rate'] = 0
+        
+        return Response(stats)
     
     @action(detail=False, methods=['get'])
     def flagged_items(self, request):
@@ -211,9 +278,15 @@ class BaseGoodsReceivedViewSet(AdvancedAnalyticsMixin, SmartNotificationMixin, P
     @action(detail=False, methods=['get'])
     def ready_for_shipping(self, request):
         """
-        Get all items ready for shipping.
+        Get all items ready for shipping/delivery.
         """
-        ready_goods = self.get_queryset().filter(status='READY_FOR_SHIPPING')
+        # Determine the correct status based on warehouse type
+        if hasattr(self, 'warehouse_type') and self.warehouse_type == 'ghana':
+            ready_status = 'READY_FOR_DELIVERY'
+        else:
+            ready_status = 'READY_FOR_SHIPPING'
+            
+        ready_goods = self.get_queryset().filter(status=ready_status)
         page = self.paginate_queryset(ready_goods)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -248,9 +321,15 @@ class BaseGoodsReceivedViewSet(AdvancedAnalyticsMixin, SmartNotificationMixin, P
         
         threshold_date = timezone.now() - timedelta(days=days_threshold)
         
+        # Define statuses based on warehouse type
+        if hasattr(self, 'warehouse_type') and self.warehouse_type == 'ghana':
+            active_statuses = ['PENDING', 'READY_FOR_DELIVERY', 'FLAGGED']
+        else:
+            active_statuses = ['PENDING', 'READY_FOR_SHIPPING', 'FLAGGED']
+        
         overdue_goods = self.get_queryset().filter(
             date_received__lt=threshold_date,
-            status__in=['PENDING', 'READY_FOR_SHIPPING', 'FLAGGED']
+            status__in=active_statuses
         )
         
         page = self.paginate_queryset(overdue_goods)
@@ -269,7 +348,7 @@ class BaseGoodsReceivedViewSet(AdvancedAnalyticsMixin, SmartNotificationMixin, P
             'items': serializer.data
         })
     
-    @action(detail=False, methods=['post'], parser_classes=['rest_framework.parsers.MultiPartParser'])
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
     def upload_excel(self, request):
         """
         Upload Excel file to bulk create goods entries.
