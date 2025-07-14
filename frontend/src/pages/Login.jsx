@@ -5,10 +5,11 @@ import TextInput from "../components/TextInput";
 import PasswordInput from "../components/PasswordInput";
 import FormButton from "../components/FormButton";
 import Footer from "../components/Footer";
-import authService from "../services/authService";
+import { useAuth } from "../hooks/useAuth";
 
 function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     phone: "",
     password: "",
@@ -30,7 +31,7 @@ function Login() {
 
     try {
       setLoading(true);
-      const response = await authService.login(formData.phone, formData.password);
+      const response = await login(formData.phone, formData.password);
       console.log("Login successful:", response);
       
       // Redirect to dashboard or home page after successful login
