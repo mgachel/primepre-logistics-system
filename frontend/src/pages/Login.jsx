@@ -16,6 +16,7 @@ function Login() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -31,11 +32,16 @@ function Login() {
 
     try {
       setLoading(true);
+      setError(null);
+      setSuccess(false);
       const response = await login(formData.phone, formData.password);
       console.log("Login successful:", response);
       
-      // Redirect to dashboard or home page after successful login
-      navigate("/dashboard");
+      // Show success message briefly before navigating
+      setSuccess(true);
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1000);
     } catch (error) {
       console.error("Login error:", error);
       setError(error.message || "Login failed. Please check your credentials.");
@@ -57,6 +63,12 @@ function Login() {
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+            Login successful! Redirecting to dashboard...
           </div>
         )}
 
