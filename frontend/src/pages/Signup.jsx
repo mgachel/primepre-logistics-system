@@ -23,6 +23,7 @@ function SignUp() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({
     length: false,
     uppercase: false,
@@ -107,14 +108,19 @@ function SignUp() {
 
     try {
       setLoading(true);
+      setError(null);
+      setSuccess(false);
       console.log('Form data being submitted:', formData);
       await authService.register(formData);
 
       // Store phone for verification page
       sessionStorage.setItem("registrationPhone", formData.phone);
 
-      // Navigate to dashboard after successful registration
-      navigate("/dashboard");
+      // Show success message and redirect to dashboard
+      setSuccess(true);
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1500);
     } catch (error) {
       console.error("Registration error:", error);
       setError(error.message || "Registration failed. Please try again.");
@@ -136,6 +142,12 @@ function SignUp() {
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+            Registration successful! Welcome to PrimePre Logistics. Redirecting to dashboard...
           </div>
         )}
 
