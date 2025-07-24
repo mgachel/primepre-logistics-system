@@ -14,15 +14,6 @@ export const customersService = {
         queryParams.append('search', params.search);
       }
       
-      // Add pagination parameters
-      if (params.page) {
-        queryParams.append('page', params.page);
-      }
-      
-      if (params.page_size) {
-        queryParams.append('page_size', params.page_size);
-      }
-      
       // Add ordering parameter
       if (params.ordering) {
         queryParams.append('ordering', params.ordering);
@@ -40,7 +31,28 @@ export const customersService = {
         throw new Error(errorData.detail || 'Failed to fetch customers');
       }
 
-      return await response.json();
+      const data = await response.json();
+      
+      // Handle both paginated and non-paginated responses
+      if (Array.isArray(data)) {
+        // Non-paginated response
+        const customers = data.filter(user => user.user_role === 'CUSTOMER');
+        
+        // Apply client-side pagination if needed
+        const startIndex = ((params.page || 1) - 1) * (params.page_size || 10);
+        const endIndex = startIndex + (params.page_size || 10);
+        const paginatedCustomers = customers.slice(startIndex, endIndex);
+        
+        return {
+          results: paginatedCustomers,
+          count: customers.length,
+          next: endIndex < customers.length ? `page=${(params.page || 1) + 1}` : null,
+          previous: startIndex > 0 ? `page=${(params.page || 1) - 1}` : null
+        };
+      } else {
+        // Paginated response
+        return data;
+      }
     } catch (error) {
       console.error('Error fetching customers:', error);
       throw error;
