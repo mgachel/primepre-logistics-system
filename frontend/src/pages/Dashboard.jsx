@@ -13,7 +13,7 @@ function Dashboard() {
   const getPageTitle = () => {
     switch (currentPage) {
       case 'dashboard':
-        return 'PrimePre Logistics Dashboard';
+        return 'Dashboard';
       case 'cargo-sea':
         return 'Sea Cargo Management';
       case 'cargo-air':
@@ -27,7 +27,7 @@ function Dashboard() {
       case 'rates':
         return 'Shipping Rates';
       default:
-        return 'PrimePre Logistics Dashboard';
+        return 'Dashboard';
     }
   };
 
