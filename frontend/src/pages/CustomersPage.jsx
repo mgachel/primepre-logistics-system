@@ -1,52 +1,106 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { customersService } from '../services/customersService';
 
 function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(8);
   const [selectedCustomers, setSelectedCustomers] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [customerStats, setCustomerStats] = useState({
+    total_users: 0,
+    active_users: 0,
+    customer_users: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data - in real app, this would come from API
-  const mockCustomers = [
-    { id: 1, shippingMark: 'SM001', clientName: 'John Doe', email: 'john.doe@email.com', phone: '+1234567890', region: 'North America', status: 'Active', createdBy: 'Admin' },
-    { id: 2, shippingMark: 'SM002', clientName: 'Jane Smith', email: 'jane.smith@email.com', phone: '+1234567891', region: 'Europe', status: 'Active', createdBy: 'Manager' },
-    { id: 3, shippingMark: 'SM003', clientName: 'Bob Johnson', email: 'bob.johnson@email.com', phone: '+1234567892', region: 'Asia', status: 'Inactive', createdBy: 'Admin' },
-    { id: 4, shippingMark: 'SM004', clientName: 'Alice Brown', email: 'alice.brown@email.com', phone: '+1234567893', region: 'Africa', status: 'Active', createdBy: 'Staff' },
-    { id: 5, shippingMark: 'SM005', clientName: 'Charlie Wilson', email: 'charlie.wilson@email.com', phone: '+1234567894', region: 'South America', status: 'Active', createdBy: 'Manager' },
-    { id: 6, shippingMark: 'SM006', clientName: 'Diana Davis', email: 'diana.davis@email.com', phone: '+1234567895', region: 'North America', status: 'Inactive', createdBy: 'Admin' },
-    { id: 7, shippingMark: 'SM007', clientName: 'Edward Miller', email: 'edward.miller@email.com', phone: '+1234567896', region: 'Europe', status: 'Active', createdBy: 'Staff' },
-    { id: 8, shippingMark: 'SM008', clientName: 'Fiona Garcia', email: 'fiona.garcia@email.com', phone: '+1234567897', region: 'Asia', status: 'Active', createdBy: 'Manager' },
-    { id: 9, shippingMark: 'SM009', clientName: 'George Martinez', email: 'george.martinez@email.com', phone: '+1234567898', region: 'Africa', status: 'Active', createdBy: 'Admin' },
-    { id: 10, shippingMark: 'SM010', clientName: 'Helen Rodriguez', email: 'helen.rodriguez@email.com', phone: '+1234567899', region: 'South America', status: 'Inactive', createdBy: 'Staff' }
-  ];
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
 
-  const filteredCustomers = mockCustomers.filter(customer =>
-    customer.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.shippingMark.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  const sortedCustomers = [...filteredCustomers].sort((a, b) => {
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, sortBy]);
+
+  // Fetch customers from API
+  useEffect(() => {
+    fetchCustomers();
+  }, [currentPage, sortBy, debouncedSearchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch customer statistics
+  useEffect(() => {
+    fetchCustomerStats();
+  }, []);
+
+  const fetchCustomers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = {
+        page: currentPage,
+        page_size: pageSize,
+        search: debouncedSearchTerm,
+        ordering: getOrderingParam(sortBy)
+      };
+
+      const response = await customersService.getCustomers(params);
+      
+      if (response.results) {
+        setCustomers(response.results);
+        setTotalCustomers(response.count || response.results.length);
+      } else {
+        // If API doesn't use pagination, handle direct array response
+        setCustomers(response);
+        setTotalCustomers(response.length);
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching customers:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCustomerStats = async () => {
+    try {
+      const stats = await customersService.getCustomerStats();
+      setCustomerStats(stats);
+    } catch (err) {
+      console.error('Error fetching customer stats:', err);
+    }
+  };
+
+  const getOrderingParam = (sortBy) => {
     switch (sortBy) {
       case 'newest':
-        return b.id - a.id;
+        return '-date_joined';
       case 'oldest':
-        return a.id - b.id;
+        return 'date_joined';
       case 'name':
-        return a.clientName.localeCompare(b.clientName);
+        return 'first_name';
       default:
-        return 0;
+        return '-date_joined';
     }
-  });
+  };
 
-  const totalPages = Math.ceil(sortedCustomers.length / pageSize);
+  // Calculate pagination values
+  const totalPages = Math.ceil(totalCustomers / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedCustomers = sortedCustomers.slice(startIndex, startIndex + pageSize);
 
   const handleSelectAll = (checked) => {
     if (checked) {
-      setSelectedCustomers(paginatedCustomers.map(customer => customer.id));
+      setSelectedCustomers(customers.map(customer => customer.id));
     } else {
       setSelectedCustomers([]);
     }
@@ -60,18 +114,49 @@ function CustomersPage() {
     }
   };
 
+  const handleDeleteCustomer = async (customerId) => {
+    if (window.confirm('Are you sure you want to delete this customer?')) {
+      try {
+        await customersService.deleteCustomer(customerId);
+        fetchCustomers(); // Refresh the list
+      } catch (err) {
+        setError(err.message);
+      }
+    }
+  };
+
+  const handleToggleStatus = async (customerId) => {
+    try {
+      await customersService.toggleCustomerStatus(customerId);
+      fetchCustomers(); // Refresh the list
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  if (loading && customers.length === 0) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-lg text-gray-600">Loading customers...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
+
       {/* Header Section */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Hello, John 👋</h1>
-          </div>
-          <div className="relative">
+          <div className="relative ml-auto">
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search customers..."
               className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full sm:w-64"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -94,35 +179,36 @@ function CustomersPage() {
               </div>
               <div className="text-center sm:text-left">
                 <div className="text-xs text-gray-500 mb-1">Total Customers</div>
-                <div className="text-2xl font-bold text-gray-900">5,423</div>
+                <div className="text-2xl font-bold text-gray-900">{customerStats.customer_users?.toLocaleString() || '0'}</div>
                 <div className="text-xs text-green-600">↑ 16% this month</div>
               </div>
             </div>
 
-            {/* Inactive Members */}
+            {/* Active Customers */}
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/>
+                </svg>
+              </div>
+              <div className="text-center sm:text-left">
+                <div className="text-xs text-gray-500 mb-1">Active Customers</div>
+                <div className="text-2xl font-bold text-gray-900">{customerStats.active_users?.toLocaleString() || '0'}</div>
+                <div className="text-xs text-green-600">↑ 8% this month</div>
+              </div>
+            </div>
+
+            {/* Inactive Customers */}
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-red-600" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/>
                 </svg>
               </div>
               <div className="text-center sm:text-left">
                 <div className="text-xs text-gray-500 mb-1">Inactive</div>
-                <div className="text-2xl font-bold text-gray-900">1,893</div>
-                <div className="text-xs text-red-600">↓ 1% this month</div>
-              </div>
-            </div>
-
-            {/* Blocked */}
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
-                </svg>
-              </div>
-              <div className="text-center sm:text-left">
-                <div className="text-xs text-gray-500 mb-1">Blocked</div>
-                <div className="text-2xl font-bold text-gray-900">189</div>
+                <div className="text-2xl font-bold text-gray-900">{((customerStats.customer_users || 0) - (customerStats.active_users || 0)).toLocaleString()}</div>
+                <div className="text-xs text-red-600">↓ 2% this month</div>
               </div>
             </div>
           </div>
@@ -161,7 +247,7 @@ function CustomersPage() {
                     type="checkbox"
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     onChange={(e) => handleSelectAll(e.target.checked)}
-                    checked={selectedCustomers.length === paginatedCustomers.length && paginatedCustomers.length > 0}
+                    checked={selectedCustomers.length === customers.length && customers.length > 0}
                   />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shipping Mark</th>
@@ -175,7 +261,7 @@ function CustomersPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedCustomers.map((customer) => (
+              {customers.map((customer) => (
                 <tr key={customer.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <input
@@ -186,13 +272,13 @@ function CustomersPage() {
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {customer.shippingMark}
+                    {customer.shipping_mark || `SM${customer.id.toString().padStart(3, '0')}`}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {customer.clientName}
+                    {customer.full_name || `${customer.first_name} ${customer.last_name}`}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {customer.email}
+                    {customer.email || 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {customer.phone}
@@ -202,24 +288,32 @@ function CustomersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      customer.status === 'Active' 
+                      customer.is_active 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {customer.status}
+                      {customer.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {customer.createdBy}
+                    {customer.created_by?.full_name || customer.created_by?.first_name || 'System'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center space-x-2">
-                      <button className="text-blue-600 hover:text-blue-900">
+                      <button 
+                        className="text-blue-600 hover:text-blue-900"
+                        onClick={() => handleToggleStatus(customer.id)}
+                        title={customer.is_active ? 'Deactivate' : 'Activate'}
+                      >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </button>
-                      <button className="text-red-600 hover:text-red-900">
+                      <button 
+                        className="text-red-600 hover:text-red-900"
+                        onClick={() => handleDeleteCustomer(customer.id)}
+                        title="Delete customer"
+                      >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
@@ -236,7 +330,7 @@ function CustomersPage() {
         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="text-sm text-gray-700">
-              Showing data {startIndex + 1} to {Math.min(startIndex + pageSize, sortedCustomers.length)} of {sortedCustomers.length} entries
+              Showing data {startIndex + 1} to {Math.min(startIndex + pageSize, totalCustomers)} of {totalCustomers} entries
             </div>
             <div className="flex items-center space-x-2">
               <button
@@ -266,10 +360,10 @@ function CustomersPage() {
                 <>
                   <span className="px-3 py-1 text-sm text-gray-500">...</span>
                   <button
-                    onClick={() => setCurrentPage(40)}
+                    onClick={() => setCurrentPage(totalPages)}
                     className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100"
                   >
-                    40
+                    {totalPages}
                   </button>
                 </>
               )}
