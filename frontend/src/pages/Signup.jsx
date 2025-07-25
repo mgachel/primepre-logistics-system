@@ -130,14 +130,16 @@ function SignUp() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-4">
-      <LogoHeader />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-3 sm:px-4 lg:px-6 py-4">
+      <div className="w-full max-w-xs sm:max-w-sm lg:max-w-md mb-4 sm:mb-6">
+        <LogoHeader />
+      </div>
 
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-xl shadow-md p-8 w-full max-w-md"
+        className="bg-white rounded-xl shadow-md p-4 sm:p-6 lg:p-8 w-full max-w-xs sm:max-w-sm lg:max-w-md"
       >
-        <h2 className="text-center text-2xl font-semibold mb-6">Sign up</h2>
+        <h2 className="text-center text-xl sm:text-2xl font-semibold mb-4 sm:mb-6">Sign up</h2>
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -328,13 +330,15 @@ function SignUp() {
 
         <div className="text-sm text-center mt-4">
           Already have an account?{" "}
-          <a href="/login" className="text-blue-600">
+          <a href="/login" className="text-blue-600 hover:underline">
             Click here
           </a>
         </div>
       </form>
 
-      <Footer />
+      <div className="mt-4 sm:mt-6 w-full max-w-xs sm:max-w-sm lg:max-w-md">
+        <Footer />
+      </div>
     </div>
   );
 }
