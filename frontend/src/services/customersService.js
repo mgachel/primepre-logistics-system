@@ -39,8 +39,15 @@ export const customersService = {
       const response = await authService.authenticatedFetch(url);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to fetch customers');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        console.error('API Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          url,
+          errorData
+        });
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
