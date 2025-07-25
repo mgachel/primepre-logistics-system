@@ -18,20 +18,20 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
 
   const SidebarItem = ({ icon, label, isActive = false, onClick, hasSubmenu = false, isExpanded = false }) => (
     <div 
-      className={`flex items-center justify-between px-3 sm:px-4 py-3 cursor-pointer transition-colors duration-200 ${
+      className={`flex items-center justify-between px-2 sm:px-3 lg:px-4 py-2.5 sm:py-3 cursor-pointer transition-colors duration-200 ${
         isActive ? 'bg-blue-500 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'
       }`}
       onClick={onClick}
     >
-      <div className="flex items-center space-x-3">
-        <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+      <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+        <div className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center flex-shrink-0">
           {icon}
         </div>
-        <span className="text-sm font-medium truncate">{label}</span>
+        <span className="text-xs sm:text-sm font-medium truncate">{label}</span>
       </div>
       {hasSubmenu && (
         <svg 
-          className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform duration-200 flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
           fill="none" 
           stroke="currentColor" 
           viewBox="0 0 24 24"
@@ -44,15 +44,15 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
 
   const SubMenuItem = ({ icon, label, isActive = false, onClick }) => (
     <div 
-      className={`flex items-center space-x-3 px-3 sm:px-4 py-2 ml-6 sm:ml-8 cursor-pointer transition-colors duration-200 ${
+      className={`flex items-center space-x-2 sm:space-x-3 px-2 sm:px-3 lg:px-4 py-2 ml-4 sm:ml-6 lg:ml-8 cursor-pointer transition-colors duration-200 ${
         isActive ? 'bg-blue-500 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'
       }`}
       onClick={onClick}
     >
-      <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+      <div className="w-3 h-3 sm:w-4 sm:h-4 flex items-center justify-center flex-shrink-0">
         {icon}
       </div>
-      <span className="text-sm truncate">{label}</span>
+      <span className="text-xs sm:text-sm truncate">{label}</span>
     </div>
   );
 
@@ -69,14 +69,14 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
       {/* Sidebar */}
       <div className={`
         fixed lg:static inset-y-0 left-0 z-30 
-        w-64 sm:w-72 lg:w-80 bg-gray-800 min-h-screen flex flex-col
+        w-56 sm:w-64 lg:w-72 xl:w-80 bg-gray-800 min-h-screen flex flex-col
         transform transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
       {/* Header */}
-      <div className="px-4 sm:px-6 py-4 sm:py-6 border-b border-gray-700">
-        <div className="flex items-center justify-between mb-4 lg:hidden">
-          <span className="text-white text-lg font-semibold">Menu</span>
+      <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6 border-b border-gray-700">
+        <div className="flex items-center justify-between mb-3 lg:hidden">
+          <span className="text-white text-base sm:text-lg font-semibold">Menu</span>
           <button
             onClick={onToggle}
             className="text-gray-400 hover:text-white p-2"
@@ -86,14 +86,14 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
             </svg>
           </button>
         </div>
-        <div className="bg-white rounded-lg p-3 sm:p-4">
+        <div className="bg-white rounded-lg p-2 sm:p-3 lg:p-4">
           <LogoHeader />
         </div>
       </div>
 
       {/* Navigation Menu */}
-      <nav className="flex-1 py-4">
-        <div className="space-y-1">
+      <nav className="flex-1 py-2 sm:py-4 overflow-y-auto">
+        <div className="space-y-0.5 sm:space-y-1">
           {/* Dashboard */}
           <SidebarItem
             icon={
