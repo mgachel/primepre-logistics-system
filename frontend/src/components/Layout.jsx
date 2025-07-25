@@ -62,7 +62,7 @@ function Layout({ children, currentPage, onPageChange }) {
       />
       
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col lg:ml-0">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <Header 
           onToggleSidebar={toggleSidebar}
@@ -70,7 +70,7 @@ function Layout({ children, currentPage, onPageChange }) {
         />
 
         {/* Main Content */}
-        <main className="flex-1 max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
+        <main className="flex-1 w-full mx-auto py-2 sm:py-4 lg:py-6 px-2 sm:px-4 lg:px-6 xl:px-8 max-w-full overflow-hidden">
           {children}
         </main>
 
