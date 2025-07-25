@@ -259,13 +259,22 @@ function CustomersPage() {
             <div className="flex items-center gap-3">
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                onChange={(e) => {
+                  console.log('Sort changed to:', e.target.value);
+                  setSortBy(e.target.value);
+                }}
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="newest">Sort by: Newest</option>
                 <option value="oldest">Sort by: Oldest</option>
                 <option value="name">Sort by: Name</option>
               </select>
+              {loading && (
+                <div className="text-sm text-gray-500 flex items-center">
+                  <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                  Loading...
+                </div>
+              )}
             </div>
           </div>
         </div>

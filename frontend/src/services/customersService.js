@@ -22,7 +22,19 @@ export const customersService = {
       // Add role filter to get only customers
       queryParams.append('user_role', 'CUSTOMER');
 
+      // Add pagination parameters
+      if (params.page) {
+        queryParams.append('page', params.page);
+      }
+      
+      if (params.page_size) {
+        queryParams.append('page_size', params.page_size);
+      }
+
       const url = `${API_URL}/api/auth/admin/users/?${queryParams.toString()}`;
+      
+      console.log('API Request URL:', url);
+      console.log('Request params:', params);
       
       const response = await authService.authenticatedFetch(url);
 
@@ -34,7 +46,10 @@ export const customersService = {
       const data = await response.json();
       
       // Handle both paginated and non-paginated responses
-      if (Array.isArray(data)) {
+      if (data.results) {
+        // Paginated response from DRF
+        return data;
+      } else if (Array.isArray(data)) {
         // Non-paginated response
         const customers = data.filter(user => user.user_role === 'CUSTOMER');
         
@@ -49,10 +64,9 @@ export const customersService = {
           next: endIndex < customers.length ? `page=${(params.page || 1) + 1}` : null,
           previous: startIndex > 0 ? `page=${(params.page || 1) - 1}` : null
         };
-      } else {
-        // Paginated response
-        return data;
       }
+      
+      return data;
     } catch (error) {
       console.error('Error fetching customers:', error);
       throw error;

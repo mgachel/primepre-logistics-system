@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
 from datetime import timedelta
+from django_filters.rest_framework import DjangoFilterBackend
 from .serializers import (
     RegisterSerializer, UserSerializer, PasswordResetRequestSerializer,
     PasswordResetCodeVerifySerializer, PasswordResetConfirmSerializer,
@@ -105,26 +106,37 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = CustomerUser.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['user_role', 'is_active', 'user_type', 'region']
+    search_fields = ['first_name', 'last_name', 'email', 'phone', 'shipping_mark', 'company_name']
+    ordering_fields = ['first_name', 'last_name', 'date_joined', 'email', 'phone']
+    ordering = ['-date_joined']  # Default ordering
     
     def get_queryset(self):
-        """Filter users based on requesting user's permissions"""
+        """Filter users based on requesting user's permissions and query parameters"""
         user = self.request.user
         queryset = CustomerUser.objects.all()
         
-        # Super admins can see all users
+        # Apply role-based filtering first
         if user.is_super_admin:
-            return queryset
+            # Super admins can see all users
+            pass
+        elif user.user_role == 'MANAGER':
+            # Managers can see all non-super-admin users
+            queryset = queryset.exclude(user_role='SUPER_ADMIN')
+        elif user.user_role == 'ADMIN':
+            # Admins can only see customers and staff
+            queryset = queryset.filter(user_role__in=['CUSTOMER', 'STAFF'])
+        else:
+            # Other roles can only see their own profile
+            queryset = queryset.filter(id=user.id)
         
-        # Managers can see all non-super-admin users
-        if user.user_role == 'MANAGER':
-            return queryset.exclude(user_role='SUPER_ADMIN')
+        # Apply additional filtering based on query parameters
+        user_role = self.request.query_params.get('user_role', None)
+        if user_role:
+            queryset = queryset.filter(user_role=user_role)
         
-        # Admins can only see customers and staff
-        if user.user_role == 'ADMIN':
-            return queryset.filter(user_role__in=['CUSTOMER', 'STAFF'])
-        
-        # Other roles can only see their own profile
-        return queryset.filter(id=user.id)
+        return queryset
     
     def get_serializer_class(self):
         """Use different serializers based on action"""
