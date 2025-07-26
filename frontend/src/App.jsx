@@ -4,7 +4,7 @@ import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyResetCode from './pages/VerifyResetCode';
 import ResetPassword from './pages/ResetPassword';
-import Dashboard from './pages/Dashboard';
+import AppRouter from './components/AppRouter';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -24,7 +24,7 @@ function App() {
           path="/dashboard" 
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <AppRouter />
             </ProtectedRoute>
           } 
         />

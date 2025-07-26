@@ -51,14 +51,16 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-4">
-      <LogoHeader />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-3 sm:px-4 lg:px-6">
+      <div className="w-full max-w-xs sm:max-w-sm lg:max-w-md mb-6 sm:mb-8">
+        <LogoHeader />
+      </div>
 
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-xl shadow-md p-8 w-full max-w-md"
+        className="bg-white rounded-xl shadow-md p-4 sm:p-6 lg:p-8 w-full max-w-xs sm:max-w-sm lg:max-w-md"
       >
-        <h2 className="text-center text-2xl font-semibold mb-6">Login</h2>
+        <h2 className="text-center text-xl sm:text-2xl font-semibold mb-4 sm:mb-6">Login</h2>
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -92,17 +94,19 @@ function Login() {
 
         <FormButton label={loading ? "Logging in..." : "Login"} disabled={loading} />
 
-        <div className="flex justify-between text-sm mt-4">
-          <a href="/signup" className="text-blue-600 hover:underline">
+        <div className="flex flex-col sm:flex-row justify-between text-sm mt-4 space-y-2 sm:space-y-0">
+          <a href="/signup" className="text-blue-600 hover:underline text-center sm:text-left">
             Create an account
           </a>
-          <a href="/forgot-password" className="text-blue-600 hover:underline">
+          <a href="/forgot-password" className="text-blue-600 hover:underline text-center sm:text-right">
             Forgot password?
           </a>
         </div>
       </form>
 
-      <Footer />
+      <div className="mt-6 sm:mt-8 w-full max-w-xs sm:max-w-sm lg:max-w-md">
+        <Footer />
+      </div>
     </div>
   );
 }

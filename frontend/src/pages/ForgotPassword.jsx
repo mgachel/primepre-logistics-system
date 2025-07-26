@@ -51,15 +51,17 @@ function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-4">
-      <LogoHeader />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-3 sm:px-4 lg:px-6">
+      <div className="w-full max-w-xs sm:max-w-sm lg:max-w-md mb-6 sm:mb-8">
+        <LogoHeader />
+      </div>
 
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-xl shadow-md p-8 w-full max-w-md"
+        className="bg-white rounded-xl shadow-md p-4 sm:p-6 lg:p-8 w-full max-w-xs sm:max-w-sm lg:max-w-md"
       >
-        <h2 className="text-center text-2xl font-semibold mb-2">Forgot Password</h2>
-        <p className="text-center text-gray-600 mb-6">
+        <h2 className="text-center text-xl sm:text-2xl font-semibold mb-2">Forgot Password</h2>
+        <p className="text-center text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
           Enter your email address and we'll send you a verification code to reset your password.
         </p>
 
