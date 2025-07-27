@@ -266,18 +266,23 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
               <div className="bg-gray-750">
                 <SubMenuItem
                   icon={
+                    // China flag SVG
                     <svg
-                      fill="none"
-                      stroke="currentColor"
                       viewBox="0 0 24 24"
                       className="w-4 h-4"
+                      xmlns="http://www.w3.org/2000/svg"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                      <rect width="24" height="24" fill="#DE2910" />
+                      <polygon
+                        points="4,4 5.2,7.2 8.6,7.2 5.8,9.2 7,12.4 4,10.2 1,12.4 2.2,9.2 0.4,7.2 3.8,7.2"
+                        fill="#FFDE00"
+                        transform="scale(1.2) translate(1,0)"
                       />
+                      <circle cx="8.5" cy="5.5" r="0.7" fill="#FFDE00" />
+                      <circle cx="7.2" cy="7.5" r="0.5" fill="#FFDE00" />
+                      <circle cx="9.8" cy="7.5" r="0.5" fill="#FFDE00" />
+                      <circle cx="7.8" cy="9.2" r="0.5" fill="#FFDE00" />
+                      <circle cx="9.2" cy="9.2" r="0.5" fill="#FFDE00" />
                     </svg>
                   }
                   label="China warehouse"
@@ -286,17 +291,18 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
                 />
                 <SubMenuItem
                   icon={
+                    // Ghana flag SVG
                     <svg
-                      fill="none"
-                      stroke="currentColor"
                       viewBox="0 0 24 24"
                       className="w-4 h-4"
+                      xmlns="http://www.w3.org/2000/svg"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                      <rect width="24" height="8" y="0" fill="#EF2B2D" />
+                      <rect width="24" height="8" y="8" fill="#FCD116" />
+                      <rect width="24" height="8" y="16" fill="#009E49" />
+                      <polygon
+                        points="12,9 13,13 17,13 14,15 15,19 12,17 9,19 10,15 7,13 11,13"
+                        fill="#000"
                       />
                     </svg>
                   }
