@@ -13,11 +13,11 @@ export const AuthProvider = ({ children }) => {
       clearInterval(window.authRefreshInterval);
       delete window.authRefreshInterval;
     }
-    
+
     authService.logout();
     setUser(null);
     setIsAuthenticated(false);
-    
+
     // Redirect to login page
     window.location.href = '/login';
   }, []);
@@ -44,15 +44,15 @@ export const AuthProvider = ({ children }) => {
     // Check if user is already logged in on app start
     const currentUser = authService.getCurrentUser();
     const token = authService.getToken();
-    
+
     if (currentUser && token) {
       setUser(currentUser);
       setIsAuthenticated(true);
-      
+
       // Set up automatic token refresh
       setupTokenRefresh();
     }
-    
+
     setLoading(false);
   }, [setupTokenRefresh]);
 
@@ -61,10 +61,10 @@ export const AuthProvider = ({ children }) => {
       const response = await authService.login(phone, password);
       setUser(response.user);
       setIsAuthenticated(true);
-      
+
       // Set up automatic token refresh
       setupTokenRefresh();
-      
+
       return response;
     } catch (error) {
       console.error('Login failed:', error);
@@ -89,6 +89,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     register,
     refreshToken: authService.refreshToken,
+    getToken: authService.getToken, // Add this line
   };
 
   return (
