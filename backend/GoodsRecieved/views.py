@@ -823,3 +823,234 @@ class GoodsReceivedGhanaViewSet(BaseGoodsReceivedViewSet):
             'CBM': [3.2, 6.5],
             'SUPPLIER&TRACKING NO': ['TRK555666777', 'TRK888999000']
         }
+
+
+# ========================================
+# CUSTOMER-SPECIFIC VIEWSETS
+# ========================================
+
+class CustomerBaseGoodsReceivedViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Base ViewSet for customer-specific goods viewing.
+    Customers can only view their own goods (filtered by shipping_mark).
+    """
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    
+    # Common filtering options for customers
+    filterset_fields = ['status', 'location', 'supplier_name']
+    search_fields = ['supply_tracking', 'item_id', 'description']
+    ordering_fields = ['date_received', 'created_at', 'status']
+    ordering = ['-date_received']
+    
+    def get_queryset(self):
+        """
+        Filter queryset to show only the authenticated customer's goods.
+        """
+        user = self.request.user
+        
+        # Only show goods belonging to the authenticated customer
+        queryset = self.model_class.objects.filter(shipping_mark=user.shipping_mark)
+        
+        # Apply date filtering
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        
+        if date_from:
+            try:
+                date_from = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+                queryset = queryset.filter(date_received__gte=date_from)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                date_to = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+                queryset = queryset.filter(date_received__lte=date_to)
+            except ValueError:
+                pass
+        
+        return queryset
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override retrieve to ensure customers can only access their own goods.
+        """
+        instance = self.get_object()
+        
+        # Verify the item belongs to the requesting customer
+        if instance.shipping_mark != request.user.shipping_mark:
+            return Response(
+                {'detail': 'You can only access your own goods.'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def my_statistics(self, request):
+        """Get customer's personal statistics"""
+        queryset = self.get_queryset()
+        
+        stats = {
+            'total_items': queryset.count(),
+            'by_status': queryset.values('status').annotate(count=Count('id')),
+            'total_cbm': queryset.aggregate(total=Sum('cbm'))['total'] or 0,
+            'total_weight': queryset.aggregate(total=Sum('weight'))['total'] or 0,
+            'recent_items': queryset.filter(
+                date_received__gte=timezone.now() - timedelta(days=30)
+            ).count(),
+        }
+        
+        return Response(stats)
+    
+    @action(detail=False, methods=['get'])
+    def my_flagged_items(self, request):
+        """Get customer's flagged items"""
+        queryset = self.get_queryset().filter(status='FLAGGED')
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def ready_for_shipping(self, request):
+        """Get customer's items ready for shipping"""
+        queryset = self.get_queryset().filter(status='READY_FOR_SHIPPING')
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def overdue_items(self, request):
+        """Get customer's overdue items"""
+        days_threshold = int(request.query_params.get('days', 30))
+        threshold_date = timezone.now() - timedelta(days=days_threshold)
+        
+        queryset = self.get_queryset().filter(
+            date_received__lt=threshold_date,
+            status__in=['PENDING', 'PROCESSING']
+        )
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def tracking(self, request):
+        """Track item by supply tracking number"""
+        tracking_id = request.query_params.get('tracking_id')
+        if not tracking_id:
+            return Response(
+                {'detail': 'tracking_id parameter is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            item = self.get_queryset().get(supply_tracking=tracking_id)
+            serializer = self.get_serializer(item)
+            return Response(serializer.data)
+        except self.model_class.DoesNotExist:
+            return Response(
+                {'detail': 'Item not found or not accessible'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+class CustomerGoodsReceivedChinaViewSet(CustomerBaseGoodsReceivedViewSet):
+    """
+    Customer ViewSet for China warehouse goods.
+    Customers can only view their own goods.
+    """
+    serializer_class = GoodsReceivedChinaSerializer
+    model_class = GoodsReceivedChina
+
+
+class CustomerGoodsReceivedGhanaViewSet(CustomerBaseGoodsReceivedViewSet):
+    """
+    Customer ViewSet for Ghana warehouse goods.
+    Customers can only view their own goods.
+    """
+    serializer_class = GoodsReceivedGhanaSerializer
+    model_class = GoodsReceivedGhana
+
+
+# ========================================
+# CUSTOMER DASHBOARD VIEW
+# ========================================
+
+from rest_framework.views import APIView
+
+class CustomerDashboardView(APIView):
+    """
+    Customer dashboard providing unified view of all their goods.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Get customer's dashboard with unified statistics and recent items.
+        """
+        user = request.user
+        
+        # Get customer's goods from both warehouses
+        china_goods = GoodsReceivedChina.objects.filter(shipping_mark=user.shipping_mark)
+        ghana_goods = GoodsReceivedGhana.objects.filter(shipping_mark=user.shipping_mark)
+        
+        # Calculate unified statistics
+        total_china_items = china_goods.count()
+        total_ghana_items = ghana_goods.count()
+        
+        china_stats = {
+            'total_items': total_china_items,
+            'total_cbm': china_goods.aggregate(total=Sum('cbm'))['total'] or 0,
+            'total_weight': china_goods.aggregate(total=Sum('weight'))['total'] or 0,
+            'by_status': list(china_goods.values('status').annotate(count=Count('id'))),
+            'flagged_count': china_goods.filter(status='FLAGGED').count(),
+            'ready_count': china_goods.filter(status='READY_FOR_SHIPPING').count(),
+        }
+        
+        ghana_stats = {
+            'total_items': total_ghana_items,
+            'total_cbm': ghana_goods.aggregate(total=Sum('cbm'))['total'] or 0,
+            'total_weight': ghana_goods.aggregate(total=Sum('weight'))['total'] or 0,
+            'by_status': list(ghana_goods.values('status').annotate(count=Count('id'))),
+            'flagged_count': ghana_goods.filter(status='FLAGGED').count(),
+            'ready_count': ghana_goods.filter(status='READY_FOR_SHIPPING').count(),
+        }
+        
+        # Get recent items from both warehouses
+        recent_china = china_goods.order_by('-date_received')[:5]
+        recent_ghana = ghana_goods.order_by('-date_received')[:5]
+        
+        # Get overdue items (30+ days)
+        threshold_date = timezone.now() - timedelta(days=30)
+        overdue_china = china_goods.filter(
+            date_received__lt=threshold_date,
+            status__in=['PENDING', 'PROCESSING']
+        ).count()
+        overdue_ghana = ghana_goods.filter(
+            date_received__lt=threshold_date,
+            status__in=['PENDING', 'PROCESSING']
+        ).count()
+        
+        dashboard_data = {
+            'customer_info': {
+                'shipping_mark': user.shipping_mark,
+                'name': user.get_full_name(),
+                'company': user.company_name,
+            },
+            'overview': {
+                'total_items': total_china_items + total_ghana_items,
+                'total_cbm': china_stats['total_cbm'] + ghana_stats['total_cbm'],
+                'total_weight': china_stats['total_weight'] + ghana_stats['total_weight'],
+                'total_flagged': china_stats['flagged_count'] + ghana_stats['flagged_count'],
+                'total_ready': china_stats['ready_count'] + ghana_stats['ready_count'],
+                'total_overdue': overdue_china + overdue_ghana,
+            },
+            'china_warehouse': china_stats,
+            'ghana_warehouse': ghana_stats,
+            'recent_items': {
+                'china': GoodsReceivedChinaSerializer(recent_china, many=True).data,
+                'ghana': GoodsReceivedGhanaSerializer(recent_ghana, many=True).data,
+            },
+        }
+        
+        return Response(dashboard_data)
