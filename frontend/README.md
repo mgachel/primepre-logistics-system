@@ -45,10 +45,6 @@ The frontend of the Primepre Logistics System is a modern web application built 
    ```
 3. Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-## API Integration
-
-API calls are managed in the `services/` directory. Authentication tokens are handled via the `useAuth` hook. Update API endpoints as needed in the service files.
-
 ## Customization
 
 - **Styling**: Modify `tailwind.config.js` and `index.css` for custom styles.
