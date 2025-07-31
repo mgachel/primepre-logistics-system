@@ -2,21 +2,30 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 
-# Create router for ViewSets
+# Create router for ViewSets (Admin/Staff)
 router = DefaultRouter()
 router.register(r'containers', views.CargoContainerViewSet, basename='container')
 router.register(r'cargo-items', views.CargoItemViewSet, basename='cargo-item')
 router.register(r'customers', views.CustomerUserViewSet, basename='customer')
 router.register(r'client-summaries', views.ClientShipmentSummaryViewSet, basename='client-summary')
 
+# Customer-specific router
+customer_router = DefaultRouter()
+customer_router.register(r'containers', views.CustomerCargoContainerViewSet, basename='customer-container')
+customer_router.register(r'cargo-items', views.CustomerCargoItemViewSet, basename='customer-cargo-item')
+
 app_name = 'cargo'
 
 urlpatterns = [
-    # API routes
+    # Admin/Staff API routes
     path('api/', include(router.urls)),
     path('api/dashboard/', views.CargoDashboardView.as_view(), name='dashboard'),
     path('api/statistics/', views.cargo_statistics, name='statistics'),
     path('api/bulk-upload/', views.BulkCargoItemUploadView.as_view(), name='bulk-upload'),
+    
+    # Customer-specific API routes
+    path('api/customer/', include(customer_router.urls)),
+    path('api/customer/dashboard/', views.CustomerCargoDashboardView.as_view(), name='customer-cargo-dashboard'),
     
     # Template views (if needed for frontend)
     path('dashboard/', views.cargo_dashboard, name='cargo-dashboard'),
