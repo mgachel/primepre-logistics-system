@@ -1,9 +1,3 @@
-# Frontend Documentation
-
-## Overview
-
-The frontend of the Primepre Logistics System is a modern web application built with React and Vite. It provides a user-friendly interface for managing logistics operations, including dashboards, cargo tracking, and client management.
-
 ## Project Structure
 
 - `src/` - Main source code directory
