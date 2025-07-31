@@ -19,13 +19,6 @@ The frontend of the Primepre Logistics System is a modern web application built 
 - `public/` - Static files served directly
 - `index.html` - Main HTML template
 
-## Key Technologies
-
-- **React**: UI library for building interactive interfaces
-- **Vite**: Fast development server and build tool
-- **Tailwind CSS**: Utility-first CSS framework for styling
-- **ESLint**: Linting and code quality
-
 ## Main Features
 
 - **Dashboard**: Visual summary of logistics data (goods received, in transit, clients, etc.)
