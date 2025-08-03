@@ -1,13 +1,51 @@
 import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import LogoHeader from "./LogoHeader";
 
-function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
+function Sidebar({ isOpen, onToggle }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [expandedMenus, setExpandedMenus] = useState({
     cargo: false,
     goodsReceived: false,
   });
+
+  const getCurrentPage = () => {
+    const path = location.pathname;
+    if (path.includes("/dashboard/overview")) return "dashboard";
+    if (path.includes("/dashboard/cargo-sea")) return "cargo-sea";
+    if (path.includes("/dashboard/cargo-air")) return "cargo-air";
+    if (path.includes("/dashboard/customers")) return "customers";
+    if (path.includes("/dashboard/goods-received-china"))
+      return "goods-received-china";
+    if (path.includes("/dashboard/goods-received-ghana"))
+      return "goods-received-ghana";
+    if (path.includes("/dashboard/rates")) return "rates";
+    return "dashboard";
+  };
+
+  const currentPage = getCurrentPage();
+
+  const handleNavigation = (page) => {
+    const routes = {
+      dashboard: "/dashboard/overview",
+      "cargo-sea": "/dashboard/cargo-sea",
+      "cargo-air": "/dashboard/cargo-air",
+      customers: "/dashboard/customers",
+      "goods-received-china": "/dashboard/goods-received-china",
+      "goods-received-ghana": "/dashboard/goods-received-ghana",
+      rates: "/dashboard/rates",
+    };
+
+    navigate(routes[page] || "/dashboard/overview");
+
+    // Close sidebar on mobile when navigating
+    if (onToggle && window.innerWidth < 1024) {
+      onToggle();
+    }
+  };
 
   const toggleMenu = (menuName) => {
     setExpandedMenus((prev) => ({
@@ -149,7 +187,7 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
               }
               label="Dashboard"
               isActive={currentPage === "dashboard"}
-              onClick={() => onPageChange("dashboard")}
+              onClick={() => handleNavigation("dashboard")}
             />
 
             {/* Cargo */}
@@ -193,7 +231,7 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
                   }
                   label="SEA"
                   isActive={currentPage === "cargo-sea"}
-                  onClick={() => onPageChange("cargo-sea")}
+                  onClick={() => handleNavigation("cargo-sea")}
                 />
                 <SubMenuItem
                   icon={
@@ -207,7 +245,7 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
                   }
                   label="AIR"
                   isActive={currentPage === "cargo-air"}
-                  onClick={() => onPageChange("cargo-air")}
+                  onClick={() => handleNavigation("cargo-air")}
                 />
               </div>
             )}
@@ -239,7 +277,7 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
               }
               label="Customers"
               isActive={currentPage === "customers"}
-              onClick={() => onPageChange("customers")}
+              onClick={() => handleNavigation("customers")}
             />
 
             {/* Goods Received */}
@@ -291,7 +329,7 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
                   }
                   label="China warehouse"
                   isActive={currentPage === "goods-received-china"}
-                  onClick={() => onPageChange("goods-received-china")}
+                  onClick={() => handleNavigation("goods-received-china")}
                 />
                 <SubMenuItem
                   icon={
@@ -312,7 +350,7 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
                   }
                   label="Ghana warehouse"
                   isActive={currentPage === "goods-received-ghana"}
-                  onClick={() => onPageChange("goods-received-ghana")}
+                  onClick={() => handleNavigation("goods-received-ghana")}
                 />
               </div>
             )}
@@ -336,7 +374,7 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
               }
               label="Rates"
               isActive={currentPage === "rates"}
-              onClick={() => onPageChange("rates")}
+              onClick={() => handleNavigation("rates")}
             />
           </div>
         </nav>
