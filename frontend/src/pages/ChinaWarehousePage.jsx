@@ -2,6 +2,7 @@ import React, { useState, useContext } from "react";
 import StatusCard from "../components/StatusCard";
 import ControlPanel from "../components/ControlPanel";
 import DataTable from "../components/DataTable";
+import AddItemModal from "../components/AddItemModal";
 import { BoxIcon, TruckIcon, FlagIcon } from "../components/Icons";
 import { useChinaWarehouse } from "../hooks/useChinaWarehouse";
 import { AuthContext } from "../contexts/authContext";
@@ -17,6 +18,7 @@ function ChinaWarehousePage() {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [updateForm, setUpdateForm] = useState({ description: "" });
   const [statusForm, setStatusForm] = useState({ status: "", notes: "" });
@@ -60,12 +62,17 @@ function ChinaWarehousePage() {
 
   const handleAddItem = () => {
     console.log("Add item clicked");
-    // TODO: Implement add item modal/form
     if (!isStaffUser) {
       alert("Only staff members can add items");
       return;
     }
-    // This would typically open a modal or navigate to an add item form
+    setShowAddItemModal(true);
+  };
+
+  const handleAddItemSuccess = (newItem) => {
+    console.log("Item added successfully:", newItem);
+    // Refresh the data by reloading the page
+    window.location.reload();
   };
 
   const handleSearch = (value) => {
@@ -663,6 +670,13 @@ function ChinaWarehousePage() {
           </div>
         </div>
       )}
+
+      {/* Add Item Modal */}
+      <AddItemModal
+        isOpen={showAddItemModal}
+        onClose={() => setShowAddItemModal(false)}
+        onSuccess={handleAddItemSuccess}
+      />
     </div>
   );
 }
