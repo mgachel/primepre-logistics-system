@@ -235,6 +235,7 @@ export const chinaWarehouseService = {
   uploadExcel: async (file) => {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('warehouse', 'china'); // Required by the backend serializer
 
     try {
       const token = localStorage.getItem('accessToken');
