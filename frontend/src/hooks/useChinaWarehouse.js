@@ -19,6 +19,47 @@ export const useChinaWarehouse = (userRole = 'customer') => {
   // Determine which API endpoints to use based on user role
   const isStaffUser = userRole === 'staff' || userRole === 'admin';
 
+  // Function to calculate real-time statistics from actual data
+  const calculateStatistics = useCallback((items) => {
+    const stats = {
+      received: 0,    // Items that have been received (pending + ready + others, excluding shipped/flagged)
+      shipped: 0,     // Items that have been shipped out
+      flagged: 0,     // Items that have issues/problems
+      pending: 0,     // Items waiting for processing
+      ready_for_shipping: 0,  // Items ready to be shipped
+      total: items.length
+    };
+
+    items.forEach(item => {
+      const status = item.status?.toLowerCase();
+      
+      switch (status) {
+        case 'pending':
+          stats.pending++;
+          stats.received++; // Pending items are considered received in warehouse
+          break;
+        case 'ready_for_shipping':
+        case 'ready for shipping':
+          stats.ready_for_shipping++;
+          stats.received++; // Ready items are also received in warehouse
+          break;
+        case 'shipped':
+          stats.shipped++;
+          // Shipped items are not counted as "received" since they've left
+          break;
+        case 'flagged':
+          stats.flagged++;
+          // Flagged items are not counted as "received" due to issues
+          break;
+        default:
+          // For any other status (cancelled, etc.), consider it as received
+          stats.received++;
+      }
+    });
+
+    return stats;
+  }, []);
+
   const fetchData = useCallback(async (params = {}) => {
     try {
       setLoading(true);
@@ -36,30 +77,16 @@ export const useChinaWarehouse = (userRole = 'customer') => {
         ? chinaWarehouseService.getAllItems(params)
         : chinaWarehouseService.getCustomerItems(params);
 
-      const statsPromise = isStaffUser
-        ? chinaWarehouseService.getStatistics()
-        : chinaWarehouseService.getCustomerStatistics();
-
-      const [itemsResponse, statsResponse] = await Promise.all([
-        itemsPromise,
-        statsPromise
-      ]);
+      // We'll calculate statistics from the actual items data instead of a separate API call
+      const itemsResponse = await itemsPromise;
 
       const items = itemsResponse.results || itemsResponse;
       setData(items);
       setOriginalData(items); // Keep a copy for local filtering
       
-      // Map backend statistics to frontend format
-      if (statsResponse) {
-        setStatistics({
-          received: statsResponse.pending || statsResponse.received || 0,
-          shipped: statsResponse.shipped || 0,
-          flagged: statsResponse.flagged || 0,
-          pending: statsResponse.pending || 0,
-          ready_for_shipping: statsResponse.ready_for_shipping || 0,
-          total: statsResponse.total || 0
-        });
-      }
+      // Calculate real-time statistics from actual data
+      const calculatedStats = calculateStatistics(items);
+      setStatistics(calculatedStats);
     } catch (err) {
       console.error('Error fetching China warehouse data:', err);
       
@@ -72,7 +99,7 @@ export const useChinaWarehouse = (userRole = 'customer') => {
     } finally {
       setLoading(false);
     }
-  }, [isStaffUser]);
+  }, [isStaffUser, calculateStatistics]);
 
   const createItem = useCallback(async (itemData) => {
     if (!isStaffUser) {
@@ -81,25 +108,19 @@ export const useChinaWarehouse = (userRole = 'customer') => {
 
     try {
       const newItem = await chinaWarehouseService.createItem(itemData);
-      setData(prevData => [newItem, ...prevData]);
+      const updatedData = [newItem, ...data];
+      setData(updatedData);
+      setOriginalData(updatedData);
       
-      // Refresh statistics
-      const stats = await chinaWarehouseService.getStatistics();
-      setStatistics({
-        received: stats.pending || stats.received || 0,
-        shipped: stats.shipped || 0,
-        flagged: stats.flagged || 0,
-        pending: stats.pending || 0,
-        ready_for_shipping: stats.ready_for_shipping || 0,
-        total: stats.total || 0
-      });
+      // Recalculate statistics with new data
+      setStatistics(calculateStatistics(updatedData));
       
       return newItem;
     } catch (err) {
       console.error('Error creating item:', err);
       throw err;
     }
-  }, [isStaffUser]);
+  }, [isStaffUser, data, calculateStatistics]);
 
   const updateItem = useCallback(async (id, itemData) => {
     if (!isStaffUser) {
@@ -108,17 +129,21 @@ export const useChinaWarehouse = (userRole = 'customer') => {
 
     try {
       const updatedItem = await chinaWarehouseService.updateItem(id, itemData);
-      setData(prevData => 
-        prevData.map(item => 
-          item.id === id ? { ...item, ...updatedItem } : item
-        )
+      const updatedData = data.map(item => 
+        item.id === id ? { ...item, ...updatedItem } : item
       );
+      setData(updatedData);
+      setOriginalData(updatedData);
+      
+      // Recalculate statistics with updated data
+      setStatistics(calculateStatistics(updatedData));
+      
       return updatedItem;
     } catch (err) {
       console.error('Error updating item:', err);
       throw err;
     }
-  }, [isStaffUser]);
+  }, [isStaffUser, data, calculateStatistics]);
 
   const deleteItem = useCallback(async (id) => {
     if (!isStaffUser) {
@@ -127,23 +152,17 @@ export const useChinaWarehouse = (userRole = 'customer') => {
 
     try {
       await chinaWarehouseService.deleteItem(id);
-      setData(prevData => prevData.filter(item => item.id !== id));
+      const updatedData = data.filter(item => item.id !== id);
+      setData(updatedData);
+      setOriginalData(updatedData);
       
-      // Refresh statistics
-      const stats = await chinaWarehouseService.getStatistics();
-      setStatistics({
-        received: stats.pending || stats.received || 0,
-        shipped: stats.shipped || 0,
-        flagged: stats.flagged || 0,
-        pending: stats.pending || 0,
-        ready_for_shipping: stats.ready_for_shipping || 0,
-        total: stats.total || 0
-      });
+      // Recalculate statistics with updated data
+      setStatistics(calculateStatistics(updatedData));
     } catch (err) {
       console.error('Error deleting item:', err);
       throw err;
     }
-  }, [isStaffUser]);
+  }, [isStaffUser, data, calculateStatistics]);
 
   const updateStatus = useCallback(async (id, status, notes = '') => {
     if (!isStaffUser) {
@@ -152,37 +171,30 @@ export const useChinaWarehouse = (userRole = 'customer') => {
 
     try {
       const updatedItem = await chinaWarehouseService.updateStatus(id, status, notes);
-      setData(prevData => 
-        prevData.map(item => 
-          item.id === id ? { ...item, status, ...updatedItem } : item
-        )
+      const updatedData = data.map(item => 
+        item.id === id ? { ...item, status, ...updatedItem } : item
       );
+      setData(updatedData);
+      setOriginalData(updatedData);
       
-      // Refresh statistics
-      const stats = await chinaWarehouseService.getStatistics();
-      setStatistics({
-        received: stats.pending || stats.received || 0,
-        shipped: stats.shipped || 0,
-        flagged: stats.flagged || 0,
-        pending: stats.pending || 0,
-        ready_for_shipping: stats.ready_for_shipping || 0,
-        total: stats.total || 0
-      });
+      // Recalculate statistics with updated data
+      setStatistics(calculateStatistics(updatedData));
       
       return updatedItem;
     } catch (err) {
       console.error('Error updating status:', err);
       throw err;
     }
-  }, [isStaffUser]);
+  }, [isStaffUser, data, calculateStatistics]);
 
   // Local search function (instant filtering)
   const searchItems = useCallback((searchQuery) => {
     setSearchQuery(searchQuery);
     
     if (!searchQuery || searchQuery.trim() === '') {
-      // If search is empty, show all data
+      // If search is empty, show all data and recalculate full statistics
       setData(originalData);
+      setStatistics(calculateStatistics(originalData));
       return;
     }
 
@@ -201,7 +213,9 @@ export const useChinaWarehouse = (userRole = 'customer') => {
     });
 
     setData(filteredData);
-  }, [originalData]);
+    // Update statistics to reflect only the filtered data
+    setStatistics(calculateStatistics(filteredData));
+  }, [originalData, calculateStatistics]);
 
   // Server-side search function (for more complex searches if needed)
   const searchItemsOnServer = useCallback(async (searchQuery) => {
