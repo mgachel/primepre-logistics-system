@@ -43,11 +43,11 @@ const DataTable = ({
   };
 
   const goToPreviousPage = () => {
-    setCurrentPage(prev => Math.max(1, prev - 1));
+    setCurrentPage((prev) => Math.max(1, prev - 1));
   };
 
   const goToNextPage = () => {
-    setCurrentPage(prev => Math.min(totalPages, prev + 1));
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
   };
 
   const renderCell = (item, column) => {
@@ -275,7 +275,8 @@ const DataTable = ({
           <div className="flex items-center justify-between">
             {/* Left side - Item count info */}
             <div className="text-sm text-gray-700">
-              Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} items
+              Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of{" "}
+              {totalItems} items
             </div>
 
             {/* Right side - Page navigation */}
@@ -300,7 +301,9 @@ const DataTable = ({
                     >
                       1
                     </button>
-                    {currentPage > 4 && <span className="text-gray-500">...</span>}
+                    {currentPage > 4 && (
+                      <span className="text-gray-500">...</span>
+                    )}
                   </>
                 )}
 
@@ -314,8 +317,8 @@ const DataTable = ({
                         onClick={() => goToPage(pageNum)}
                         className={`px-3 py-1 text-sm border rounded-md ${
                           pageNum === currentPage
-                            ? 'bg-blue-500 text-white border-blue-500'
-                            : 'border-gray-300 hover:bg-gray-100'
+                            ? "bg-blue-500 text-white border-blue-500"
+                            : "border-gray-300 hover:bg-gray-100"
                         }`}
                       >
                         {pageNum}
@@ -328,7 +331,9 @@ const DataTable = ({
                 {/* Show last page if not in view */}
                 {currentPage < totalPages - 2 && (
                   <>
-                    {currentPage < totalPages - 3 && <span className="text-gray-500">...</span>}
+                    {currentPage < totalPages - 3 && (
+                      <span className="text-gray-500">...</span>
+                    )}
                     <button
                       onClick={() => goToPage(totalPages)}
                       className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100"
