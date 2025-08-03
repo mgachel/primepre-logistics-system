@@ -680,7 +680,11 @@ const AddItemModal = ({ isOpen, onClose, onSuccess }) => {
                   <span>• DESCRIPTION</span>
                   <span>• DATE OF LOADING</span>
                 </div>
-                <p className="text-xs text-blue-600 mb-3">* Required fields</p>
+                <p className="text-xs text-blue-600 mb-2">* Required fields</p>
+                <p className="text-xs text-green-600 mb-3">
+                  ✅ Multiple items can have the same shipping mark
+                  <br />❗ Each item must have a unique supplier tracking number
+                </p>
                 <button
                   onClick={handleDownloadTemplate}
                   className="px-3 py-2 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 transition-colors"
