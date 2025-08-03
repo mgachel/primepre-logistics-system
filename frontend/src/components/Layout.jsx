@@ -53,16 +53,18 @@ function Layout({ children, currentPage, onPageChange }) {
 
   return (
     <div className="min-h-screen flex bg-gray-50">
-      {/* Sidebar */}
-      <Sidebar 
-        currentPage={currentPage} 
-        onPageChange={handlePageChange}
-        isOpen={sidebarOpen}
-        onToggle={toggleSidebar}
-      />
-      
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Static Sidebar */}
+      <div className="hidden lg:block">
+        <Sidebar 
+          currentPage={currentPage} 
+          onPageChange={handlePageChange}
+          isOpen={sidebarOpen}
+          onToggle={toggleSidebar}
+        />
+      </div>
+
+      {/* Main Content Area with its own scroll */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         {/* Header */}
         <Header 
           onToggleSidebar={toggleSidebar}
@@ -70,7 +72,7 @@ function Layout({ children, currentPage, onPageChange }) {
         />
 
         {/* Main Content */}
-        <main className="flex-1 w-full mx-auto py-2 sm:py-4 lg:py-6 px-2 sm:px-4 lg:px-6 xl:px-8 max-w-full overflow-hidden">
+        <main className="flex-1 w-full mx-auto py-2 sm:py-4 lg:py-6 px-2 sm:px-4 lg:px-6 xl:px-8 max-w-full">
           {children}
         </main>
 
