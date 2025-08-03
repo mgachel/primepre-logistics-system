@@ -16,6 +16,8 @@ This is a capstone project developed by Computer Science students from the Unive
 - [Team Members](#team-members)
 - [Project Timeline](#project-timeline)
 - [License](#license)
+- [Changelog](#changelog)
+
 
 ---
 
@@ -139,7 +141,7 @@ DB_HOST=localhost
 🧑‍💻 Contributing
 We use a feature-branch model. Here’s how to contribute:
 
-1. CLone the Repository
+1. Clone the Repository
 git clone https://github.com/YOUR_USERNAME/primepre-logistics-system.git
 
 2.git checkout -b feature/module-name
@@ -160,6 +162,18 @@ git clone https://github.com/YOUR_USERNAME/primepre-logistics-system.git
 | UI/UX Designer     | \[Gabriel] | User flows, wireframes    |
 | UI/UX Designer     | \[Sherriffa] | Prototypes, color palette |
 | DevOps Engineer    | \[Isabella] | CI/CD, Docker, deployment |
+
+---
+
+## 🧾 Changelog
+
+### v1.0.0 – August 3, 2025
+- ✅ Fixed failing Django unit tests (`GoodsRecieved.tests`)
+- ✅ All backend tests now passing locally and in CI
+- 🐳 Validated Docker container setup and stability
+- 🔁 CI pipeline via GitHub Actions now fully functional
+- 🏷️ Git tag `v1.0.0` created and pushed to mark backend milestone
+
 
 
 
