@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 
 const DataTable = ({
   data = [],
@@ -9,7 +9,10 @@ const DataTable = ({
   onUpdateStatus,
   emptyMessage = "No data available",
   userRole = "customer",
+  itemsPerPage = 25, // Show 25 items per page by default
 }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+
   const defaultColumns = [
     { key: "tracking_id", label: "TRACKING ID", width: "w-1/6" },
     { key: "shipping_mark", label: "SHIPPING MARK", width: "w-1/6" },
@@ -20,6 +23,32 @@ const DataTable = ({
   ];
 
   const tableColumns = columns.length > 0 ? columns : defaultColumns;
+
+  // Calculate pagination
+  const totalItems = data.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentData = useMemo(() => {
+    return data.slice(startIndex, endIndex);
+  }, [data, startIndex, endIndex]);
+
+  // Reset to first page when data changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [data.length]);
+
+  const goToPage = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage(prev => Math.max(1, prev - 1));
+  };
+
+  const goToNextPage = () => {
+    setCurrentPage(prev => Math.min(totalPages, prev + 1));
+  };
 
   const renderCell = (item, column) => {
     if (column.key === "actions") {
@@ -223,7 +252,7 @@ const DataTable = ({
 
       {/* Table Body */}
       <div className="divide-y divide-gray-200">
-        {data.map((item, index) => (
+        {currentData.map((item, index) => (
           <div
             key={index}
             className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-gray-50"
@@ -239,6 +268,89 @@ const DataTable = ({
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="bg-gray-50 px-6 py-3 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            {/* Left side - Item count info */}
+            <div className="text-sm text-gray-700">
+              Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} items
+            </div>
+
+            {/* Right side - Page navigation */}
+            <div className="flex items-center space-x-2">
+              {/* Previous button */}
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+
+              {/* Page numbers */}
+              <div className="flex items-center space-x-1">
+                {/* Show first page if not in view */}
+                {currentPage > 3 && (
+                  <>
+                    <button
+                      onClick={() => goToPage(1)}
+                      className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100"
+                    >
+                      1
+                    </button>
+                    {currentPage > 4 && <span className="text-gray-500">...</span>}
+                  </>
+                )}
+
+                {/* Show pages around current page */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = Math.max(1, currentPage - 2) + i;
+                  if (pageNum <= totalPages) {
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => goToPage(pageNum)}
+                        className={`px-3 py-1 text-sm border rounded-md ${
+                          pageNum === currentPage
+                            ? 'bg-blue-500 text-white border-blue-500'
+                            : 'border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  }
+                  return null;
+                }).filter(Boolean)}
+
+                {/* Show last page if not in view */}
+                {currentPage < totalPages - 2 && (
+                  <>
+                    {currentPage < totalPages - 3 && <span className="text-gray-500">...</span>}
+                    <button
+                      onClick={() => goToPage(totalPages)}
+                      className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100"
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Next button */}
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
