@@ -32,6 +32,7 @@ function ChinaWarehousePage() {
     data: warehouseData,
     statistics,
     loading,
+    loadingMessage,
     error,
     searchItems,
     sortItems,
@@ -190,6 +191,10 @@ function ChinaWarehousePage() {
           ))}
         </div>
         <div className="bg-gray-100 rounded-lg p-8 animate-pulse">
+          <div className="text-center mb-6">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent mb-4"></div>
+            <p className="text-gray-600 font-medium">{loadingMessage}</p>
+          </div>
           <div className="h-12 bg-gray-200 rounded mb-4"></div>
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
