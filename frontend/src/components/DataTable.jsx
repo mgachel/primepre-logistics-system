@@ -43,19 +43,36 @@ const DataTable = ({
 
     if (column.key === "status") {
       const statusColor = {
-        received: "bg-blue-100 text-blue-800",
+        pending: "bg-yellow-100 text-yellow-800",
+        ready_for_shipping: "bg-blue-100 text-blue-800",
         shipped: "bg-green-100 text-green-800",
         flagged: "bg-red-100 text-red-800",
+        cancelled: "bg-gray-100 text-gray-800",
+        // Legacy mappings for compatibility
+        received: "bg-blue-100 text-blue-800",
         processing: "bg-yellow-100 text-yellow-800",
       };
+
+      const displayStatus = {
+        pending: "Pending",
+        ready_for_shipping: "Ready to Ship",
+        shipped: "Shipped",
+        flagged: "Flagged",
+        cancelled: "Cancelled",
+        // Legacy mappings
+        received: "Received",
+        processing: "Processing",
+      };
+
+      const status = item[column.key]?.toLowerCase() || "pending";
 
       return (
         <span
           className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-            statusColor[item[column.key]] || "bg-gray-100 text-gray-800"
+            statusColor[status] || "bg-gray-100 text-gray-800"
           }`}
         >
-          {item[column.key]}
+          {displayStatus[status] || status}
         </span>
       );
     }
