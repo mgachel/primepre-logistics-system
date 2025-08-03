@@ -201,7 +201,7 @@ class GoodsAPITestCase(APITestCase):
         
         response = self.client.get('/api/goods/china/statistics/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('total_items', response.data)
+        self.assertIn('total_count', response.data)
         self.assertIn('pending_count', response.data)
         self.assertIn('shipped_count', response.data)
     
