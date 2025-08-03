@@ -90,7 +90,11 @@ function Sidebar({ currentPage, onPageChange, isOpen, onToggle }) {
         lg:sticky lg:top-0 lg:h-screen lg:flex-shrink-0
         w-56 sm:w-64 lg:w-72 xl:w-80 bg-gray-800 min-h-screen flex flex-col
         transform transition-transform duration-300 ease-in-out
-        ${isOpen ? "fixed inset-y-0 left-0 z-30 translate-x-0" : "fixed inset-y-0 left-0 z-30 -translate-x-full lg:static lg:translate-x-0"}
+        ${
+          isOpen
+            ? "fixed inset-y-0 left-0 z-30 translate-x-0"
+            : "fixed inset-y-0 left-0 z-30 -translate-x-full lg:static lg:translate-x-0"
+        }
       `}
       >
         {/* Header */}
