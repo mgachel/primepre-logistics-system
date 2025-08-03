@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
 
 const DataTable = ({
   data = [],
@@ -10,29 +10,13 @@ const DataTable = ({
   emptyMessage = "No data available",
   userRole = "customer",
 }) => {
-  const [openDropdown, setOpenDropdown] = useState(null);
-  const dropdownRef = useRef(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setOpenDropdown(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
   const defaultColumns = [
     { key: "tracking_id", label: "TRACKING ID", width: "w-1/6" },
     { key: "shipping_mark", label: "SHIPPING MARK", width: "w-1/6" },
     { key: "description", label: "DESCRIPTION", width: "w-1/4" },
     { key: "status", label: "STATUS", width: "w-1/6" },
     { key: "added_by", label: "ADDED BY", width: "w-1/6" },
-    { key: "actions", label: "ACTIONS", width: "w-1/12" },
+    { key: "actions", label: "ACTIONS", width: "w-1/8" },
   ];
 
   const tableColumns = columns.length > 0 ? columns : defaultColumns;
@@ -46,16 +30,15 @@ const DataTable = ({
         userRole === "super_admin";
 
       return (
-        <div className="relative">
+        <div className="flex items-center space-x-2">
+          {/* View Details Button */}
           <button
-            onClick={() =>
-              setOpenDropdown(openDropdown === item.id ? null : item.id)
-            }
-            className="text-gray-400 hover:text-gray-600 focus:outline-none p-1 rounded hover:bg-gray-100"
-            title="Actions"
+            onClick={() => onRowAction && onRowAction(item)}
+            className="inline-flex items-center justify-center w-8 h-8 text-blue-600 bg-blue-100 rounded hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            title="View Details"
           >
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -64,133 +47,82 @@ const DataTable = ({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
               />
             </svg>
           </button>
 
-          {/* Dropdown Menu */}
-          {openDropdown === item.id && (
-            <div
-              ref={dropdownRef}
-              className="absolute right-0 top-8 z-50 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1"
-            >
-              {/* View Details */}
+          {isStaffUser && (
+            <>
+              {/* Update Item Button */}
               <button
-                onClick={() => {
-                  setOpenDropdown(null);
-                  onRowAction && onRowAction(item);
-                }}
-                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                onClick={() => onUpdate && onUpdate(item)}
+                className="inline-flex items-center justify-center w-8 h-8 text-green-600 bg-green-100 rounded hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+                title="Update Item"
               >
-                <div className="flex items-center">
-                  <svg
-                    className="w-4 h-4 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  </svg>
-                  View Details
-                </div>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  />
+                </svg>
               </button>
 
-              {isStaffUser && (
-                <>
-                  {/* Update Item */}
-                  <button
-                    onClick={() => {
-                      setOpenDropdown(null);
-                      onUpdate && onUpdate(item);
-                    }}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <div className="flex items-center">
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                        />
-                      </svg>
-                      Update Item
-                    </div>
-                  </button>
+              {/* Update Status Button */}
+              <button
+                onClick={() => onUpdateStatus && onUpdateStatus(item)}
+                className="inline-flex items-center justify-center w-8 h-8 text-purple-600 bg-purple-100 rounded hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                title="Update Status"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </button>
 
-                  {/* Update Status */}
-                  <button
-                    onClick={() => {
-                      setOpenDropdown(null);
-                      onUpdateStatus && onUpdateStatus(item);
-                    }}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <div className="flex items-center">
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      Update Status
-                    </div>
-                  </button>
-
-                  <hr className="my-1" />
-
-                  {/* Delete Item */}
-                  <button
-                    onClick={() => {
-                      setOpenDropdown(null);
-                      onDelete && onDelete(item);
-                    }}
-                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <div className="flex items-center">
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                      Delete Item
-                    </div>
-                  </button>
-                </>
-              )}
-            </div>
+              {/* Delete Item Button */}
+              <button
+                onClick={() => onDelete && onDelete(item)}
+                className="inline-flex items-center justify-center w-8 h-8 text-red-600 bg-red-100 rounded hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                title="Delete Item"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
+                </svg>
+              </button>
+            </>
           )}
         </div>
       );
