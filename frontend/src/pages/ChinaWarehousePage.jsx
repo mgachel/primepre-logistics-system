@@ -193,8 +193,8 @@ function ChinaWarehousePage() {
       {/* Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatusCard
-          title="Items Recieved"
-          count={statistics.received + statistics.pending}
+          title="Items Received"
+          count={statistics.received}
           icon={<BoxIcon className="w-6 h-6 text-blue-600" />}
           backgroundColor="bg-blue-100"
           textColor="text-blue-600"
