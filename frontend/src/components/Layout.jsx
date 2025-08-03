@@ -1,16 +1,28 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import Footer from "./Footer";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 
-function Layout({ children, currentPage, onPageChange }) {
+function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
 
-  const handlePageChange = (page) => {
-    onPageChange(page);
-    // Close sidebar on mobile when navigating
-    setSidebarOpen(false);
+  const getCurrentPage = () => {
+    const path = location.pathname;
+    if (path.includes("/dashboard/overview")) return "dashboard";
+    if (path.includes("/dashboard/cargo-sea")) return "cargo-sea";
+    if (path.includes("/dashboard/cargo-air")) return "cargo-air";
+    if (path.includes("/dashboard/customers")) return "customers";
+    if (path.includes("/dashboard/goods-received-china"))
+      return "goods-received-china";
+    if (path.includes("/dashboard/goods-received-ghana"))
+      return "goods-received-ghana";
+    if (path.includes("/dashboard/rates")) return "rates";
+    return "dashboard";
   };
+
+  const currentPage = getCurrentPage();
 
   const getPageTitle = () => {
     switch (currentPage) {
@@ -56,12 +68,7 @@ function Layout({ children, currentPage, onPageChange }) {
     <div className="min-h-screen flex bg-gray-50">
       {/* Static Sidebar */}
       <div className="hidden lg:block">
-        <Sidebar
-          currentPage={currentPage}
-          onPageChange={handlePageChange}
-          isOpen={sidebarOpen}
-          onToggle={toggleSidebar}
-        />
+        <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
       </div>
 
       {/* Main Content Area with its own scroll */}
