@@ -57,20 +57,12 @@ function ChinaWarehousePage() {
     // This would typically open a modal or navigate to an add item form
   };
 
-  const handleSearch = async (value) => {
+  const handleSearch = (value) => {
     setSearchValue(value);
     console.log("Search value:", value);
 
-    try {
-      if (value.trim()) {
-        await searchItems(value);
-      } else {
-        // If search is cleared, fetch all items
-        window.location.reload(); // Temporary solution - ideally we'd have a refreshData method
-      }
-    } catch (err) {
-      console.error("Error searching items:", err);
-    }
+    // Use local search for instant filtering
+    searchItems(value);
   };
 
   const handleRowAction = (item) => {
