@@ -13,6 +13,7 @@ export const useChinaWarehouse = (userRole = 'customer') => {
     total: 0
   });
   const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Loading warehouse data...');
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -63,6 +64,7 @@ export const useChinaWarehouse = (userRole = 'customer') => {
   const fetchData = useCallback(async (params = {}) => {
     try {
       setLoading(true);
+      setLoadingMessage('Loading warehouse data...');
       setError(null);
 
       // Check if user is authenticated
@@ -73,19 +75,51 @@ export const useChinaWarehouse = (userRole = 'customer') => {
         return;
       }
 
-      const itemsPromise = isStaffUser 
-        ? chinaWarehouseService.getAllItems(params)
-        : chinaWarehouseService.getCustomerItems(params);
+      // Fetch all pages to get complete data
+      let allItems = [];
+      let nextPage = 1;
+      let hasMorePages = true;
 
-      // We'll calculate statistics from the actual items data instead of a separate API call
-      const itemsResponse = await itemsPromise;
+      while (hasMorePages) {
+        // Update loading message to show progress
+        if (nextPage > 1) {
+          setLoadingMessage(`Loading page ${nextPage}... (${allItems.length} items loaded)`);
+        }
 
-      const items = itemsResponse.results || itemsResponse;
-      setData(items);
-      setOriginalData(items); // Keep a copy for local filtering
+        const pageParams = { ...params, page: nextPage };
+        
+        const itemsPromise = isStaffUser 
+          ? chinaWarehouseService.getAllItems(pageParams)
+          : chinaWarehouseService.getCustomerItems(pageParams);
+
+        const itemsResponse = await itemsPromise;
+
+        // Handle both paginated and non-paginated responses
+        if (itemsResponse.results) {
+          // Paginated response
+          allItems = [...allItems, ...itemsResponse.results];
+          hasMorePages = !!itemsResponse.next;
+          nextPage++;
+        } else {
+          // Non-paginated response (for older API versions)
+          allItems = itemsResponse;
+          hasMorePages = false;
+        }
+
+        // Safety break to prevent infinite loops
+        if (nextPage > 50) {
+          console.warn('Too many pages, stopping at 50 pages');
+          break;
+        }
+      }
+
+      console.log(`Fetched ${allItems.length} total items from ${nextPage - 1} pages`);
       
-      // Calculate real-time statistics from actual data
-      const calculatedStats = calculateStatistics(items);
+      setData(allItems);
+      setOriginalData(allItems); // Keep a copy for local filtering
+      
+      // Calculate real-time statistics from ALL data
+      const calculatedStats = calculateStatistics(allItems);
       setStatistics(calculatedStats);
     } catch (err) {
       console.error('Error fetching China warehouse data:', err);
@@ -98,6 +132,7 @@ export const useChinaWarehouse = (userRole = 'customer') => {
       }
     } finally {
       setLoading(false);
+      setLoadingMessage('Loading warehouse data...');
     }
   }, [isStaffUser, calculateStatistics]);
 
@@ -280,6 +315,7 @@ export const useChinaWarehouse = (userRole = 'customer') => {
     data,
     statistics,
     loading,
+    loadingMessage,
     error,
     searchQuery,
     fetchData,
