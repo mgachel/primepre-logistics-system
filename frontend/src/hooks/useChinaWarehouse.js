@@ -3,6 +3,7 @@ import { chinaWarehouseService } from '../services/chinaWarehouseService';
 
 export const useChinaWarehouse = (userRole = 'customer') => {
   const [data, setData] = useState([]);
+  const [originalData, setOriginalData] = useState([]); // Keep original data for local filtering
   const [statistics, setStatistics] = useState({
     received: 0,
     shipped: 0,
@@ -13,6 +14,7 @@ export const useChinaWarehouse = (userRole = 'customer') => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Determine which API endpoints to use based on user role
   const isStaffUser = userRole === 'staff' || userRole === 'admin';
@@ -43,7 +45,9 @@ export const useChinaWarehouse = (userRole = 'customer') => {
         statsPromise
       ]);
 
-      setData(itemsResponse.results || itemsResponse);
+      const items = itemsResponse.results || itemsResponse;
+      setData(items);
+      setOriginalData(items); // Keep a copy for local filtering
       
       // Map backend statistics to frontend format
       if (statsResponse) {
@@ -172,7 +176,35 @@ export const useChinaWarehouse = (userRole = 'customer') => {
     }
   }, [isStaffUser]);
 
-  const searchItems = useCallback(async (searchQuery) => {
+  // Local search function (instant filtering)
+  const searchItems = useCallback((searchQuery) => {
+    setSearchQuery(searchQuery);
+    
+    if (!searchQuery || searchQuery.trim() === '') {
+      // If search is empty, show all data
+      setData(originalData);
+      return;
+    }
+
+    // Local filtering for instant response
+    const query = searchQuery.toLowerCase();
+    const filteredData = originalData.filter(item => {
+      return (
+        (item.supply_tracking && item.supply_tracking.toLowerCase().includes(query)) ||
+        (item.item_id && item.item_id.toLowerCase().includes(query)) ||
+        (item.shipping_mark && item.shipping_mark.toLowerCase().includes(query)) ||
+        (item.description && item.description.toLowerCase().includes(query)) ||
+        (item.status && item.status.toLowerCase().includes(query)) ||
+        (item.created_by?.full_name && item.created_by.full_name.toLowerCase().includes(query)) ||
+        (item.created_by?.username && item.created_by.username.toLowerCase().includes(query))
+      );
+    });
+
+    setData(filteredData);
+  }, [originalData]);
+
+  // Server-side search function (for more complex searches if needed)
+  const searchItemsOnServer = useCallback(async (searchQuery) => {
     try {
       setLoading(true);
       const params = { search: searchQuery };
@@ -181,7 +213,9 @@ export const useChinaWarehouse = (userRole = 'customer') => {
         ? await chinaWarehouseService.getAllItems(params)
         : await chinaWarehouseService.getCustomerItems(params);
       
-      setData(response.results || response);
+      const items = response.results || response;
+      setData(items);
+      setOriginalData(items); // Update original data with search results
     } catch (err) {
       console.error('Error searching items:', err);
       setError(err.message || 'Failed to search items');
@@ -189,6 +223,12 @@ export const useChinaWarehouse = (userRole = 'customer') => {
       setLoading(false);
     }
   }, [isStaffUser]);
+
+  // Reset search and show all data
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+    setData(originalData);
+  }, [originalData]);
 
   const sortItems = useCallback(async (ordering) => {
     try {
@@ -227,12 +267,15 @@ export const useChinaWarehouse = (userRole = 'customer') => {
     statistics,
     loading,
     error,
+    searchQuery,
     fetchData,
     createItem,
     updateItem,
     deleteItem,
     updateStatus,
     searchItems,
+    searchItemsOnServer,
+    clearSearch,
     sortItems,
     trackItem,
     isStaffUser
