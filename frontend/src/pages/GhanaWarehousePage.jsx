@@ -3,7 +3,7 @@ import StatusCard from "../components/StatusCard";
 import ControlPanel from "../components/ControlPanel";
 import DataTable from "../components/DataTable";
 import GhanaAddItemModal from "../components/GhanaAddItemModal";
-import { BoxIcon, TruckIcon, FlagIcon } from "../components/Icons";
+import { BoxIcon, FlagIcon } from "../components/Icons";
 import { useGhanaWarehouse } from "../hooks/useGhanaWarehouse";
 import { AuthContext } from "../contexts/authContext";
 import { ghanaWarehouseService } from "../services/ghanaWarehouseService";
@@ -183,8 +183,8 @@ function GhanaWarehousePage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
             <div key={i} className="bg-gray-100 rounded-lg p-4 animate-pulse">
               <div className="h-20"></div>
             </div>
@@ -293,7 +293,7 @@ function GhanaWarehousePage() {
   return (
     <div className="space-y-6">
       {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatusCard
           title="Items Received"
           count={statistics.received}
@@ -327,21 +327,11 @@ function GhanaWarehousePage() {
         />
 
         <StatusCard
-          title="Ready for Delivery"
-          count={statistics.ready_for_delivery}
-          icon={<TruckIcon className="w-6 h-6 text-green-600" />}
-          backgroundColor="bg-green-100"
-          textColor="text-green-600"
-          countTextColor="text-green-900"
-          borderColor="border-green-200"
-        />
-
-        <StatusCard
           title="Delivered"
           count={statistics.delivered}
           icon={
             <svg
-              className="w-6 h-6 text-purple-600"
+              className="w-6 h-6 text-green-600"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -352,10 +342,10 @@ function GhanaWarehousePage() {
               />
             </svg>
           }
-          backgroundColor="bg-purple-100"
-          textColor="text-purple-600"
-          countTextColor="text-purple-900"
-          borderColor="border-purple-200"
+          backgroundColor="bg-green-100"
+          textColor="text-green-600"
+          countTextColor="text-green-900"
+          borderColor="border-green-200"
         />
       </div>
 
@@ -443,7 +433,7 @@ function GhanaWarehousePage() {
                         : selectedItem.status === "ready_for_delivery"
                         ? "bg-green-100 text-green-800"
                         : selectedItem.status === "delivered"
-                        ? "bg-purple-100 text-purple-800"
+                        ? "bg-green-100 text-green-800"
                         : "bg-red-100 text-red-800"
                     }`}
                   >
