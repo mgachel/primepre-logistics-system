@@ -1,92 +1,243 @@
+import React, { useState, useContext } from "react";
+import StatusCard from "../components/StatusCard";
+import ControlPanel from "../components/ControlPanel";
+import DataTable from "../components/DataTable";
+import { BoxIcon, TruckIcon, FlagIcon } from "../components/Icons";
+import { useChinaWarehouse } from "../hooks/useChinaWarehouse";
+import { AuthContext } from "../contexts/authContext";
+
 function ChinaWarehousePage() {
+  const [searchValue, setSearchValue] = useState("");
+  const [sortValue, setSortValue] = useState("");
+  const { user } = useContext(AuthContext);
+
+  // Determine user role - check if user is staff or customer
+  const userRole = user?.user_type || user?.is_staff ? "staff" : "customer";
+
+  // Use the custom hook for China warehouse data
+  const {
+    data: warehouseData,
+    statistics,
+    loading,
+    error,
+    searchItems,
+    sortItems,
+    isStaffUser,
+  } = useChinaWarehouse(userRole);
+
+  const handleSortChange = async (value) => {
+    setSortValue(value);
+    console.log("Sort changed to:", value);
+
+    // Map frontend sort values to backend ordering
+    const orderingMap = {
+      date: "-created_at",
+      status: "status",
+      tracking_id: "supply_tracking",
+      description: "description",
+    };
+
+    const ordering = orderingMap[value];
+    if (ordering) {
+      try {
+        await sortItems(ordering);
+      } catch (err) {
+        console.error("Error sorting items:", err);
+      }
+    }
+  };
+
+  const handleAddItem = () => {
+    console.log("Add item clicked");
+    // TODO: Implement add item modal/form
+    if (!isStaffUser) {
+      alert("Only staff members can add items");
+      return;
+    }
+    // This would typically open a modal or navigate to an add item form
+  };
+
+  const handleSearch = (value) => {
+    setSearchValue(value);
+    console.log("Search value:", value);
+
+    // Use local search for instant filtering
+    searchItems(value);
+  };
+
+  const handleRowAction = (item) => {
+    console.log("Row action for:", item);
+    // TODO: Implement row action menu (edit, delete, update status, etc.)
+  };
+
+  // Transform data for the DataTable component
+  const transformedData = warehouseData.map((item) => ({
+    tracking_id: item.supply_tracking || item.item_id || "-",
+    shipping_mark: item.shipping_mark || "-",
+    description: item.description || "-",
+    status: item.status?.toLowerCase() || "pending",
+    added_by:
+      item.created_by?.full_name || item.created_by?.username || "System",
+    id: item.id, // Keep the original ID for actions
+  }));
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-gray-100 rounded-lg p-4 animate-pulse">
+              <div className="h-20"></div>
+            </div>
+          ))}
+        </div>
+        <div className="bg-gray-100 rounded-lg p-8 animate-pulse">
+          <div className="h-12 bg-gray-200 rounded mb-4"></div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-8 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    const isAuthError =
+      error.includes("authentication") ||
+      error.includes("credentials") ||
+      error.includes("login");
+
+    return (
+      <div className="space-y-6">
+        <div
+          className={`border rounded-lg p-4 ${
+            isAuthError
+              ? "bg-yellow-50 border-yellow-200"
+              : "bg-red-50 border-red-200"
+          }`}
+        >
+          <div className="flex items-center">
+            <div
+              className={`mr-3 ${
+                isAuthError ? "text-yellow-600" : "text-red-600"
+              }`}
+            >
+              {isAuthError ? (
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 15v2m0-6V7m0 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              )}
+            </div>
+            <div className="flex-1">
+              <h3
+                className={`font-medium ${
+                  isAuthError ? "text-yellow-800" : "text-red-800"
+                }`}
+              >
+                {isAuthError ? "Authentication Required" : "Error Loading Data"}
+              </h3>
+              <p
+                className={`text-sm ${
+                  isAuthError ? "text-yellow-700" : "text-red-700"
+                }`}
+              >
+                {isAuthError
+                  ? "Please log in to access the China warehouse data."
+                  : error}
+              </p>
+              {isAuthError && (
+                <button
+                  onClick={() => (window.location.href = "/login")}
+                  className="mt-2 px-4 py-2 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 transition-colors"
+                >
+                  Go to Login
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-      {/* Header Section */}
-      <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 lg:p-8">
-        <div className="mb-4 sm:mb-6">
-          <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 mb-2">China Warehouse - Goods Received</h2>
-          <p className="text-sm sm:text-base text-gray-600">
-            Track goods received at the China warehouse. This page will be created later.
-          </p>
-        </div>
-        
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-          <div className="bg-red-50 rounded-lg p-3 sm:p-4 border border-red-200">
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/>
-                </svg>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm font-medium text-red-600">Items Received</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-red-900">0</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-yellow-50 rounded-lg p-3 sm:p-4 border border-yellow-200">
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
-                </svg>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm font-medium text-yellow-600">Processing</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-yellow-900">0</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-200">
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
-                </svg>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm font-medium text-blue-600">Ready to Ship</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-900">0</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-green-50 rounded-lg p-3 sm:p-4 border border-green-200">
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                </svg>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm font-medium text-green-600">Shipped</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-green-900">0</p>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-6">
+      {/* Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatusCard
+          title="Items Received"
+          count={statistics.received}
+          icon={<BoxIcon className="w-6 h-6 text-blue-600" />}
+          backgroundColor="bg-blue-100"
+          textColor="text-blue-600"
+          countTextColor="text-blue-900"
+          borderColor="border-blue-200"
+        />
+
+        <StatusCard
+          title="Shipped"
+          count={statistics.shipped}
+          icon={<TruckIcon className="w-6 h-6 text-green-600" />}
+          backgroundColor="bg-green-100"
+          textColor="text-green-600"
+          countTextColor="text-green-900"
+          borderColor="border-green-200"
+        />
+
+        <StatusCard
+          title="Flagged"
+          count={statistics.flagged}
+          icon={<FlagIcon className="w-6 h-6 text-red-600" />}
+          backgroundColor="bg-red-100"
+          textColor="text-red-600"
+          countTextColor="text-red-900"
+          borderColor="border-red-200"
+        />
       </div>
 
-      {/* Feature Coming Soon */}
-      <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8 lg:p-12">
-        <div className="text-center">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 sm:w-10 sm:h-10 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/>
-            </svg>
-          </div>
-          <h3 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900 mb-2">China Warehouse Management</h3>
-          <p className="text-sm sm:text-base text-gray-600 mb-6 max-w-md mx-auto">
-            Complete warehouse management system is coming soon. Track inventory, manage goods received, and coordinate international shipping.
-          </p>
-          <div className="inline-flex items-center px-4 py-2 bg-red-100 text-red-800 rounded-full text-sm font-medium">
-            🏭 Coming Soon
-          </div>
-        </div>
-      </div>
+      {/* Control Panel */}
+      <ControlPanel
+        onSortChange={handleSortChange}
+        onAddItem={handleAddItem}
+        onSearch={handleSearch}
+        searchValue={searchValue}
+        sortValue={sortValue}
+      />
+
+      {/* Data Table */}
+      <DataTable
+        data={transformedData}
+        onRowAction={handleRowAction}
+        emptyMessage="No warehouse items found. Click 'ADD ITEM' to get started."
+      />
     </div>
   );
 }
