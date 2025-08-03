@@ -147,9 +147,16 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
     try {
       const result = await ghanaWarehouseService.uploadExcel(excelFile);
       setUploadResult(result);
-      setSuccess(`Successfully processed ${result.success_count || 0} items!`);
 
-      if (result.success_count > 0) {
+      // Get the correct field names from the backend response
+      const successCount = result.results?.successful_creates || 0;
+      const totalProcessed = result.results?.total_processed || 0;
+
+      setSuccess(
+        `Successfully processed ${successCount} out of ${totalProcessed} items!`
+      );
+
+      if (successCount > 0) {
         setTimeout(() => {
           onSuccess(result);
           handleClose();
@@ -497,38 +504,42 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div className="bg-green-50 p-3 rounded-lg">
                       <p className="text-lg font-bold text-green-600">
-                        {uploadResult.success_count || 0}
+                        {uploadResult.results?.successful_creates || 0}
                       </p>
                       <p className="text-xs text-green-600">Successful</p>
                     </div>
                     <div className="bg-red-50 p-3 rounded-lg">
                       <p className="text-lg font-bold text-red-600">
-                        {uploadResult.error_count || 0}
+                        {uploadResult.results?.failed_creates || 0}
                       </p>
                       <p className="text-xs text-red-600">Failed</p>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-lg">
                       <p className="text-lg font-bold text-blue-600">
-                        {uploadResult.total_rows || 0}
+                        {uploadResult.results?.total_processed || 0}
                       </p>
-                      <p className="text-xs text-blue-600">Total Rows</p>
+                      <p className="text-xs text-blue-600">Total Processed</p>
                     </div>
                   </div>
 
-                  {uploadResult.errors && uploadResult.errors.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-sm font-medium text-red-600 mb-2">
-                        Errors found:
-                      </p>
-                      <div className="bg-red-50 border border-red-200 rounded p-3 max-h-32 overflow-y-auto">
-                        {uploadResult.errors.map((error, index) => (
-                          <p key={index} className="text-xs text-red-600 mb-1">
-                            {error}
-                          </p>
-                        ))}
+                  {uploadResult.results?.errors &&
+                    uploadResult.results.errors.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-sm font-medium text-red-600 mb-2">
+                          Errors found:
+                        </p>
+                        <div className="bg-red-50 border border-red-200 rounded p-3 max-h-32 overflow-y-auto">
+                          {uploadResult.results.errors.map((error, index) => (
+                            <p
+                              key={index}
+                              className="text-xs text-red-600 mb-1"
+                            >
+                              {error}
+                            </p>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </div>
               )}
 
