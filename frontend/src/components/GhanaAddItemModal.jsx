@@ -14,8 +14,10 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
     cbm: "",
     quantity: "",
     description: "",
-    date_received: "",
-    date_loading: "",
+    weight: "",
+    supplier_name: "",
+    estimated_value: "",
+    location: "ACCRA", // Default location for Ghana
   });
 
   // Excel upload state
@@ -29,8 +31,10 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
       cbm: "",
       quantity: "",
       description: "",
-      date_received: "",
-      date_loading: "",
+      weight: "",
+      supplier_name: "",
+      estimated_value: "",
+      location: "ACCRA",
     });
     setExcelFile(null);
     setUploadResult(null);
@@ -80,13 +84,26 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
         cbm: parseFloat(formData.cbm),
         quantity: parseInt(formData.quantity),
         description: formData.description.trim() || "No description provided",
-        date_received: formData.date_received || new Date().toISOString().split("T")[0],
-        date_loading: formData.date_loading || "",
+        location: formData.location || "ACCRA",
       };
+
+      // Add optional fields if provided
+      if (formData.weight && parseFloat(formData.weight) > 0) {
+        itemData.weight = parseFloat(formData.weight);
+      }
+      if (formData.supplier_name && formData.supplier_name.trim()) {
+        itemData.supplier_name = formData.supplier_name.trim();
+      }
+      if (
+        formData.estimated_value &&
+        parseFloat(formData.estimated_value) > 0
+      ) {
+        itemData.estimated_value = parseFloat(formData.estimated_value);
+      }
 
       const result = await ghanaWarehouseService.createItem(itemData);
       setSuccess("Item added successfully!");
-      
+
       setTimeout(() => {
         onSuccess(result);
         handleClose();
@@ -131,7 +148,7 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
       const result = await ghanaWarehouseService.uploadExcel(excelFile);
       setUploadResult(result);
       setSuccess(`Successfully processed ${result.success_count || 0} items!`);
-      
+
       if (result.success_count > 0) {
         setTimeout(() => {
           onSuccess(result);
@@ -179,8 +196,18 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
               className="text-gray-400 hover:text-gray-600"
               disabled={isSubmitting}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -239,6 +266,7 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="e.g., PMJOHN01"
+                    maxLength={20}
                     required
                     disabled={isSubmitting}
                   />
@@ -255,6 +283,7 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="e.g., TRK123456789"
+                    maxLength={50}
                     required
                     disabled={isSubmitting}
                   />
@@ -271,8 +300,9 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="e.g., 2.5"
-                    min="0.01"
-                    step="0.01"
+                    min="0.001"
+                    max="1000"
+                    step="0.001"
                     required
                     disabled={isSubmitting}
                   />
@@ -290,6 +320,7 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="e.g., 5"
                     min="1"
+                    max="100000"
                     required
                     disabled={isSubmitting}
                   />
@@ -297,28 +328,70 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Date Received
+                    Weight (kg)
                   </label>
                   <input
-                    type="date"
-                    name="date_received"
-                    value={formData.date_received}
+                    type="number"
+                    name="weight"
+                    value={formData.weight}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g., 100.5"
+                    min="0.01"
+                    max="50000"
+                    step="0.01"
                     disabled={isSubmitting}
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Date Loading
+                    Location
                   </label>
-                  <input
-                    type="date"
-                    name="date_loading"
-                    value={formData.date_loading}
+                  <select
+                    name="location"
+                    value={formData.location}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={isSubmitting}
+                  >
+                    <option value="ACCRA">Accra</option>
+                    <option value="KUMASI">Kumasi</option>
+                    <option value="TAKORADI">Takoradi</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Supplier Name
+                  </label>
+                  <input
+                    type="text"
+                    name="supplier_name"
+                    value={formData.supplier_name}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g., ABC Trading Ltd"
+                    maxLength={100}
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Estimated Value (USD)
+                  </label>
+                  <input
+                    type="number"
+                    name="estimated_value"
+                    value={formData.estimated_value}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g., 1500.00"
+                    min="0.01"
+                    max="1000000"
+                    step="0.01"
                     disabled={isSubmitting}
                   />
                 </div>
@@ -366,14 +439,26 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
                   📋 Step 1: Download Template
                 </h4>
                 <p className="text-sm text-blue-700 mb-3">
-                  Download the Ghana warehouse Excel template to ensure your data is formatted correctly.
+                  Download the Ghana warehouse Excel template to ensure your
+                  data is formatted correctly. Required fields: Shipping Mark,
+                  Supply Tracking, CBM, and Quantity.
                 </p>
                 <button
                   onClick={handleDownloadTemplate}
                   className="inline-flex items-center px-3 py-2 border border-blue-300 shadow-sm text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <svg
+                    className="w-4 h-4 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                   </svg>
                   Download Template
                 </button>
@@ -406,28 +491,40 @@ const GhanaAddItemModal = ({ isOpen, onClose, onSuccess }) => {
               {/* Upload Result */}
               {uploadResult && (
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-3">Upload Results</h4>
+                  <h4 className="text-sm font-medium text-gray-900 mb-3">
+                    Upload Results
+                  </h4>
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div className="bg-green-50 p-3 rounded-lg">
-                      <p className="text-lg font-bold text-green-600">{uploadResult.success_count || 0}</p>
+                      <p className="text-lg font-bold text-green-600">
+                        {uploadResult.success_count || 0}
+                      </p>
                       <p className="text-xs text-green-600">Successful</p>
                     </div>
                     <div className="bg-red-50 p-3 rounded-lg">
-                      <p className="text-lg font-bold text-red-600">{uploadResult.error_count || 0}</p>
+                      <p className="text-lg font-bold text-red-600">
+                        {uploadResult.error_count || 0}
+                      </p>
                       <p className="text-xs text-red-600">Failed</p>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-lg font-bold text-blue-600">{uploadResult.total_rows || 0}</p>
+                      <p className="text-lg font-bold text-blue-600">
+                        {uploadResult.total_rows || 0}
+                      </p>
                       <p className="text-xs text-blue-600">Total Rows</p>
                     </div>
                   </div>
-                  
+
                   {uploadResult.errors && uploadResult.errors.length > 0 && (
                     <div className="mt-4">
-                      <p className="text-sm font-medium text-red-600 mb-2">Errors found:</p>
+                      <p className="text-sm font-medium text-red-600 mb-2">
+                        Errors found:
+                      </p>
                       <div className="bg-red-50 border border-red-200 rounded p-3 max-h-32 overflow-y-auto">
                         {uploadResult.errors.map((error, index) => (
-                          <p key={index} className="text-xs text-red-600 mb-1">{error}</p>
+                          <p key={index} className="text-xs text-red-600 mb-1">
+                            {error}
+                          </p>
                         ))}
                       </div>
                     </div>
