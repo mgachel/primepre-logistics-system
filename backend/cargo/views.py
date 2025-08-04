@@ -318,3 +318,79 @@ def sea_cargo_view(request):
 def air_cargo_view(request):
     """Template view for air cargo"""
     return render(request, 'cargo/air_cargo.html')
+
+
+# Customer-specific ViewSets
+class CustomerCargoContainerViewSet(viewsets.ReadOnlyModelViewSet):
+    """Customer view for their containers only"""
+    serializer_class = CargoContainerSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        # Only return containers that have cargo items for this customer
+        if self.request.user.user_role != 'CUSTOMER':
+            return CargoContainer.objects.none()
+        
+        return CargoContainer.objects.filter(
+            cargo_items__client=self.request.user
+        ).distinct()
+    
+    @action(detail=True, methods=['get'])
+    def my_cargo_items(self, request, pk=None):
+        """Get customer's cargo items in this container"""
+        container = self.get_object()
+        items = CargoItem.objects.filter(
+            container=container,
+            client=request.user
+        )
+        serializer = CargoItemSerializer(items, many=True)
+        return Response(serializer.data)
+
+
+class CustomerCargoItemViewSet(viewsets.ReadOnlyModelViewSet):
+    """Customer view for their cargo items only"""
+    serializer_class = CargoItemSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        if self.request.user.user_role != 'CUSTOMER':
+            return CargoItem.objects.none()
+        
+        return CargoItem.objects.filter(client=self.request.user)
+
+
+class CustomerCargoDashboardView(APIView):
+    """Customer-specific cargo dashboard"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        if request.user.user_role != 'CUSTOMER':
+            return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get customer's cargo statistics
+        total_cargo_items = CargoItem.objects.filter(client=request.user).count()
+        pending_items = CargoItem.objects.filter(client=request.user, status='pending').count()
+        in_transit_items = CargoItem.objects.filter(client=request.user, status='in_transit').count()
+        delivered_items = CargoItem.objects.filter(client=request.user, status='delivered').count()
+        
+        # Get customer's containers
+        customer_containers = CargoContainer.objects.filter(
+            cargo_items__client=request.user
+        ).distinct()
+        
+        # Recent cargo items
+        recent_items = CargoItem.objects.filter(
+            client=request.user
+        ).order_by('-created_at')[:5]
+        
+        data = {
+            'total_cargo_items': total_cargo_items,
+            'pending_items': pending_items,
+            'in_transit_items': in_transit_items,
+            'delivered_items': delivered_items,
+            'total_containers': customer_containers.count(),
+            'recent_items': CargoItemSerializer(recent_items, many=True).data,
+            'containers': CargoContainerSerializer(customer_containers, many=True).data
+        }
+        
+        return Response(data)

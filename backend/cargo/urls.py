@@ -17,18 +17,13 @@ customer_router.register(r'cargo-items', views.CustomerCargoItemViewSet, basenam
 app_name = 'cargo'
 
 urlpatterns = [
-    # Admin/Staff API routes
-    path('api/', include(router.urls)),
-    path('api/dashboard/', views.CargoDashboardView.as_view(), name='dashboard'),
-    path('api/statistics/', views.cargo_statistics, name='statistics'),
-    path('api/bulk-upload/', views.BulkCargoItemUploadView.as_view(), name='bulk-upload'),
+    # Admin/Staff API routes (no api/ prefix since it's already in main urls)
+    path('', include(router.urls)),
+    path('dashboard/', views.CargoDashboardView.as_view(), name='dashboard'),
+    path('statistics/', views.cargo_statistics, name='statistics'),
+    path('bulk-upload/', views.BulkCargoItemUploadView.as_view(), name='bulk-upload'),
     
     # Customer-specific API routes
-    path('api/customer/', include(customer_router.urls)),
-    path('api/customer/dashboard/', views.CustomerCargoDashboardView.as_view(), name='customer-cargo-dashboard'),
-    
-    # Template views (if needed for frontend)
-    path('dashboard/', views.cargo_dashboard, name='cargo-dashboard'),
-    path('sea/', views.sea_cargo_view, name='sea-cargo'),
-    path('air/', views.air_cargo_view, name='air-cargo'),
+    path('customer/', include(customer_router.urls)),
+    path('customer/dashboard/', views.CustomerCargoDashboardView.as_view(), name='customer-cargo-dashboard'),
 ]
