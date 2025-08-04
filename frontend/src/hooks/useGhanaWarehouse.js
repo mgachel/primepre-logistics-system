@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { chinaWarehouseService } from '../services/chinaWarehouseService';
+import { ghanaWarehouseService } from '../services/ghanaWarehouseService';
 
-export const useChinaWarehouse = (userRole = 'customer') => {
+export const useGhanaWarehouse = (userRole = 'customer') => {
   const [data, setData] = useState([]);
   const [originalData, setOriginalData] = useState([]); // Keep original data for local filtering
   const [statistics, setStatistics] = useState({
     received: 0,
-    shipped: 0,
-    flagged: 0,
     pending: 0,
-    ready_for_shipping: 0,
+    ready_for_delivery: 0,
+    delivered: 0,
+    flagged: 0,
     total: 0
   });
   const [loading, setLoading] = useState(true);
@@ -23,11 +23,11 @@ export const useChinaWarehouse = (userRole = 'customer') => {
   // Function to calculate real-time statistics from actual data
   const calculateStatistics = useCallback((items) => {
     const stats = {
-      received: 0,    // Items that have been received (pending + ready + others, excluding shipped/flagged)
-      shipped: 0,     // Items that have been shipped out
-      flagged: 0,     // Items that have issues/problems
+      received: 0,    // Items that have been received (pending + ready + others, excluding delivered/flagged)
       pending: 0,     // Items waiting for processing
-      ready_for_shipping: 0,  // Items ready to be shipped
+      ready_for_delivery: 0,  // Items ready to be delivered
+      delivered: 0,   // Items that have been delivered
+      flagged: 0,     // Items that have issues/problems
       total: items.length
     };
 
@@ -39,14 +39,16 @@ export const useChinaWarehouse = (userRole = 'customer') => {
           stats.pending++;
           stats.received++; // Pending items are considered received in warehouse
           break;
+        case 'ready_for_delivery':
+        case 'ready for delivery':
         case 'ready_for_shipping':
         case 'ready for shipping':
-          stats.ready_for_shipping++;
+          stats.ready_for_delivery++;
           stats.received++; // Ready items are also received in warehouse
           break;
-        case 'shipped':
-          stats.shipped++;
-          // Shipped items are not counted as "received" since they've left
+        case 'delivered':
+          stats.delivered++;
+          // Delivered items are not counted as "received" since they've left
           break;
         case 'flagged':
           stats.flagged++;
@@ -89,8 +91,8 @@ export const useChinaWarehouse = (userRole = 'customer') => {
         const pageParams = { ...params, page: nextPage };
         
         const itemsPromise = isStaffUser 
-          ? chinaWarehouseService.getAllItems(pageParams)
-          : chinaWarehouseService.getCustomerItems(pageParams);
+          ? ghanaWarehouseService.getAllItems(pageParams)
+          : ghanaWarehouseService.getCustomerItems(pageParams);
 
         const itemsResponse = await itemsPromise;
 
@@ -122,7 +124,7 @@ export const useChinaWarehouse = (userRole = 'customer') => {
       const calculatedStats = calculateStatistics(allItems);
       setStatistics(calculatedStats);
     } catch (err) {
-      console.error('Error fetching China warehouse data:', err);
+      console.error('Error fetching Ghana warehouse data:', err);
       
       // Handle authentication errors specifically
       if (err.message.includes('Authentication credentials') || err.message.includes('401')) {
@@ -142,17 +144,16 @@ export const useChinaWarehouse = (userRole = 'customer') => {
     }
 
     try {
-      const newItem = await chinaWarehouseService.createItem(itemData);
+      const newItem = await ghanaWarehouseService.createItem(itemData);
       const updatedData = [newItem, ...data];
       setData(updatedData);
       setOriginalData(updatedData);
       
       // Recalculate statistics with new data
       setStatistics(calculateStatistics(updatedData));
-      
       return newItem;
     } catch (err) {
-      console.error('Error creating item:', err);
+      console.error('Error creating Ghana warehouse item:', err);
       throw err;
     }
   }, [isStaffUser, data, calculateStatistics]);
@@ -163,7 +164,7 @@ export const useChinaWarehouse = (userRole = 'customer') => {
     }
 
     try {
-      const updatedItem = await chinaWarehouseService.updateItem(id, itemData);
+      const updatedItem = await ghanaWarehouseService.updateItem(id, itemData);
       const updatedData = data.map(item => 
         item.id === id ? { ...item, ...updatedItem } : item
       );
@@ -172,10 +173,9 @@ export const useChinaWarehouse = (userRole = 'customer') => {
       
       // Recalculate statistics with updated data
       setStatistics(calculateStatistics(updatedData));
-      
       return updatedItem;
     } catch (err) {
-      console.error('Error updating item:', err);
+      console.error('Error updating Ghana warehouse item:', err);
       throw err;
     }
   }, [isStaffUser, data, calculateStatistics]);
@@ -186,15 +186,16 @@ export const useChinaWarehouse = (userRole = 'customer') => {
     }
 
     try {
-      await chinaWarehouseService.deleteItem(id);
+      await ghanaWarehouseService.deleteItem(id);
       const updatedData = data.filter(item => item.id !== id);
       setData(updatedData);
       setOriginalData(updatedData);
       
       // Recalculate statistics with updated data
       setStatistics(calculateStatistics(updatedData));
+      return { success: true };
     } catch (err) {
-      console.error('Error deleting item:', err);
+      console.error('Error deleting Ghana warehouse item:', err);
       throw err;
     }
   }, [isStaffUser, data, calculateStatistics]);
@@ -205,75 +206,63 @@ export const useChinaWarehouse = (userRole = 'customer') => {
     }
 
     try {
-      const updatedItem = await chinaWarehouseService.updateStatus(id, status, notes);
+      const result = await ghanaWarehouseService.updateStatus(id, status, notes);
       const updatedData = data.map(item => 
-        item.id === id ? { ...item, status, ...updatedItem } : item
+        item.id === id ? { ...item, status: status.toLowerCase() } : item
       );
       setData(updatedData);
       setOriginalData(updatedData);
       
       // Recalculate statistics with updated data
       setStatistics(calculateStatistics(updatedData));
-      
-      return updatedItem;
+      return result;
     } catch (err) {
       console.error('Error updating status:', err);
       throw err;
     }
   }, [isStaffUser, data, calculateStatistics]);
 
-  // Local search function (instant filtering)
-  const searchItems = useCallback((searchQuery) => {
-    setSearchQuery(searchQuery);
+  const searchItems = useCallback((query) => {
+    setSearchQuery(query);
     
-    if (!searchQuery || searchQuery.trim() === '') {
-      // If search is empty, show all data and recalculate full statistics
+    if (!query.trim()) {
+      // If search is empty, reset to original data
       setData(originalData);
-      setStatistics(calculateStatistics(originalData));
       return;
     }
 
-    // Local filtering for instant response
-    const query = searchQuery.toLowerCase();
+    // Filter data based on search query
     const filteredData = originalData.filter(item => {
-      return (
-        (item.supply_tracking && item.supply_tracking.toLowerCase().includes(query)) ||
-        (item.item_id && item.item_id.toLowerCase().includes(query)) ||
-        (item.shipping_mark && item.shipping_mark.toLowerCase().includes(query)) ||
-        (item.description && item.description.toLowerCase().includes(query)) ||
-        (item.status && item.status.toLowerCase().includes(query)) ||
-        (item.created_by?.full_name && item.created_by.full_name.toLowerCase().includes(query)) ||
-        (item.created_by?.username && item.created_by.username.toLowerCase().includes(query))
+      const searchFields = [
+        item.supply_tracking,
+        item.item_id,
+        item.shipping_mark,
+        item.description,
+        item.status,
+        item.created_by?.full_name || item.created_by?.username
+      ];
+      
+      return searchFields.some(field => 
+        field && field.toString().toLowerCase().includes(query.toLowerCase())
       );
     });
 
     setData(filteredData);
-    // Update statistics to reflect only the filtered data
-    setStatistics(calculateStatistics(filteredData));
-  }, [originalData, calculateStatistics]);
+  }, [originalData]);
 
-  // Server-side search function (for more complex searches if needed)
-  const searchItemsOnServer = useCallback(async (searchQuery) => {
+  const searchItemsOnServer = useCallback(async (query) => {
     try {
       setLoading(true);
-      const params = { search: searchQuery };
-      
-      const response = isStaffUser 
-        ? await chinaWarehouseService.getAllItems(params)
-        : await chinaWarehouseService.getCustomerItems(params);
-      
-      const items = response.results || response;
-      setData(items);
-      setOriginalData(items); // Update original data with search results
+      const params = { search: query };
+      await fetchData(params);
     } catch (err) {
-      console.error('Error searching items:', err);
+      console.error('Error searching items on server:', err);
       setError(err.message || 'Failed to search items');
     } finally {
       setLoading(false);
     }
-  }, [isStaffUser]);
+  }, [fetchData]);
 
-  // Reset search and show all data
   const clearSearch = useCallback(() => {
     setSearchQuery('');
     setData(originalData);
@@ -285,8 +274,8 @@ export const useChinaWarehouse = (userRole = 'customer') => {
       const params = { ordering };
       
       const response = isStaffUser 
-        ? await chinaWarehouseService.getAllItems(params)
-        : await chinaWarehouseService.getCustomerItems(params);
+        ? await ghanaWarehouseService.getAllItems(params)
+        : await ghanaWarehouseService.getCustomerItems(params);
       
       setData(response.results || response);
     } catch (err) {
@@ -299,7 +288,7 @@ export const useChinaWarehouse = (userRole = 'customer') => {
 
   const trackItem = useCallback(async (trackingId) => {
     try {
-      return await chinaWarehouseService.trackBySupplyTracking(trackingId);
+      return await ghanaWarehouseService.trackBySupplyTracking(trackingId);
     } catch (err) {
       console.error('Error tracking item:', err);
       throw err;
