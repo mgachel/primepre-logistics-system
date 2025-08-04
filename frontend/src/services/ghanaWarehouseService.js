@@ -1,4 +1,4 @@
-// API service for China warehouse operations
+// API service for Ghana warehouse operations
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -20,8 +20,8 @@ const handleResponse = async (response) => {
   return await response.json();
 };
 
-export const chinaWarehouseService = {
-  // Get all China warehouse items (admin/staff)
+export const ghanaWarehouseService = {
+  // Get all Ghana warehouse items (admin/staff)
   getAllItems: async (params = {}) => {
     const queryParams = new URLSearchParams();
     
@@ -32,7 +32,7 @@ export const chinaWarehouseService = {
       }
     });
 
-    const url = `/api/goods/china/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const url = `/api/goods/ghana/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
     
     try {
       const response = await fetch(`${API_URL}${url}`, {
@@ -41,12 +41,12 @@ export const chinaWarehouseService = {
       });
       return await handleResponse(response);
     } catch (error) {
-      console.error('Error fetching China warehouse items:', error);
+      console.error('Error fetching Ghana warehouse items:', error);
       throw error;
     }
   },
 
-  // Get customer's China warehouse items only
+  // Get customer's Ghana warehouse items only
   getCustomerItems: async (params = {}) => {
     const queryParams = new URLSearchParams();
     
@@ -56,7 +56,7 @@ export const chinaWarehouseService = {
       }
     });
 
-    const url = `/api/customer/goods/china/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const url = `/api/customer/goods/ghana/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
     
     try {
       const response = await fetch(`${API_URL}${url}`, {
@@ -65,50 +65,64 @@ export const chinaWarehouseService = {
       });
       return await handleResponse(response);
     } catch (error) {
-      console.error('Error fetching customer China warehouse items:', error);
+      console.error('Error fetching customer Ghana warehouse items:', error);
       throw error;
     }
   },
 
-  // Get statistics for China warehouse (admin/staff)
+  // Get statistics for Ghana warehouse (admin/staff)
   getStatistics: async () => {
     try {
-      const response = await fetch(`${API_URL}/api/goods/china/statistics/`, {
+      const response = await fetch(`${API_URL}/api/goods/ghana/statistics/`, {
         method: 'GET',
         headers: getAuthHeaders()
       });
       return await handleResponse(response);
     } catch (error) {
-      console.error('Error fetching China warehouse statistics:', error);
+      console.error('Error fetching Ghana warehouse statistics:', error);
       throw error;
     }
   },
 
-  // Get customer's statistics for China warehouse
+  // Get customer's statistics for Ghana warehouse
   getCustomerStatistics: async () => {
     try {
-      const response = await fetch(`${API_URL}/api/customer/goods/china/my_statistics/`, {
+      const response = await fetch(`${API_URL}/api/customer/goods/ghana/my_statistics/`, {
         method: 'GET',
         headers: getAuthHeaders()
       });
       return await handleResponse(response);
     } catch (error) {
-      console.error('Error fetching customer China warehouse statistics:', error);
+      console.error('Error fetching customer Ghana warehouse statistics:', error);
       throw error;
     }
   },
 
-  // Create new China warehouse item (admin/staff)
+  // Track specific item by supply tracking ID
+  trackBySupplyTracking: async (trackingId) => {
+    try {
+      const response = await fetch(`${API_URL}/api/customer/goods/ghana/tracking/?tracking_id=${trackingId}`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error tracking Ghana warehouse item:', error);
+      throw error;
+    }
+  },
+
+  // Create new Ghana warehouse item (admin/staff)
   createItem: async (itemData) => {
     try {
-      const response = await fetch(`${API_URL}/api/goods/china/`, {
+      const response = await fetch(`${API_URL}/api/goods/ghana/`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(itemData)
       });
       return await handleResponse(response);
     } catch (error) {
-      console.error('Error creating China warehouse item:', error);
+      console.error('Error creating Ghana warehouse item:', error);
       throw error;
     }
   },
@@ -116,14 +130,14 @@ export const chinaWarehouseService = {
   // Update item (admin/staff)
   updateItem: async (id, itemData) => {
     try {
-      const response = await fetch(`${API_URL}/api/goods/china/${id}/`, {
+      const response = await fetch(`${API_URL}/api/goods/ghana/${id}/`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify(itemData)
       });
       return await handleResponse(response);
     } catch (error) {
-      console.error('Error updating China warehouse item:', error);
+      console.error('Error updating Ghana warehouse item:', error);
       throw error;
     }
   },
@@ -131,7 +145,7 @@ export const chinaWarehouseService = {
   // Delete item (admin/staff)
   deleteItem: async (id) => {
     try {
-      const response = await fetch(`${API_URL}/api/goods/china/${id}/`, {
+      const response = await fetch(`${API_URL}/api/goods/ghana/${id}/`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -140,7 +154,7 @@ export const chinaWarehouseService = {
       }
       return { success: true };
     } catch (error) {
-      console.error('Error deleting China warehouse item:', error);
+      console.error('Error deleting Ghana warehouse item:', error);
       throw error;
     }
   },
@@ -148,7 +162,7 @@ export const chinaWarehouseService = {
   // Update status of specific item (admin/staff)
   updateStatus: async (id, status, notes = '') => {
     try {
-      const response = await fetch(`${API_URL}/api/goods/china/${id}/update_status/`, {
+      const response = await fetch(`${API_URL}/api/goods/ghana/${id}/update_status/`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ status, notes })
@@ -163,7 +177,7 @@ export const chinaWarehouseService = {
   // Get flagged items (admin/staff)
   getFlaggedItems: async () => {
     try {
-      const response = await fetch(`${API_URL}/api/goods/china/flagged_items/`, {
+      const response = await fetch(`${API_URL}/api/goods/ghana/flagged_items/`, {
         method: 'GET',
         headers: getAuthHeaders()
       });
@@ -177,7 +191,7 @@ export const chinaWarehouseService = {
   // Get customer's flagged items
   getCustomerFlaggedItems: async () => {
     try {
-      const response = await fetch(`${API_URL}/api/customer/goods/china/my_flagged_items/`, {
+      const response = await fetch(`${API_URL}/api/customer/goods/ghana/my_flagged_items/`, {
         method: 'GET',
         headers: getAuthHeaders()
       });
@@ -188,30 +202,30 @@ export const chinaWarehouseService = {
     }
   },
 
-  // Get ready for shipping items (admin/staff)
-  getReadyForShippingItems: async () => {
+  // Get ready for delivery items (admin/staff)
+  getReadyForDeliveryItems: async () => {
     try {
-      const response = await fetch(`${API_URL}/api/goods/china/ready_for_shipping/`, {
+      const response = await fetch(`${API_URL}/api/goods/ghana/ready_for_shipping/`, {
         method: 'GET',
         headers: getAuthHeaders()
       });
       return await handleResponse(response);
     } catch (error) {
-      console.error('Error fetching ready for shipping items:', error);
+      console.error('Error fetching ready for delivery items:', error);
       throw error;
     }
   },
 
-  // Get customer's ready for shipping items
-  getCustomerReadyForShippingItems: async () => {
+  // Get customer's ready for delivery items
+  getCustomerReadyForDeliveryItems: async () => {
     try {
-      const response = await fetch(`${API_URL}/api/customer/goods/china/ready_for_shipping/`, {
+      const response = await fetch(`${API_URL}/api/customer/goods/ghana/ready_for_shipping/`, {
         method: 'GET',
         headers: getAuthHeaders()
       });
       return await handleResponse(response);
     } catch (error) {
-      console.error('Error fetching customer ready for shipping items:', error);
+      console.error('Error fetching customer ready for delivery items:', error);
       throw error;
     }
   },
@@ -219,7 +233,7 @@ export const chinaWarehouseService = {
   // Bulk status update (admin/staff)
   bulkStatusUpdate: async (itemIds, status, notes = '') => {
     try {
-      const response = await fetch(`${API_URL}/api/goods/china/bulk_status_update/`, {
+      const response = await fetch(`${API_URL}/api/goods/ghana/bulk_status_update/`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ item_ids: itemIds, status, notes })
@@ -235,11 +249,11 @@ export const chinaWarehouseService = {
   uploadExcel: async (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('warehouse', 'china'); // Required by the backend serializer
+    formData.append('warehouse', 'ghana'); // Required by the backend serializer
 
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_URL}/api/goods/china/upload_excel/`, {
+      const response = await fetch(`${API_URL}/api/goods/ghana/upload_excel/`, {
         method: 'POST',
         headers: {
           ...(token && { 'Authorization': `Bearer ${token}` })
@@ -256,43 +270,23 @@ export const chinaWarehouseService = {
   // Download Excel template (admin/staff)
   downloadTemplate: async () => {
     try {
-      const response = await fetch(`${API_URL}/api/goods/china/download_template/`, {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`${API_URL}/api/goods/ghana/download_template/`, {
         method: 'GET',
-        headers: getAuthHeaders()
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'china_warehouse_template.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Error downloading template:', error);
-      throw error;
-    }
-  },
 
-  // Track item by supply tracking ID (customer)
-  trackBySupplyTracking: async (trackingId) => {
-    try {
-      const response = await fetch(`${API_URL}/api/customer/goods/china/tracking/${trackingId}/`, {
-        method: 'GET',
-        headers: getAuthHeaders()
-      });
-      return await handleResponse(response);
+      // Return the blob for download
+      return await response.blob();
     } catch (error) {
-      console.error('Error tracking item:', error);
+      console.error('Error downloading Ghana warehouse template:', error);
       throw error;
     }
   }
 };
-
-export default chinaWarehouseService;

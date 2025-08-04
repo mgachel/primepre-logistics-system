@@ -382,16 +382,8 @@ class BaseGoodsReceivedViewSet(AdvancedAnalyticsMixin, SmartNotificationMixin, P
                 with transaction.atomic():
                     for row_data in processed_data['data']:
                         try:
-                            # Check for duplicates more efficiently
-                            existing_shipping = self.model_class.objects.filter(
-                                shipping_mark=row_data['shipping_mark']
-                            ).exists()
-                            
-                            if existing_shipping:
-                                errors.append(f"Shipping mark '{row_data['shipping_mark']}' already exists")
-                                failed_items.append(row_data['shipping_mark'])
-                                continue
-                            
+                            # Only check for supply_tracking duplicates (which has unique=True constraint)
+                            # Shipping marks are allowed to be duplicated
                             existing_tracking = self.model_class.objects.filter(
                                 supply_tracking=row_data['supply_tracking']
                             ).exists()
