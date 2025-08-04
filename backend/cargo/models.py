@@ -95,7 +95,7 @@ class CargoItem(models.Model):
                 client=self.client,
                 created_at__date=timezone.now().date()
             ).count() + 1
-            self.tracking_id = f"{self.container_id}_{self.client.shipping_mark}_{today}_{count:04d}"
+            self.tracking_id = f"{self.container.container_id}_{self.client.shipping_mark}_{today}_{count:04d}"
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -121,7 +121,7 @@ class ClientShipmentSummary(models.Model):
         if not self.assigned_tracking:
             # Generate tracking: CONT_MARK_CONSIGNMENT
             today = timezone.now().strftime('%Y%m%d')
-            self.assigned_tracking = f"CONS_{self.container_id}_{self.client.shipping_mark}_{today}"
+            self.assigned_tracking = f"CONS_{self.container.container_id}_{self.client.shipping_mark}_{today}"
         super().save(*args, **kwargs)
     
     def update_totals(self):
