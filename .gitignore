@@ -38,6 +38,9 @@ staticfiles/
 *.swo
 *~
 
+# Copilot instructions should not be committed
+.github/copilot-instructions.md
+
 # OS
 .DS_Store
 .DS_Store?

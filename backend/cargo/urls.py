@@ -26,4 +26,9 @@ urlpatterns = [
     # Customer-specific API routes
     path('customer/', include(customer_router.urls)),
     path('customer/dashboard/', views.CustomerCargoDashboardView.as_view(), name='customer-cargo-dashboard'),
+    
+    # Template views (if needed for frontend)
+    path('dashboard-template/', views.cargo_dashboard, name='cargo-dashboard-template'),
+    path('sea/', views.sea_cargo_view, name='sea-cargo'),
+    path('air/', views.air_cargo_view, name='air-cargo'),
 ]
