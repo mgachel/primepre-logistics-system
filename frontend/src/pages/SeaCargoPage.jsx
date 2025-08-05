@@ -6,6 +6,7 @@ import { BoxIcon, TruckIcon, FlagIcon } from "../components/Icons";
 import { useSeaCargo } from "../hooks/useSeaCargo";
 import { AuthContext } from "../contexts/authContext";
 import { seaCargoService } from "../services/seaCargoService";
+import authService from "../services/authService";
 
 function SeaCargoPage() {
   const [searchValue, setSearchValue] = useState("");
@@ -178,17 +179,10 @@ function SeaCargoPage() {
 
     try {
       // Fetch items for this cargo container
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(
+      const response = await authService.authenticatedFetch(
         `${
           import.meta.env.VITE_API_URL || "http://localhost:8000"
-        }/api/cargo/api/containers/${item.container_id}/cargo_items/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
+        }/api/cargo/api/containers/${item.container_id}/cargo_items/`
       );
 
       if (!response.ok) {
@@ -254,17 +248,10 @@ function SeaCargoPage() {
 
     setLoadingCustomers(true);
     try {
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(
+      const response = await authService.authenticatedFetch(
         `${
           import.meta.env.VITE_API_URL || "http://localhost:8000"
-        }/api/cargo/api/customers/?search=${encodeURIComponent(query.trim())}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
+        }/api/cargo/api/customers/?search=${encodeURIComponent(query.trim())}`
       );
 
       if (response.ok) {
@@ -341,25 +328,24 @@ function SeaCargoPage() {
       } else if (customerSearchQuery && customerSearchQuery.trim()) {
         // Try to search for customer by shipping mark from the search query
         try {
-          const token = localStorage.getItem("accessToken");
-          const response = await fetch(
+          const response = await authService.authenticatedFetch(
             `${
               import.meta.env.VITE_API_URL || "http://localhost:8000"
-            }/api/cargo/api/customers/?search=${encodeURIComponent(customerSearchQuery.trim())}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-            }
+            }/api/cargo/api/customers/?search=${encodeURIComponent(
+              customerSearchQuery.trim()
+            )}`
           );
 
           if (response.ok) {
             const result = await response.json();
-            const customers = Array.isArray(result) ? result : result.results || [];
+            const customers = Array.isArray(result)
+              ? result
+              : result.results || [];
             // Find exact match for shipping mark
-            const exactMatch = customers.find(c => c.shipping_mark === customerSearchQuery.trim());
-            
+            const exactMatch = customers.find(
+              (c) => c.shipping_mark === customerSearchQuery.trim()
+            );
+
             if (exactMatch) {
               clientId = exactMatch.id;
             } else {
@@ -387,17 +373,12 @@ function SeaCargoPage() {
       }
 
       // API call to add item to cargo container
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(
+      const response = await authService.authenticatedFetch(
         `${
           import.meta.env.VITE_API_URL || "http://localhost:8000"
         }/api/cargo/api/cargo-items/`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             container: selectedItem.container_id,
             client: clientId,
@@ -446,16 +427,12 @@ function SeaCargoPage() {
       formData.append("container_id", selectedItem.container_id);
 
       // API call to upload Excel file for cargo items
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(
+      const response = await authService.authenticatedFetch(
         `${
           import.meta.env.VITE_API_URL || "http://localhost:8000"
         }/api/cargo/api/bulk-upload/`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
           body: formData,
         }
       );
@@ -1427,7 +1404,9 @@ function SeaCargoPage() {
                     <input
                       type="text"
                       value={customerSearchQuery}
-                      onChange={(e) => handleShippingMarkInputChange(e.target.value)}
+                      onChange={(e) =>
+                        handleShippingMarkInputChange(e.target.value)
+                      }
                       onFocus={() => {
                         if (customerSearchQuery.length >= 2) {
                           setShowCustomerSuggestions(true);
@@ -1435,12 +1414,15 @@ function SeaCargoPage() {
                       }}
                       onBlur={() => {
                         // Delay hiding suggestions to allow click on suggestion
-                        setTimeout(() => setShowCustomerSuggestions(false), 200);
+                        setTimeout(
+                          () => setShowCustomerSuggestions(false),
+                          200
+                        );
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                       placeholder="Type to search for shipping mark or customer..."
                     />
-                    
+
                     {loadingCustomers && (
                       <div className="absolute right-3 top-3">
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
@@ -1448,37 +1430,43 @@ function SeaCargoPage() {
                     )}
 
                     {/* Suggestions Dropdown */}
-                    {showCustomerSuggestions && availableCustomers.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                        {availableCustomers.map((customer) => (
-                          <div
-                            key={customer.id}
-                            onMouseDown={(e) => {
-                              // Prevent input from losing focus
-                              e.preventDefault();
-                              handleCustomerSelection(customer);
-                            }}
-                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                          >
-                            <div className="font-medium text-gray-900">
-                              {customer.shipping_mark}
+                    {showCustomerSuggestions &&
+                      availableCustomers.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                          {availableCustomers.map((customer) => (
+                            <div
+                              key={customer.id}
+                              onMouseDown={(e) => {
+                                // Prevent input from losing focus
+                                e.preventDefault();
+                                handleCustomerSelection(customer);
+                              }}
+                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="font-medium text-gray-900">
+                                {customer.shipping_mark}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {customer.full_name ||
+                                  customer.company_name ||
+                                  "No Name"}
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-600">
-                              {customer.full_name || customer.company_name || "No Name"}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                          ))}
+                        </div>
+                      )}
 
                     {/* No results message */}
-                    {showCustomerSuggestions && availableCustomers.length === 0 && customerSearchQuery.length >= 2 && !loadingCustomers && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                        <div className="px-4 py-3 text-gray-500 text-sm">
-                          No customers found matching "{customerSearchQuery}"
+                    {showCustomerSuggestions &&
+                      availableCustomers.length === 0 &&
+                      customerSearchQuery.length >= 2 &&
+                      !loadingCustomers && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                          <div className="px-4 py-3 text-gray-500 text-sm">
+                            No customers found matching "{customerSearchQuery}"
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
 
                   {/* Selected Customer Display */}
@@ -1500,23 +1488,29 @@ function SeaCargoPage() {
                   {!selectedCustomer && customerSearchQuery.length === 0 && (
                     <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
                       <p className="text-xs text-blue-600">
-                        Start typing to search for customers by shipping mark or name. 
-                        If no customer is selected, the item will be assigned to the current user.
+                        Start typing to search for customers by shipping mark or
+                        name. If no customer is selected, the item will be
+                        assigned to the current user.
                       </p>
                     </div>
                   )}
 
                   {/* New Customer Warning */}
-                  {!selectedCustomer && customerSearchQuery.length >= 2 && !loadingCustomers && availableCustomers.length === 0 && (
-                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                      <p className="text-sm text-yellow-800">
-                        No customer found with shipping mark "{customerSearchQuery}".
-                      </p>
-                      <p className="text-xs text-yellow-600">
-                        The item will be assigned as "No Name" customer or contact admin to create this customer.
-                      </p>
-                    </div>
-                  )}
+                  {!selectedCustomer &&
+                    customerSearchQuery.length >= 2 &&
+                    !loadingCustomers &&
+                    availableCustomers.length === 0 && (
+                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <p className="text-sm text-yellow-800">
+                          No customer found with shipping mark "
+                          {customerSearchQuery}".
+                        </p>
+                        <p className="text-xs text-yellow-600">
+                          The item will be assigned as "No Name" customer or
+                          contact admin to create this customer.
+                        </p>
+                      </div>
+                    )}
                 </div>
 
                 <div>
