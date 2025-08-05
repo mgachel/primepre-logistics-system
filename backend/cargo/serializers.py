@@ -23,7 +23,7 @@ class CargoItemSerializer(serializers.ModelSerializer):
             'item_description', 'quantity', 'weight', 'cbm', 'unit_value', 'total_value',
             'status', 'delivered_date', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'tracking_id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class CargoItemCreateSerializer(serializers.ModelSerializer):
@@ -32,7 +32,7 @@ class CargoItemCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CargoItem
         fields = [
-            'container', 'client', 'item_description', 'quantity', 
+            'container', 'client', 'tracking_id', 'item_description', 'quantity', 
             'weight', 'cbm', 'unit_value', 'total_value', 'status'
         ]
 
