@@ -161,12 +161,25 @@ function SeaCargoPage() {
 
     try {
       // Fetch items for this cargo container
-      // For now, we'll simulate this - you may need to create an API endpoint
-      // const items = await seaCargoService.getContainerItems(item.container_id);
-      // setCargoItems(items);
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_API_URL || "http://localhost:8000"
+        }/api/cargo/api/containers/${item.container_id}/cargo_items/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-      // Temporary: Set empty array until API is ready
-      setCargoItems([]);
+      if (!response.ok) {
+        throw new Error("Failed to fetch cargo items");
+      }
+
+      const itemsData = await response.json();
+      setCargoItems(itemsData);
     } catch (error) {
       console.error("Error loading cargo items:", error);
       setCargoItems([]);
@@ -174,7 +187,6 @@ function SeaCargoPage() {
       setLoadingCargoItems(false);
     }
   };
-
   const handleUpdate = (item) => {
     setSelectedItem(item);
     setUpdateForm({
@@ -221,17 +233,41 @@ function SeaCargoPage() {
     setActionLoading(true);
     try {
       // API call to add item to cargo container
-      // await seaCargoService.addItemToContainer(selectedItem.container_id, newItemForm);
-
-      console.log(
-        "Adding item to cargo:",
-        selectedItem.container_id,
-        newItemForm
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_API_URL || "http://localhost:8000"
+        }/api/cargo/api/cargo-items/`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            container: selectedItem.container_id,
+            client: user?.id || 1, // Use current user ID or fallback to 1
+            item_description: newItemForm.description,
+            quantity: parseInt(newItemForm.quantity) || 1,
+            weight: newItemForm.weight ? parseFloat(newItemForm.weight) : null,
+            cbm: 1.0, // Default CBM value - you might want to add this to the form
+            unit_value: null,
+            total_value: null,
+            status: "pending",
+          }),
+        }
       );
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to add item");
+      }
+
+      const result = await response.json();
+      console.log("Item added successfully:", result);
+
       // Refresh cargo items
-      // const updatedItems = await seaCargoService.getContainerItems(selectedItem.container_id);
-      // setCargoItems(updatedItems);
+      await handleRowAction(selectedItem);
 
       setShowAddCargoItemModal(false);
       alert("Item added to cargo successfully!");
@@ -249,24 +285,45 @@ function SeaCargoPage() {
 
     setActionLoading(true);
     try {
-      // API call to upload Excel file for cargo items
-      // const formData = new FormData();
-      // formData.append('file', file);
-      // formData.append('container_id', selectedItem.container_id);
-      // await seaCargoService.uploadCargoItems(formData);
+      // Prepare form data for bulk upload API
+      const formData = new FormData();
+      formData.append("excel_file", file);
+      formData.append("container_id", selectedItem.container_id);
 
-      console.log(
-        "Uploading file for cargo:",
-        selectedItem.container_id,
-        file.name
+      // API call to upload Excel file for cargo items
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_API_URL || "http://localhost:8000"
+        }/api/cargo/api/bulk-upload/`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
       );
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Upload failed");
+      }
+
+      const result = await response.json();
+      console.log("Bulk upload successful:", result);
+
       // Refresh cargo items
-      // const updatedItems = await seaCargoService.getContainerItems(selectedItem.container_id);
-      // setCargoItems(updatedItems);
+      await handleRowAction(selectedItem);
 
       setShowExcelUploadModal(false);
-      alert("Items uploaded successfully!");
+      alert(
+        `Upload successful! Created ${result.created_items} items. ${
+          result.errors.length > 0
+            ? `${result.errors.length} errors occurred.`
+            : ""
+        }`
+      );
     } catch (error) {
       console.error("Error uploading file:", error);
       alert("Failed to upload file: " + error.message);
@@ -1070,36 +1127,81 @@ function SeaCargoPage() {
                             Tracking ID
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Client Name
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Shipping Mark
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Description
+                            Item Description
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Quantity
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Weight
+                            Weight (kg)
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            CBM
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Unit Value
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Total Value
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
                           </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {cargoItems.map((item, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
+                          <tr
+                            key={item.id || index}
+                            className="hover:bg-gray-50"
+                          >
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {item.tracking_id}
+                              {item.tracking_id || "-"}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {item.shipping_mark}
+                              {item.client_name || "-"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {item.client_shipping_mark || "-"}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-900">
-                              {item.description}
+                              {item.item_description || "-"}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {item.quantity}
+                              {item.quantity || "-"}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {item.weight}
+                              {item.weight ? `${item.weight} kg` : "-"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {item.cbm || "-"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {item.unit_value ? `$${item.unit_value}` : "-"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {item.total_value ? `$${item.total_value}` : "-"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span
+                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  item.status === "delivered"
+                                    ? "bg-green-100 text-green-800"
+                                    : item.status === "in_transit"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : item.status === "delayed"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-yellow-100 text-yellow-800"
+                                }`}
+                              >
+                                {item.status || "pending"}
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -1345,15 +1447,55 @@ function SeaCargoPage() {
                   <h4 className="text-sm font-medium text-blue-900 mb-2">
                     Excel File Format Requirements:
                   </h4>
-                  <ul className="text-xs text-blue-800 space-y-1">
-                    <li>• Column A: Tracking ID (required)</li>
-                    <li>• Column B: Shipping Mark</li>
-                    <li>• Column C: Description (required)</li>
-                    <li>• Column D: Quantity</li>
-                    <li>• Column E: Weight (kg)</li>
-                    <li>• Column F: Dimensions</li>
-                    <li>• Column G: Notes</li>
-                  </ul>
+                  <div className="text-xs text-blue-800 space-y-1">
+                    <p className="font-medium mb-2">
+                      Required Columns (must exist in Excel):
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 ml-2">
+                      <li>
+                        <strong>shipping_mark</strong> - Customer shipping mark
+                      </li>
+                      <li>
+                        <strong>item_description</strong> - Description of the
+                        item
+                      </li>
+                      <li>
+                        <strong>quantity</strong> - Number of items
+                      </li>
+                      <li>
+                        <strong>cbm</strong> - Cubic meter measurement
+                      </li>
+                    </ul>
+
+                    <p className="font-medium mt-3 mb-2">Optional Columns:</p>
+                    <ul className="list-disc list-inside space-y-1 ml-2">
+                      <li>
+                        <strong>weight</strong> - Weight in kg
+                      </li>
+                      <li>
+                        <strong>unit_value</strong> - Value per unit
+                      </li>
+                      <li>
+                        <strong>total_value</strong> - Total value
+                      </li>
+                      <li>
+                        <strong>status</strong> - Item status (default: pending)
+                      </li>
+                    </ul>
+
+                    <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                      <p className="font-medium">Important Notes:</p>
+                      <ul className="list-disc list-inside mt-1 space-y-1">
+                        <li>
+                          Column names must match exactly (case-sensitive)
+                        </li>
+                        <li>
+                          Customer must exist with the provided shipping_mark
+                        </li>
+                        <li>Supports .xlsx, .xls, and .csv files</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
 
