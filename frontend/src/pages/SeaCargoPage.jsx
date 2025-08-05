@@ -229,12 +229,10 @@ function SeaCargoPage() {
   const transformedData = cargoData.map((item) => ({
     container_id: item.container_id || "-",
     route: item.route || "-",
-    weight: item.weight || "-",
-    cbm: item.cbm || "-",
+    load_date: item.load_date || "-",
     eta: item.eta || "-",
+    cbm: item.cbm || "-",
     status: item.status?.toLowerCase() || "pending",
-    created_by:
-      item.created_by?.full_name || item.created_by?.username || "System",
     id: item.container_id || item.id, // Use container_id as primary key for containers
   }));
 
@@ -412,11 +410,10 @@ function SeaCargoPage() {
         columns={[
           { key: "container_id", label: "Container ID" },
           { key: "route", label: "Route" },
-          { key: "weight", label: "Weight (kg)" },
-          { key: "cbm", label: "CBM" },
+          { key: "load_date", label: "Load Date" },
           { key: "eta", label: "ETA" },
+          { key: "cbm", label: "CBM" },
           { key: "status", label: "Status" },
-          { key: "created_by", label: "Added By" },
         ]}
         onRowClick={handleRowAction}
         onEdit={isStaffUser ? handleUpdate : undefined}
