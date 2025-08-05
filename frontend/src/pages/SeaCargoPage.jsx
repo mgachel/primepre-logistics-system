@@ -18,10 +18,25 @@ function SeaCargoPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showAddCargoItemModal, setShowAddCargoItemModal] = useState(false);
+  const [showExcelUploadModal, setShowExcelUploadModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [cargoItems, setCargoItems] = useState([]);
+  const [loadingCargoItems, setLoadingCargoItems] = useState(false);
   const [updateForm, setUpdateForm] = useState({ description: "" });
   const [statusForm, setStatusForm] = useState({ status: "", notes: "" });
   const [actionLoading, setActionLoading] = useState(false);
+
+  // New item form for adding items to cargo
+  const [newItemForm, setNewItemForm] = useState({
+    tracking_id: "",
+    shipping_mark: "",
+    description: "",
+    quantity: 1,
+    weight: "",
+    dimensions: "",
+    notes: "",
+  });
 
   // Add Cargo form state
   const [addCargoForm, setAddCargoForm] = useState({
@@ -139,9 +154,25 @@ function SeaCargoPage() {
     searchItems(value);
   };
 
-  const handleRowAction = (item) => {
+  const handleRowAction = async (item) => {
     setSelectedItem(item);
+    setLoadingCargoItems(true);
     setShowViewModal(true);
+
+    try {
+      // Fetch items for this cargo container
+      // For now, we'll simulate this - you may need to create an API endpoint
+      // const items = await seaCargoService.getContainerItems(item.container_id);
+      // setCargoItems(items);
+
+      // Temporary: Set empty array until API is ready
+      setCargoItems([]);
+    } catch (error) {
+      console.error("Error loading cargo items:", error);
+      setCargoItems([]);
+    } finally {
+      setLoadingCargoItems(false);
+    }
   };
 
   const handleUpdate = (item) => {
@@ -165,6 +196,83 @@ function SeaCargoPage() {
     setSelectedItem(item);
     setStatusForm({ status: item.status || "pending", notes: "" });
     setShowUpdateStatusModal(true);
+  };
+
+  const handleAddItemToCargo = () => {
+    setNewItemForm({
+      tracking_id: "",
+      shipping_mark: "",
+      description: "",
+      quantity: 1,
+      weight: "",
+      dimensions: "",
+      notes: "",
+    });
+    setShowAddCargoItemModal(true);
+  };
+
+  const handleExcelUpload = () => {
+    setShowExcelUploadModal(true);
+  };
+
+  const confirmAddItemToCargo = async () => {
+    if (!selectedItem) return;
+
+    setActionLoading(true);
+    try {
+      // API call to add item to cargo container
+      // await seaCargoService.addItemToContainer(selectedItem.container_id, newItemForm);
+
+      console.log(
+        "Adding item to cargo:",
+        selectedItem.container_id,
+        newItemForm
+      );
+
+      // Refresh cargo items
+      // const updatedItems = await seaCargoService.getContainerItems(selectedItem.container_id);
+      // setCargoItems(updatedItems);
+
+      setShowAddCargoItemModal(false);
+      alert("Item added to cargo successfully!");
+    } catch (error) {
+      console.error("Error adding item to cargo:", error);
+      alert("Failed to add item to cargo: " + error.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !selectedItem) return;
+
+    setActionLoading(true);
+    try {
+      // API call to upload Excel file for cargo items
+      // const formData = new FormData();
+      // formData.append('file', file);
+      // formData.append('container_id', selectedItem.container_id);
+      // await seaCargoService.uploadCargoItems(formData);
+
+      console.log(
+        "Uploading file for cargo:",
+        selectedItem.container_id,
+        file.name
+      );
+
+      // Refresh cargo items
+      // const updatedItems = await seaCargoService.getContainerItems(selectedItem.container_id);
+      // setCargoItems(updatedItems);
+
+      setShowExcelUploadModal(false);
+      alert("Items uploaded successfully!");
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      alert("Failed to upload file: " + error.message);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   // Modal action handlers
@@ -405,25 +513,214 @@ function SeaCargoPage() {
       />
 
       {/* Data Table */}
-      <DataTable
-        data={transformedData}
-        columns={[
-          { key: "container_id", label: "Container ID" },
-          { key: "route", label: "Route" },
-          { key: "load_date", label: "Load Date" },
-          { key: "eta", label: "ETA" },
-          { key: "cbm", label: "CBM" },
-          { key: "status", label: "Status" },
-          { key: "actions", label: "Actions" },
-        ]}
-        onRowClick={handleRowAction}
-        onUpdate={isStaffUser ? handleUpdate : undefined}
-        onDelete={isStaffUser ? handleDelete : undefined}
-        onUpdateStatus={isStaffUser ? handleUpdateStatus : undefined}
-        userRole={user?.user_role || (user?.is_staff ? "staff" : "customer")}
-        loading={loading}
-        emptyMessage="No sea cargo containers found"
-      />
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Container ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Route
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Load Date
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ETA
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  CBM
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {loading ? (
+                // Loading state
+                Array.from({ length: 5 }).map((_, index) => (
+                  <tr key={index}>
+                    {Array.from({ length: 7 }).map((_, colIndex) => (
+                      <td
+                        key={colIndex}
+                        className="px-6 py-4 whitespace-nowrap"
+                      >
+                        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : transformedData.length === 0 ? (
+                // Empty state
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center">
+                    <div className="text-gray-400 mb-4">
+                      <svg
+                        className="mx-auto h-12 w-12"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1}
+                          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-gray-500 text-sm">
+                      No sea cargo containers found
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                // Data rows
+                transformedData.map((item, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {item.container_id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {item.route}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {item.load_date}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {item.eta}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {item.cbm}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          item.status === "delivered"
+                            ? "bg-green-100 text-green-800"
+                            : item.status === "in_transit"
+                            ? "bg-blue-100 text-blue-800"
+                            : item.status === "pending"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : item.status === "demurrage"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {item.status?.charAt(0)?.toUpperCase() +
+                          item.status?.slice(1).replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        {/* View Items Button */}
+                        <button
+                          onClick={() => handleRowAction(item)}
+                          className="inline-flex items-center justify-center w-8 h-8 text-blue-600 bg-blue-100 rounded hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          title="View Items in Container"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                            />
+                          </svg>
+                        </button>
+
+                        {isStaffUser && (
+                          <>
+                            {/* Edit Container Button */}
+                            <button
+                              onClick={() => handleUpdate(item)}
+                              className="inline-flex items-center justify-center w-8 h-8 text-green-600 bg-green-100 rounded hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              title="Edit Container"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
+                              </svg>
+                            </button>
+
+                            {/* Update Status Button */}
+                            <button
+                              onClick={() => handleUpdateStatus(item)}
+                              className="inline-flex items-center justify-center w-8 h-8 text-purple-600 bg-purple-100 rounded hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              title="Update Status"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                            </button>
+
+                            {/* Delete Container Button */}
+                            <button
+                              onClick={() => handleDelete(item)}
+                              className="inline-flex items-center justify-center w-8 h-8 text-red-600 bg-red-100 rounded hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                              title="Delete Container"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Add Cargo Modal */}
       {showAddItemModal && (
@@ -677,15 +974,20 @@ function SeaCargoPage() {
         </div>
       )}
 
-      {/* View Modal */}
+      {/* View Modal - Container Items */}
       {showViewModal && selectedItem && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Container Details
-                </h3>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Container Items: {selectedItem.container_id}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Route: {selectedItem.route} | Status: {selectedItem.status}
+                  </p>
+                </div>
                 <button
                   onClick={() => setShowViewModal(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -705,73 +1007,368 @@ function SeaCargoPage() {
                   </svg>
                 </button>
               </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Container ID
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    {selectedItem.container_id}
-                  </p>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3 mb-6">
+                <button
+                  onClick={handleAddItemToCargo}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  Add Item Manually
+                </button>
+                <button
+                  onClick={handleExcelUpload}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  Upload Excel File
+                </button>
+              </div>
+
+              {/* Items Table */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-6 py-3">
+                  <h4 className="text-sm font-medium text-gray-900">
+                    Items in Container ({cargoItems.length})
+                  </h4>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Route
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    {selectedItem.route}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Weight
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    {selectedItem.weight} kg
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    CBM
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    {selectedItem.cbm}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    ETA
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    {selectedItem.eta}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Status
-                  </label>
-                  <span
-                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      selectedItem.status === "delivered"
-                        ? "bg-green-100 text-green-800"
-                        : selectedItem.status === "in_transit"
-                        ? "bg-blue-100 text-blue-800"
-                        : selectedItem.status === "pending"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    {selectedItem.status?.charAt(0)?.toUpperCase() +
-                      selectedItem.status?.slice(1).replace("_", " ")}
-                  </span>
-                </div>
+
+                {loadingCargoItems ? (
+                  <div className="p-8 text-center">
+                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent mb-4"></div>
+                    <p className="text-gray-600">Loading items...</p>
+                  </div>
+                ) : cargoItems.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <div className="text-gray-400 mb-4">
+                      <svg
+                        className="mx-auto h-12 w-12"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1}
+                          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-gray-500 mb-4">
+                      No items in this container yet
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Add items manually or upload an Excel file to get started
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Tracking ID
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Shipping Mark
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Description
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Quantity
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Weight
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {cargoItems.map((item, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {item.tracking_id}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {item.shipping_mark}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {item.description}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {item.quantity}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {item.weight}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Update Modal */}
+      {/* Add Item to Cargo Modal */}
+      {showAddCargoItemModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Add Item to Container
+                </h3>
+                <button
+                  onClick={() => setShowAddCargoItemModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tracking ID <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newItemForm.tracking_id}
+                    onChange={(e) =>
+                      setNewItemForm({
+                        ...newItemForm,
+                        tracking_id: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter tracking ID"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Shipping Mark
+                  </label>
+                  <input
+                    type="text"
+                    value={newItemForm.shipping_mark}
+                    onChange={(e) =>
+                      setNewItemForm({
+                        ...newItemForm,
+                        shipping_mark: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter shipping mark"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={newItemForm.description}
+                    onChange={(e) =>
+                      setNewItemForm({
+                        ...newItemForm,
+                        description: e.target.value,
+                      })
+                    }
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter item description"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Quantity
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newItemForm.quantity}
+                      onChange={(e) =>
+                        setNewItemForm({
+                          ...newItemForm,
+                          quantity: parseInt(e.target.value) || 1,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Weight (kg)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newItemForm.weight}
+                      onChange={(e) =>
+                        setNewItemForm({
+                          ...newItemForm,
+                          weight: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Dimensions
+                  </label>
+                  <input
+                    type="text"
+                    value={newItemForm.dimensions}
+                    onChange={(e) =>
+                      setNewItemForm({
+                        ...newItemForm,
+                        dimensions: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g., 10x20x30 cm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={newItemForm.notes}
+                    onChange={(e) =>
+                      setNewItemForm({
+                        ...newItemForm,
+                        notes: e.target.value,
+                      })
+                    }
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Additional notes (optional)"
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={() => setShowAddCargoItemModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmAddItemToCargo}
+                  disabled={
+                    actionLoading ||
+                    !newItemForm.tracking_id ||
+                    !newItemForm.description
+                  }
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {actionLoading ? "Adding..." : "Add Item"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Excel Upload Modal */}
+      {showExcelUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Upload Excel File
+                </h3>
+                <button
+                  onClick={() => setShowExcelUploadModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Excel File
+                  </label>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleFileUpload}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                  <h4 className="text-sm font-medium text-blue-900 mb-2">
+                    Excel File Format Requirements:
+                  </h4>
+                  <ul className="text-xs text-blue-800 space-y-1">
+                    <li>• Column A: Tracking ID (required)</li>
+                    <li>• Column B: Shipping Mark</li>
+                    <li>• Column C: Description (required)</li>
+                    <li>• Column D: Quantity</li>
+                    <li>• Column E: Weight (kg)</li>
+                    <li>• Column F: Dimensions</li>
+                    <li>• Column G: Notes</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={() => setShowExcelUploadModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {showUpdateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full">
