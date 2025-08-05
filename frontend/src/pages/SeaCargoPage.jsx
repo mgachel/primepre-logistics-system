@@ -2,6 +2,7 @@ import React, { useState, useContext, useEffect } from "react";
 import StatusCard from "../components/StatusCard";
 import ControlPanel from "../components/ControlPanel";
 import DataTable from "../components/DataTable";
+import NotificationToast from "../components/NotificationToast";
 import { BoxIcon, TruckIcon, FlagIcon } from "../components/Icons";
 import { useSeaCargo } from "../hooks/useSeaCargo";
 import { AuthContext } from "../contexts/authContext";
@@ -47,6 +48,14 @@ function SeaCargoPage() {
     notes: "",
   });
 
+  // Notification state
+  const [notification, setNotification] = useState({
+    show: false,
+    type: "info",
+    title: "",
+    message: "",
+  });
+
   // Add Cargo form state
   const [addCargoForm, setAddCargoForm] = useState({
     container_id: "",
@@ -84,6 +93,21 @@ function SeaCargoPage() {
       }
     };
   }, [searchTimeout]);
+
+  // Helper function to show notifications
+  const showNotification = (type, title, message) => {
+    setNotification({
+      show: true,
+      type,
+      title,
+      message,
+    });
+  };
+
+  // Helper function to close notifications
+  const closeNotification = () => {
+    setNotification((prev) => ({ ...prev, show: false }));
+  };
 
   const handleSortChange = async (value) => {
     setSortValue(value);
@@ -158,10 +182,19 @@ function SeaCargoPage() {
 
       await seaCargoService.createContainer(cargoData);
       setShowAddItemModal(false);
+      showNotification(
+        "success",
+        "Success!",
+        "Cargo container created successfully!"
+      );
       handleAddItemSuccess(cargoData);
     } catch (error) {
       console.error("Error creating cargo:", error);
-      alert("Failed to create cargo: " + error.message);
+      showNotification(
+        "error",
+        "Error",
+        `Failed to create cargo: ${error.message}`
+      );
     } finally {
       setActionLoading(false);
     }
@@ -349,20 +382,26 @@ function SeaCargoPage() {
             if (exactMatch) {
               clientId = exactMatch.id;
             } else {
-              alert(
+              showNotification(
+                "warning",
+                "Customer Not Found",
                 `Customer with shipping mark "${customerSearchQuery}" not found. Please select an existing customer or contact admin to create this customer.`
               );
               return;
             }
           } else {
-            alert(
+            showNotification(
+              "error",
+              "Verification Failed",
               `Failed to verify customer with shipping mark "${customerSearchQuery}". Please try again or contact admin.`
             );
             return;
           }
         } catch (error) {
           console.error("Error searching for customer:", error);
-          alert(
+          showNotification(
+            "error",
+            "Search Error",
             `Error searching for customer with shipping mark "${customerSearchQuery}". Please try again.`
           );
           return;
@@ -396,7 +435,30 @@ function SeaCargoPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to add item");
+        // More detailed error message handling
+        let errorMessage = "Failed to add item";
+
+        if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.tracking_id) {
+          errorMessage = `Tracking ID error: ${
+            errorData.tracking_id[0] || errorData.tracking_id
+          }`;
+        } else if (errorData.container) {
+          errorMessage = `Container error: ${
+            errorData.container[0] || errorData.container
+          }`;
+        } else if (errorData.client) {
+          errorMessage = `Client error: ${
+            errorData.client[0] || errorData.client
+          }`;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -406,10 +468,14 @@ function SeaCargoPage() {
       await handleRowAction(selectedItem);
 
       setShowAddCargoItemModal(false);
-      alert("Item added to cargo successfully!");
+      showNotification(
+        "success",
+        "Success!",
+        "Item added to cargo successfully!"
+      );
     } catch (error) {
       console.error("Error adding item to cargo:", error);
-      alert("Failed to add item to cargo: " + error.message);
+      showNotification("error", "Failed to Add Item", error.message);
     } finally {
       setActionLoading(false);
     }
@@ -449,16 +515,17 @@ function SeaCargoPage() {
       await handleRowAction(selectedItem);
 
       setShowExcelUploadModal(false);
-      alert(
-        `Upload successful! Created ${result.created_items} items. ${
-          result.errors.length > 0
-            ? `${result.errors.length} errors occurred.`
-            : ""
-        }`
-      );
+      const message = `Upload successful! Created ${
+        result.created_items
+      } items.${
+        result.errors.length > 0
+          ? ` ${result.errors.length} errors occurred.`
+          : ""
+      }`;
+      showNotification("success", "Bulk Upload Complete", message);
     } catch (error) {
       console.error("Error uploading file:", error);
-      alert("Failed to upload file: " + error.message);
+      showNotification("error", "Upload Failed", error.message);
     } finally {
       setActionLoading(false);
     }
@@ -475,10 +542,11 @@ function SeaCargoPage() {
         updateForm
       );
       setShowUpdateModal(false);
+      showNotification("success", "Success!", "Cargo updated successfully!");
       window.location.reload(); // Temporary solution
     } catch (error) {
       console.error("Error updating cargo:", error);
-      alert("Failed to update cargo: " + error.message);
+      showNotification("error", "Update Failed", error.message);
     } finally {
       setActionLoading(false);
     }
@@ -493,10 +561,11 @@ function SeaCargoPage() {
         selectedItem.id || selectedItem.container_id
       );
       setShowDeleteModal(false);
+      showNotification("success", "Success!", "Cargo deleted successfully!");
       window.location.reload(); // Temporary solution
     } catch (error) {
       console.error("Error deleting cargo:", error);
-      alert("Failed to delete cargo: " + error.message);
+      showNotification("error", "Delete Failed", error.message);
     } finally {
       setActionLoading(false);
     }
@@ -513,10 +582,11 @@ function SeaCargoPage() {
         statusForm.notes
       );
       setShowUpdateStatusModal(false);
+      showNotification("success", "Success!", "Status updated successfully!");
       window.location.reload(); // Temporary solution
     } catch (error) {
       console.error("Error updating status:", error);
-      alert("Failed to update status: " + error.message);
+      showNotification("error", "Status Update Failed", error.message);
     } finally {
       setActionLoading(false);
     }
@@ -651,6 +721,15 @@ function SeaCargoPage() {
 
   return (
     <div className="space-y-6">
+      {/* Notification Toast */}
+      <NotificationToast
+        show={notification.show}
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+        onClose={closeNotification}
+      />
+
       {/* Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatusCard
