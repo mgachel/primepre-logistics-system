@@ -27,6 +27,11 @@ function SeaCargoPage() {
   const [statusForm, setStatusForm] = useState({ status: "", notes: "" });
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Customer lookup state
+  const [availableCustomers, setAvailableCustomers] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+
   // New item form for adding items to cargo
   const [newItemForm, setNewItemForm] = useState({
     tracking_id: "",
@@ -220,7 +225,67 @@ function SeaCargoPage() {
       dimensions: "",
       notes: "",
     });
+    setSelectedCustomer(null);
+    // Load available customers when opening the modal
+    fetchAvailableCustomers();
     setShowAddCargoItemModal(true);
+  };
+
+  // Fetch available customers for shipping mark selection
+  const fetchAvailableCustomers = async () => {
+    setLoadingCustomers(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_API_URL || "http://localhost:8000"
+        }/api/cargo/api/customers/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        // Ensure we always have an array
+        const customers = Array.isArray(result) ? result : result.results || [];
+        setAvailableCustomers(customers);
+        console.log("Customers loaded:", customers);
+      } else {
+        console.error("Failed to fetch customers, status:", response.status);
+        setAvailableCustomers([]);
+      }
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      setAvailableCustomers([]);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  };
+
+  // Handle shipping mark selection
+  const handleShippingMarkChange = (shippingMark) => {
+    // Ensure availableCustomers is an array before using find
+    const customer = Array.isArray(availableCustomers)
+      ? availableCustomers.find((c) => c.shipping_mark === shippingMark)
+      : null;
+
+    if (customer) {
+      setSelectedCustomer(customer);
+      setNewItemForm({
+        ...newItemForm,
+        shipping_mark: shippingMark,
+      });
+    } else {
+      setSelectedCustomer(null);
+      setNewItemForm({
+        ...newItemForm,
+        shipping_mark: shippingMark,
+      });
+    }
   };
 
   const handleExcelUpload = () => {
@@ -232,6 +297,33 @@ function SeaCargoPage() {
 
     setActionLoading(true);
     try {
+      // Determine client ID based on shipping mark selection
+      let clientId;
+
+      if (selectedCustomer) {
+        // Use the selected customer
+        clientId = selectedCustomer.id;
+      } else if (newItemForm.shipping_mark) {
+        // Try to find customer by shipping mark
+        const customer = Array.isArray(availableCustomers)
+          ? availableCustomers.find(
+              (c) => c.shipping_mark === newItemForm.shipping_mark
+            )
+          : null;
+        if (customer) {
+          clientId = customer.id;
+        } else {
+          // Customer with this shipping mark doesn't exist
+          alert(
+            `Customer with shipping mark "${newItemForm.shipping_mark}" not found. Please select an existing customer or contact admin to create this customer.`
+          );
+          return;
+        }
+      } else {
+        // No shipping mark provided - use fallback (current user or admin decision)
+        clientId = user?.id || 1;
+      }
+
       // API call to add item to cargo container
       const token = localStorage.getItem("accessToken");
       const response = await fetch(
@@ -246,7 +338,8 @@ function SeaCargoPage() {
           },
           body: JSON.stringify({
             container: selectedItem.container_id,
-            client: user?.id || 1, // Use current user ID or fallback to 1
+            client: clientId,
+            tracking_id: newItemForm.tracking_id,
             item_description: newItemForm.description,
             quantity: parseInt(newItemForm.quantity) || 1,
             weight: newItemForm.weight ? parseFloat(newItemForm.weight) : null,
@@ -1266,20 +1359,79 @@ function SeaCargoPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Shipping Mark
+                    Shipping Mark / Customer
                   </label>
-                  <input
-                    type="text"
-                    value={newItemForm.shipping_mark}
-                    onChange={(e) =>
-                      setNewItemForm({
-                        ...newItemForm,
-                        shipping_mark: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter shipping mark"
-                  />
+                  {loadingCustomers ? (
+                    <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mr-2"></div>
+                        <span className="text-sm text-gray-600">
+                          Loading customers...
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={newItemForm.shipping_mark}
+                        onChange={(e) =>
+                          handleShippingMarkChange(e.target.value)
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">
+                          Select shipping mark (optional)
+                        </option>
+                        {Array.isArray(availableCustomers) &&
+                          availableCustomers.map((customer) => (
+                            <option
+                              key={customer.id}
+                              value={customer.shipping_mark}
+                            >
+                              {customer.shipping_mark} -{" "}
+                              {customer.full_name ||
+                                customer.company_name ||
+                                "No Name"}
+                            </option>
+                          ))}
+                      </select>
+
+                      {selectedCustomer && (
+                        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                          <p className="text-sm text-green-800">
+                            <strong>Selected Customer:</strong>{" "}
+                            {selectedCustomer.full_name ||
+                              selectedCustomer.company_name ||
+                              "No Name"}
+                          </p>
+                          <p className="text-xs text-green-600">
+                            Shipping Mark: {selectedCustomer.shipping_mark}
+                          </p>
+                        </div>
+                      )}
+
+                      {newItemForm.shipping_mark && !selectedCustomer && (
+                        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                          <p className="text-sm text-yellow-800">
+                            Customer with shipping mark "
+                            {newItemForm.shipping_mark}" not found.
+                          </p>
+                          <p className="text-xs text-yellow-600">
+                            Item will be assigned to "No Name" customer.
+                          </p>
+                        </div>
+                      )}
+
+                      {!newItemForm.shipping_mark && (
+                        <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                          <p className="text-xs text-blue-600">
+                            If no shipping mark is selected, the item will be
+                            assigned to the current user.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 <div>
