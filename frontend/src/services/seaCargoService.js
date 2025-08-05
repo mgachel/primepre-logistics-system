@@ -8,7 +8,31 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const handleResponse = async (response) => {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: `HTTP error! status: ${response.status}` }));
-    throw new Error(errorData.detail || errorData.message || `HTTP error! status: ${response.status}`);
+    
+    // Extract more detailed error information
+    let errorMessage = `HTTP error! status: ${response.status}`;
+    
+    if (errorData.detail) {
+      errorMessage = errorData.detail;
+    } else if (errorData.error) {
+      errorMessage = errorData.error;
+    } else if (errorData.message) {
+      errorMessage = errorData.message;
+    } else if (errorData.tracking_id) {
+      errorMessage = Array.isArray(errorData.tracking_id) 
+        ? errorData.tracking_id.join(', ') 
+        : errorData.tracking_id;
+    } else if (errorData.container) {
+      errorMessage = Array.isArray(errorData.container) 
+        ? errorData.container.join(', ') 
+        : errorData.container;
+    } else if (errorData.client) {
+      errorMessage = Array.isArray(errorData.client) 
+        ? errorData.client.join(', ') 
+        : errorData.client;
+    }
+    
+    throw new Error(errorMessage);
   }
   return await response.json();
 };
