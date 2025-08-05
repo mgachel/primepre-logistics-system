@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import StatusCard from "../components/StatusCard";
 import ControlPanel from "../components/ControlPanel";
 import DataTable from "../components/DataTable";
@@ -31,6 +31,9 @@ function SeaCargoPage() {
   const [availableCustomers, setAvailableCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+  const [searchTimeout, setSearchTimeout] = useState(null);
 
   // New item form for adding items to cargo
   const [newItemForm, setNewItemForm] = useState({
@@ -71,6 +74,15 @@ function SeaCargoPage() {
     sortItems,
     isStaffUser,
   } = useSeaCargo(userRole);
+
+  // Cleanup timeout on component unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
 
   const handleSortChange = async (value) => {
     setSortValue(value);
@@ -226,20 +238,27 @@ function SeaCargoPage() {
       notes: "",
     });
     setSelectedCustomer(null);
-    // Load available customers when opening the modal
-    fetchAvailableCustomers();
+    setCustomerSearchQuery("");
+    setAvailableCustomers([]);
+    setShowCustomerSuggestions(false);
     setShowAddCargoItemModal(true);
   };
 
-  // Fetch available customers for shipping mark selection
-  const fetchAvailableCustomers = async () => {
+  // Search customers based on shipping mark input
+  const searchCustomers = async (query) => {
+    if (!query || query.trim().length < 2) {
+      setAvailableCustomers([]);
+      setShowCustomerSuggestions(false);
+      return;
+    }
+
     setLoadingCustomers(true);
     try {
       const token = localStorage.getItem("accessToken");
       const response = await fetch(
         `${
           import.meta.env.VITE_API_URL || "http://localhost:8000"
-        }/api/cargo/api/customers/`,
+        }/api/cargo/api/customers/?search=${encodeURIComponent(query.trim())}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -253,39 +272,53 @@ function SeaCargoPage() {
         // Ensure we always have an array
         const customers = Array.isArray(result) ? result : result.results || [];
         setAvailableCustomers(customers);
-        console.log("Customers loaded:", customers);
+        setShowCustomerSuggestions(customers.length > 0);
+        console.log("Search results:", customers);
       } else {
-        console.error("Failed to fetch customers, status:", response.status);
+        console.error("Error searching customers:", response.status);
         setAvailableCustomers([]);
+        setShowCustomerSuggestions(false);
       }
     } catch (error) {
-      console.error("Error fetching customers:", error);
+      console.error("Error searching customers:", error);
       setAvailableCustomers([]);
+      setShowCustomerSuggestions(false);
     } finally {
       setLoadingCustomers(false);
     }
   };
 
-  // Handle shipping mark selection
-  const handleShippingMarkChange = (shippingMark) => {
-    // Ensure availableCustomers is an array before using find
-    const customer = Array.isArray(availableCustomers)
-      ? availableCustomers.find((c) => c.shipping_mark === shippingMark)
-      : null;
+  // Handle shipping mark input change with debouncing
+  const handleShippingMarkInputChange = (value) => {
+    setCustomerSearchQuery(value);
+    setNewItemForm({
+      ...newItemForm,
+      shipping_mark: value,
+    });
 
-    if (customer) {
-      setSelectedCustomer(customer);
-      setNewItemForm({
-        ...newItemForm,
-        shipping_mark: shippingMark,
-      });
-    } else {
-      setSelectedCustomer(null);
-      setNewItemForm({
-        ...newItemForm,
-        shipping_mark: shippingMark,
-      });
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
     }
+
+    // Set new timeout for debounced search
+    const newTimeout = setTimeout(() => {
+      searchCustomers(value);
+    }, 300); // 300ms delay
+
+    setSearchTimeout(newTimeout);
+  };
+
+  // Handle customer selection from suggestions
+  const handleCustomerSelection = (customer) => {
+    setSelectedCustomer(customer);
+    setCustomerSearchQuery(customer.shipping_mark);
+    setNewItemForm({
+      ...newItemForm,
+      shipping_mark: customer.shipping_mark,
+    });
+    setShowCustomerSuggestions(false);
+    setAvailableCustomers([]);
   };
 
   const handleExcelUpload = () => {
@@ -303,19 +336,46 @@ function SeaCargoPage() {
       if (selectedCustomer) {
         // Use the selected customer
         clientId = selectedCustomer.id;
-      } else if (newItemForm.shipping_mark) {
-        // Try to find customer by shipping mark
-        const customer = Array.isArray(availableCustomers)
-          ? availableCustomers.find(
-              (c) => c.shipping_mark === newItemForm.shipping_mark
-            )
-          : null;
-        if (customer) {
-          clientId = customer.id;
-        } else {
-          // Customer with this shipping mark doesn't exist
+      } else if (customerSearchQuery && customerSearchQuery.trim()) {
+        // Try to search for customer by shipping mark from the search query
+        try {
+          const token = localStorage.getItem("accessToken");
+          const response = await fetch(
+            `${
+              import.meta.env.VITE_API_URL || "http://localhost:8000"
+            }/api/cargo/api/customers/?search=${encodeURIComponent(customerSearchQuery.trim())}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (response.ok) {
+            const result = await response.json();
+            const customers = Array.isArray(result) ? result : result.results || [];
+            // Find exact match for shipping mark
+            const exactMatch = customers.find(c => c.shipping_mark === customerSearchQuery.trim());
+            
+            if (exactMatch) {
+              clientId = exactMatch.id;
+            } else {
+              alert(
+                `Customer with shipping mark "${customerSearchQuery}" not found. Please select an existing customer or contact admin to create this customer.`
+              );
+              return;
+            }
+          } else {
+            alert(
+              `Failed to verify customer with shipping mark "${customerSearchQuery}". Please try again or contact admin.`
+            );
+            return;
+          }
+        } catch (error) {
+          console.error("Error searching for customer:", error);
           alert(
-            `Customer with shipping mark "${newItemForm.shipping_mark}" not found. Please select an existing customer or contact admin to create this customer.`
+            `Error searching for customer with shipping mark "${customerSearchQuery}". Please try again.`
           );
           return;
         }
@@ -1361,76 +1421,95 @@ function SeaCargoPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Shipping Mark / Customer
                   </label>
-                  {loadingCustomers ? (
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
-                      <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mr-2"></div>
-                        <span className="text-sm text-gray-600">
-                          Loading customers...
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <select
-                        value={newItemForm.shipping_mark}
-                        onChange={(e) =>
-                          handleShippingMarkChange(e.target.value)
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={customerSearchQuery}
+                      onChange={(e) => handleShippingMarkInputChange(e.target.value)}
+                      onFocus={() => {
+                        if (customerSearchQuery.length >= 2) {
+                          setShowCustomerSuggestions(true);
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="">
-                          Select shipping mark (optional)
-                        </option>
-                        {Array.isArray(availableCustomers) &&
-                          availableCustomers.map((customer) => (
-                            <option
-                              key={customer.id}
-                              value={customer.shipping_mark}
-                            >
-                              {customer.shipping_mark} -{" "}
-                              {customer.full_name ||
-                                customer.company_name ||
-                                "No Name"}
-                            </option>
-                          ))}
-                      </select>
+                      }}
+                      onBlur={() => {
+                        // Delay hiding suggestions to allow click on suggestion
+                        setTimeout(() => setShowCustomerSuggestions(false), 150);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Type to search for shipping mark or customer..."
+                    />
+                    
+                    {loadingCustomers && (
+                      <div className="absolute right-3 top-3">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+                      </div>
+                    )}
 
-                      {selectedCustomer && (
-                        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
-                          <p className="text-sm text-green-800">
-                            <strong>Selected Customer:</strong>{" "}
-                            {selectedCustomer.full_name ||
-                              selectedCustomer.company_name ||
-                              "No Name"}
-                          </p>
-                          <p className="text-xs text-green-600">
-                            Shipping Mark: {selectedCustomer.shipping_mark}
-                          </p>
-                        </div>
-                      )}
+                    {/* Suggestions Dropdown */}
+                    {showCustomerSuggestions && availableCustomers.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {availableCustomers.map((customer) => (
+                          <div
+                            key={customer.id}
+                            onClick={() => handleCustomerSelection(customer)}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="font-medium text-gray-900">
+                              {customer.shipping_mark}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {customer.full_name || customer.company_name || "No Name"}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
-                      {newItemForm.shipping_mark && !selectedCustomer && (
-                        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                          <p className="text-sm text-yellow-800">
-                            Customer with shipping mark "
-                            {newItemForm.shipping_mark}" not found.
-                          </p>
-                          <p className="text-xs text-yellow-600">
-                            Item will be assigned to "No Name" customer.
-                          </p>
+                    {/* No results message */}
+                    {showCustomerSuggestions && availableCustomers.length === 0 && customerSearchQuery.length >= 2 && !loadingCustomers && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                        <div className="px-4 py-3 text-gray-500 text-sm">
+                          No customers found matching "{customerSearchQuery}"
                         </div>
-                      )}
+                      </div>
+                    )}
+                  </div>
 
-                      {!newItemForm.shipping_mark && (
-                        <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                          <p className="text-xs text-blue-600">
-                            If no shipping mark is selected, the item will be
-                            assigned to the current user.
-                          </p>
-                        </div>
-                      )}
-                    </>
+                  {/* Selected Customer Display */}
+                  {selectedCustomer && (
+                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-sm text-green-800">
+                        <strong>Selected Customer:</strong>{" "}
+                        {selectedCustomer.full_name ||
+                          selectedCustomer.company_name ||
+                          "No Name"}
+                      </p>
+                      <p className="text-xs text-green-600">
+                        Shipping Mark: {selectedCustomer.shipping_mark}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Help Text */}
+                  {!selectedCustomer && customerSearchQuery.length === 0 && (
+                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                      <p className="text-xs text-blue-600">
+                        Start typing to search for customers by shipping mark or name. 
+                        If no customer is selected, the item will be assigned to the current user.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* New Customer Warning */}
+                  {!selectedCustomer && customerSearchQuery.length >= 2 && !loadingCustomers && availableCustomers.length === 0 && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-800">
+                        No customer found with shipping mark "{customerSearchQuery}".
+                      </p>
+                      <p className="text-xs text-yellow-600">
+                        The item will be assigned as "No Name" customer or contact admin to create this customer.
+                      </p>
+                    </div>
                   )}
                 </div>
 
