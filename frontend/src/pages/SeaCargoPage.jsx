@@ -311,6 +311,7 @@ function SeaCargoPage() {
 
   // Handle customer selection from suggestions
   const handleCustomerSelection = (customer) => {
+    console.log("Customer selected:", customer);
     setSelectedCustomer(customer);
     setCustomerSearchQuery(customer.shipping_mark);
     setNewItemForm({
@@ -319,6 +320,7 @@ function SeaCargoPage() {
     });
     setShowCustomerSuggestions(false);
     setAvailableCustomers([]);
+    console.log("Updated form with customer:", customer.shipping_mark);
   };
 
   const handleExcelUpload = () => {
@@ -1433,7 +1435,7 @@ function SeaCargoPage() {
                       }}
                       onBlur={() => {
                         // Delay hiding suggestions to allow click on suggestion
-                        setTimeout(() => setShowCustomerSuggestions(false), 150);
+                        setTimeout(() => setShowCustomerSuggestions(false), 200);
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                       placeholder="Type to search for shipping mark or customer..."
@@ -1451,7 +1453,11 @@ function SeaCargoPage() {
                         {availableCustomers.map((customer) => (
                           <div
                             key={customer.id}
-                            onClick={() => handleCustomerSelection(customer)}
+                            onMouseDown={(e) => {
+                              // Prevent input from losing focus
+                              e.preventDefault();
+                              handleCustomerSelection(customer);
+                            }}
                             className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
                           >
                             <div className="font-medium text-gray-900">
