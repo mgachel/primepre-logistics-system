@@ -1,15 +1,8 @@
 // API service for Sea Cargo operations
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import authService from './authService';
 
-// Helper function to get auth headers
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('accessToken');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Helper function to handle API responses
 const handleResponse = async (response) => {
@@ -24,10 +17,7 @@ export const seaCargoService = {
   // Get dashboard statistics for sea cargo
   getDashboardStats: async () => {
     try {
-      const response = await fetch(`${API_URL}/api/cargo/api/dashboard/?cargo_type=sea`, {
-        method: 'GET',
-        headers: getAuthHeaders()
-      });
+      const response = await authService.authenticatedFetch(`${API_URL}/api/cargo/api/dashboard/?cargo_type=sea`);
       return await handleResponse(response);
     } catch (error) {
       console.error('Error fetching sea cargo dashboard stats:', error);
@@ -52,10 +42,7 @@ export const seaCargoService = {
     const url = `/api/cargo/api/containers/?${queryParams.toString()}`;
     
     try {
-      const response = await fetch(`${API_URL}${url}`, {
-        method: 'GET',
-        headers: getAuthHeaders()
-      });
+      const response = await authService.authenticatedFetch(`${API_URL}${url}`);
       return await handleResponse(response);
     } catch (error) {
       console.error('Error fetching sea cargo containers:', error);
@@ -73,10 +60,7 @@ export const seaCargoService = {
     const url = `/api/cargo/api/cargo-items/?${queryParams.toString()}`;
     
     try {
-      const response = await fetch(`${API_URL}${url}`, {
-        method: 'GET',
-        headers: getAuthHeaders()
-      });
+      const response = await authService.authenticatedFetch(`${API_URL}${url}`);
       return await handleResponse(response);
     } catch (error) {
       console.error('Error fetching customer sea cargo items:', error);
@@ -94,10 +78,7 @@ export const seaCargoService = {
     const url = `/api/cargo/api/containers/?${queryParams.toString()}`;
     
     try {
-      const response = await fetch(`${API_URL}${url}`, {
-        method: 'GET',
-        headers: getAuthHeaders()
-      });
+      const response = await authService.authenticatedFetch(`${API_URL}${url}`);
       return await handleResponse(response);
     } catch (error) {
       console.error('Error fetching staff sea cargo containers:', error);
@@ -108,9 +89,8 @@ export const seaCargoService = {
   // Create new sea cargo container
   createContainer: async (containerData) => {
     try {
-      const response = await fetch(`${API_URL}/api/cargo/api/containers/`, {
+      const response = await authService.authenticatedFetch(`${API_URL}/api/cargo/api/containers/`, {
         method: 'POST',
-        headers: getAuthHeaders(),
         body: JSON.stringify({
           ...containerData,
           cargo_type: 'sea'
@@ -126,9 +106,8 @@ export const seaCargoService = {
   // Update container status
   updateContainerStatus: async (containerId, status, notes = '') => {
     try {
-      const response = await fetch(`${API_URL}/api/cargo/api/containers/${containerId}/`, {
+      const response = await authService.authenticatedFetch(`${API_URL}/api/cargo/api/containers/${containerId}/`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
         body: JSON.stringify({ 
           status: status,
           ...(notes && { notes: notes })
@@ -144,9 +123,8 @@ export const seaCargoService = {
   // Update container details
   updateContainer: async (containerId, updateData) => {
     try {
-      const response = await fetch(`${API_URL}/api/cargo/api/containers/${containerId}/`, {
+      const response = await authService.authenticatedFetch(`${API_URL}/api/cargo/api/containers/${containerId}/`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
         body: JSON.stringify(updateData)
       });
       return await handleResponse(response);
@@ -159,9 +137,8 @@ export const seaCargoService = {
   // Delete container
   deleteContainer: async (containerId) => {
     try {
-      const response = await fetch(`${API_URL}/api/cargo/api/containers/${containerId}/`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
+      const response = await authService.authenticatedFetch(`${API_URL}/api/cargo/api/containers/${containerId}/`, {
+        method: 'DELETE'
       });
       
       if (!response.ok) {
@@ -179,10 +156,7 @@ export const seaCargoService = {
   // Get container details
   getContainerDetails: async (containerId) => {
     try {
-      const response = await fetch(`${API_URL}/api/cargo/api/containers/${containerId}/`, {
-        method: 'GET',
-        headers: getAuthHeaders()
-      });
+      const response = await authService.authenticatedFetch(`${API_URL}/api/cargo/api/containers/${containerId}/`);
       return await handleResponse(response);
     } catch (error) {
       console.error('Error fetching container details:', error);
@@ -193,10 +167,7 @@ export const seaCargoService = {
   // Get client summaries for a container
   getClientSummaries: async (containerId) => {
     try {
-      const response = await fetch(`${API_URL}/api/cargo/api/containers/${containerId}/client_summaries/`, {
-        method: 'GET',
-        headers: getAuthHeaders()
-      });
+      const response = await authService.authenticatedFetch(`${API_URL}/api/cargo/api/containers/${containerId}/client_summaries/`);
       return await handleResponse(response);
     } catch (error) {
       console.error('Error fetching client summaries:', error);
@@ -212,10 +183,7 @@ export const seaCargoService = {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/cargo/api/cargo-items/?${params.toString()}`, {
-        method: 'GET',
-        headers: getAuthHeaders()
-      });
+      const response = await authService.authenticatedFetch(`${API_URL}/api/cargo/api/cargo-items/?${params.toString()}`);
       return await handleResponse(response);
     } catch (error) {
       console.error('Error fetching cargo items:', error);
@@ -229,12 +197,8 @@ export const seaCargoService = {
     formData.append('file', file);
 
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(`${API_URL}/api/cargo/api/bulk-upload/`, {
+      const response = await authService.authenticatedFetch(`${API_URL}/api/cargo/api/bulk-upload/`, {
         method: 'POST',
-        headers: {
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
         body: formData
       });
       return await handleResponse(response);
