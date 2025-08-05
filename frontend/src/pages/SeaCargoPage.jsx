@@ -414,11 +414,13 @@ function SeaCargoPage() {
           { key: "eta", label: "ETA" },
           { key: "cbm", label: "CBM" },
           { key: "status", label: "Status" },
+          { key: "actions", label: "Actions" },
         ]}
         onRowClick={handleRowAction}
-        onEdit={isStaffUser ? handleUpdate : undefined}
+        onUpdate={isStaffUser ? handleUpdate : undefined}
         onDelete={isStaffUser ? handleDelete : undefined}
         onUpdateStatus={isStaffUser ? handleUpdateStatus : undefined}
+        userRole={user?.user_role || (user?.is_staff ? "staff" : "customer")}
         loading={loading}
         emptyMessage="No sea cargo containers found"
       />
