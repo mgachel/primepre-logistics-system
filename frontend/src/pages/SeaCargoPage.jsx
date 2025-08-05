@@ -22,7 +22,7 @@ function SeaCargoPage() {
   const [updateForm, setUpdateForm] = useState({ description: "" });
   const [statusForm, setStatusForm] = useState({ status: "", notes: "" });
   const [actionLoading, setActionLoading] = useState(false);
-  
+
   // Add Cargo form state
   const [addCargoForm, setAddCargoForm] = useState({
     container_id: "",
@@ -34,7 +34,7 @@ function SeaCargoPage() {
     rates: "",
     stay_days: 0,
     delay_days: 0,
-    status: "pending"
+    status: "pending",
   });
 
   // Determine user role - check if user is staff or customer
@@ -88,7 +88,7 @@ function SeaCargoPage() {
       rates: "",
       stay_days: 0,
       delay_days: 0,
-      status: "pending"
+      status: "pending",
     });
     setShowAddItemModal(true);
   };
@@ -106,7 +106,7 @@ function SeaCargoPage() {
       // Prepare data for API
       const cargoData = {
         ...addCargoForm,
-        cargo_type: 'sea', // Always set to sea for sea cargo page
+        cargo_type: "sea", // Always set to sea for sea cargo page
         weight: addCargoForm.weight ? parseFloat(addCargoForm.weight) : null,
         cbm: addCargoForm.cbm ? parseFloat(addCargoForm.cbm) : null,
         rates: addCargoForm.rates ? parseFloat(addCargoForm.rates) : null,
@@ -115,9 +115,9 @@ function SeaCargoPage() {
       };
 
       // Remove empty values
-      Object.keys(cargoData).forEach(key => {
+      Object.keys(cargoData).forEach((key) => {
         if (cargoData[key] === "" || cargoData[key] === null) {
-          if (key !== 'weight' && key !== 'cbm' && key !== 'rates') {
+          if (key !== "weight" && key !== "cbm" && key !== "rates") {
             delete cargoData[key];
           }
         }
@@ -454,7 +454,7 @@ function SeaCargoPage() {
                   </svg>
                 </button>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Container ID */}
                 <div className="md:col-span-2">
@@ -464,7 +464,12 @@ function SeaCargoPage() {
                   <input
                     type="text"
                     value={addCargoForm.container_id}
-                    onChange={(e) => setAddCargoForm({ ...addCargoForm, container_id: e.target.value })}
+                    onChange={(e) =>
+                      setAddCargoForm({
+                        ...addCargoForm,
+                        container_id: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Enter unique container ID"
                     required
@@ -479,7 +484,12 @@ function SeaCargoPage() {
                   <input
                     type="text"
                     value={addCargoForm.route}
-                    onChange={(e) => setAddCargoForm({ ...addCargoForm, route: e.target.value })}
+                    onChange={(e) =>
+                      setAddCargoForm({
+                        ...addCargoForm,
+                        route: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     placeholder="e.g., China to Ghana"
                     required
@@ -494,7 +504,12 @@ function SeaCargoPage() {
                   <input
                     type="date"
                     value={addCargoForm.load_date}
-                    onChange={(e) => setAddCargoForm({ ...addCargoForm, load_date: e.target.value })}
+                    onChange={(e) =>
+                      setAddCargoForm({
+                        ...addCargoForm,
+                        load_date: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
@@ -503,12 +518,15 @@ function SeaCargoPage() {
                 {/* ETA */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estimated Time of Arrival (ETA) <span className="text-red-500">*</span>
+                    Estimated Time of Arrival (ETA){" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
                     value={addCargoForm.eta}
-                    onChange={(e) => setAddCargoForm({ ...addCargoForm, eta: e.target.value })}
+                    onChange={(e) =>
+                      setAddCargoForm({ ...addCargoForm, eta: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
@@ -523,7 +541,12 @@ function SeaCargoPage() {
                     type="number"
                     step="0.01"
                     value={addCargoForm.weight}
-                    onChange={(e) => setAddCargoForm({ ...addCargoForm, weight: e.target.value })}
+                    onChange={(e) =>
+                      setAddCargoForm({
+                        ...addCargoForm,
+                        weight: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0.00"
                   />
@@ -538,7 +561,9 @@ function SeaCargoPage() {
                     type="number"
                     step="0.01"
                     value={addCargoForm.cbm}
-                    onChange={(e) => setAddCargoForm({ ...addCargoForm, cbm: e.target.value })}
+                    onChange={(e) =>
+                      setAddCargoForm({ ...addCargoForm, cbm: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0.00"
                   />
@@ -553,7 +578,12 @@ function SeaCargoPage() {
                     type="number"
                     step="0.01"
                     value={addCargoForm.rates}
-                    onChange={(e) => setAddCargoForm({ ...addCargoForm, rates: e.target.value })}
+                    onChange={(e) =>
+                      setAddCargoForm({
+                        ...addCargoForm,
+                        rates: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0.00"
                   />
@@ -568,7 +598,12 @@ function SeaCargoPage() {
                     type="number"
                     min="0"
                     value={addCargoForm.stay_days}
-                    onChange={(e) => setAddCargoForm({ ...addCargoForm, stay_days: e.target.value })}
+                    onChange={(e) =>
+                      setAddCargoForm({
+                        ...addCargoForm,
+                        stay_days: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0"
                   />
@@ -583,7 +618,12 @@ function SeaCargoPage() {
                     type="number"
                     min="0"
                     value={addCargoForm.delay_days}
-                    onChange={(e) => setAddCargoForm({ ...addCargoForm, delay_days: e.target.value })}
+                    onChange={(e) =>
+                      setAddCargoForm({
+                        ...addCargoForm,
+                        delay_days: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0"
                   />
@@ -596,7 +636,12 @@ function SeaCargoPage() {
                   </label>
                   <select
                     value={addCargoForm.status}
-                    onChange={(e) => setAddCargoForm({ ...addCargoForm, status: e.target.value })}
+                    onChange={(e) =>
+                      setAddCargoForm({
+                        ...addCargoForm,
+                        status: e.target.value,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="pending">Pending</option>
@@ -616,7 +661,13 @@ function SeaCargoPage() {
                 </button>
                 <button
                   onClick={confirmAddCargo}
-                  disabled={actionLoading || !addCargoForm.container_id || !addCargoForm.route || !addCargoForm.load_date || !addCargoForm.eta}
+                  disabled={
+                    actionLoading ||
+                    !addCargoForm.container_id ||
+                    !addCargoForm.route ||
+                    !addCargoForm.load_date ||
+                    !addCargoForm.eta
+                  }
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {actionLoading ? "Creating..." : "Create Cargo"}
