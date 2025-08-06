@@ -18,18 +18,23 @@ const handleResponse = async (response) => {
       errorMessage = errorData.error;
     } else if (errorData.message) {
       errorMessage = errorData.message;
-    } else if (errorData.tracking_id) {
-      errorMessage = Array.isArray(errorData.tracking_id) 
-        ? errorData.tracking_id.join(', ') 
-        : errorData.tracking_id;
-    } else if (errorData.container) {
-      errorMessage = Array.isArray(errorData.container) 
-        ? errorData.container.join(', ') 
-        : errorData.container;
-    } else if (errorData.client) {
-      errorMessage = Array.isArray(errorData.client) 
-        ? errorData.client.join(', ') 
-        : errorData.client;
+    } else if (errorData.non_field_errors) {
+      errorMessage = Array.isArray(errorData.non_field_errors) 
+        ? errorData.non_field_errors.join(', ') 
+        : errorData.non_field_errors;
+    } else {
+      // Handle field-specific errors
+      const fieldErrors = [];
+      for (const [field, errors] of Object.entries(errorData)) {
+        if (Array.isArray(errors)) {
+          fieldErrors.push(`${field}: ${errors.join(', ')}`);
+        } else if (typeof errors === 'string') {
+          fieldErrors.push(`${field}: ${errors}`);
+        }
+      }
+      if (fieldErrors.length > 0) {
+        errorMessage = fieldErrors.join('; ');
+      }
     }
     
     throw new Error(errorMessage);
@@ -147,9 +152,17 @@ export const seaCargoService = {
   // Update container details
   updateContainer: async (containerId, updateData) => {
     try {
+      // Filter out empty strings and null values
+      const cleanedData = {};
+      for (const [key, value] of Object.entries(updateData)) {
+        if (value !== "" && value !== null && value !== undefined) {
+          cleanedData[key] = value;
+        }
+      }
+      
       const response = await authService.authenticatedFetch(`${API_URL}/api/cargo/api/containers/${containerId}/`, {
         method: 'PATCH',
-        body: JSON.stringify(updateData)
+        body: JSON.stringify(cleanedData)
       });
       return await handleResponse(response);
     } catch (error) {
