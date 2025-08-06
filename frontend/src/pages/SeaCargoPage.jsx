@@ -82,6 +82,7 @@ function SeaCargoPage() {
     error,
     searchItems,
     sortItems,
+    refreshData,
     isStaffUser,
   } = useSeaCargo(userRole);
 
@@ -153,7 +154,7 @@ function SeaCargoPage() {
   const handleAddItemSuccess = (newItem) => {
     console.log("New cargo added:", newItem);
     // Refresh the data to show the new item
-    window.location.reload(); // Temporary solution - ideally should update state
+    refreshData();
   };
 
   // Handle add cargo form submission
@@ -187,7 +188,11 @@ function SeaCargoPage() {
         "Success!",
         "Cargo container created successfully!"
       );
-      handleAddItemSuccess(cargoData);
+
+      // Delay refresh to allow users to see the notification
+      setTimeout(() => {
+        handleAddItemSuccess(cargoData);
+      }, 1500);
     } catch (error) {
       console.error("Error creating cargo:", error);
       showNotification(
@@ -464,7 +469,7 @@ function SeaCargoPage() {
       const result = await response.json();
       console.log("Item added successfully:", result);
 
-      // Refresh cargo items
+      // Refresh cargo items for the container
       await handleRowAction(selectedItem);
 
       setShowAddCargoItemModal(false);
@@ -473,6 +478,11 @@ function SeaCargoPage() {
         "Success!",
         "Item added to cargo successfully!"
       );
+
+      // Refresh main data after a short delay to show the notification
+      setTimeout(() => {
+        refreshData();
+      }, 1500);
     } catch (error) {
       console.error("Error adding item to cargo:", error);
       showNotification("error", "Failed to Add Item", error.message);
@@ -511,7 +521,7 @@ function SeaCargoPage() {
       const result = await response.json();
       console.log("Bulk upload successful:", result);
 
-      // Refresh cargo items
+      // Refresh cargo items for the container
       await handleRowAction(selectedItem);
 
       setShowExcelUploadModal(false);
@@ -523,6 +533,11 @@ function SeaCargoPage() {
           : ""
       }`;
       showNotification("success", "Bulk Upload Complete", message);
+
+      // Refresh main data after a short delay to show the notification
+      setTimeout(() => {
+        refreshData();
+      }, 1500);
     } catch (error) {
       console.error("Error uploading file:", error);
       showNotification("error", "Upload Failed", error.message);
@@ -543,7 +558,11 @@ function SeaCargoPage() {
       );
       setShowUpdateModal(false);
       showNotification("success", "Success!", "Cargo updated successfully!");
-      window.location.reload(); // Temporary solution
+
+      // Refresh data after a short delay to show the notification
+      setTimeout(() => {
+        refreshData();
+      }, 1500);
     } catch (error) {
       console.error("Error updating cargo:", error);
       showNotification("error", "Update Failed", error.message);
@@ -562,7 +581,11 @@ function SeaCargoPage() {
       );
       setShowDeleteModal(false);
       showNotification("success", "Success!", "Cargo deleted successfully!");
-      window.location.reload(); // Temporary solution
+
+      // Refresh data after a short delay to show the notification
+      setTimeout(() => {
+        refreshData();
+      }, 1500);
     } catch (error) {
       console.error("Error deleting cargo:", error);
       showNotification("error", "Delete Failed", error.message);
@@ -583,7 +606,11 @@ function SeaCargoPage() {
       );
       setShowUpdateStatusModal(false);
       showNotification("success", "Success!", "Status updated successfully!");
-      window.location.reload(); // Temporary solution
+
+      // Refresh data after a short delay to show the notification
+      setTimeout(() => {
+        refreshData();
+      }, 1500);
     } catch (error) {
       console.error("Error updating status:", error);
       showNotification("error", "Status Update Failed", error.message);
