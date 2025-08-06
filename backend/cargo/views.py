@@ -229,19 +229,44 @@ class BulkCargoItemUploadView(APIView):
                             excel_file.seek(0)  # Reset file pointer
                             df = pd.read_csv(excel_file, encoding='cp1252')
                 else:
-                    # Read Excel file with error handling
-                    df = pd.read_excel(excel_file, engine='openpyxl')
+                    # Read Excel file with multiple engine attempts
+                    try:
+                        df = pd.read_excel(excel_file, engine='openpyxl')
+                    except Exception:
+                        try:
+                            excel_file.seek(0)  # Reset file pointer
+                            df = pd.read_excel(excel_file, engine='xlrd')
+                        except Exception:
+                            excel_file.seek(0)  # Reset file pointer
+                            # Try reading as binary and force encoding
+                            df = pd.read_excel(excel_file, engine='openpyxl', 
+                                             na_filter=False, keep_default_na=False)
                     
             except Exception as e:
-                return Response({
-                    'error': f'Failed to read file. The file may be corrupted or have encoding issues. Please try saving as a new .xlsx file or CSV with UTF-8 encoding. Technical error: {str(e)}',
-                    'suggestions': [
-                        'Save your Excel file as a new .xlsx file',
-                        'Try converting to CSV with UTF-8 encoding',
-                        'Check for special characters in your data',
-                        'Use the sample files as templates'
-                    ]
-                }, status=status.HTTP_400_BAD_REQUEST)
+                error_msg = str(e)
+                if 'codec' in error_msg or 'decode' in error_msg or 'utf-8' in error_msg:
+                    return Response({
+                        'error': 'File encoding error: The Excel file contains characters that cannot be read. Please save your file as a new .xlsx file or remove special characters.',
+                        'suggestions': [
+                            'Save your Excel file as a new .xlsx file using "Save As"',
+                            'Remove any special characters or symbols from your data',
+                            'Try converting to CSV with UTF-8 encoding',
+                            'Use the sample template files provided',
+                            'Ensure your file is not corrupted'
+                        ],
+                        'technical_error': error_msg
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({
+                        'error': f'Failed to read file. The file may be corrupted or in an unsupported format. Technical error: {error_msg}',
+                        'suggestions': [
+                            'Save your Excel file as a new .xlsx file',
+                            'Try converting to CSV with UTF-8 encoding',
+                            'Check for special characters in your data',
+                            'Use the sample files as templates',
+                            'Ensure the file is not password protected'
+                        ]
+                    }, status=status.HTTP_400_BAD_REQUEST)
             
             # Expected columns
             required_columns = [
