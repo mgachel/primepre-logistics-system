@@ -25,7 +25,7 @@ function SeaCargoPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [cargoItems, setCargoItems] = useState([]);
   const [loadingCargoItems, setLoadingCargoItems] = useState(false);
-  const [updateForm, setUpdateForm] = useState({ description: "" });
+  const [updateForm, setUpdateForm] = useState({});
   const [statusForm, setStatusForm] = useState({ status: "", notes: "" });
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -239,7 +239,6 @@ function SeaCargoPage() {
   const handleUpdate = (item) => {
     setSelectedItem(item);
     setUpdateForm({
-      description: item.description || item.route || "",
       route: item.route || "",
       weight: item.weight || "",
       cbm: item.cbm || "",
