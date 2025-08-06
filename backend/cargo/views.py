@@ -215,11 +215,33 @@ class BulkCargoItemUploadView(APIView):
             # Get container
             container = get_object_or_404(CargoContainer, container_id=container_id)
             
-            # Read Excel or CSV file
-            if excel_file.name.endswith('.csv'):
-                df = pd.read_csv(excel_file)
-            else:
-                df = pd.read_excel(excel_file)
+            # Read Excel or CSV file with enhanced error handling
+            try:
+                if excel_file.name.endswith('.csv'):
+                    # Try different encodings for CSV files
+                    try:
+                        df = pd.read_csv(excel_file, encoding='utf-8')
+                    except UnicodeDecodeError:
+                        try:
+                            excel_file.seek(0)  # Reset file pointer
+                            df = pd.read_csv(excel_file, encoding='latin1')
+                        except UnicodeDecodeError:
+                            excel_file.seek(0)  # Reset file pointer
+                            df = pd.read_csv(excel_file, encoding='cp1252')
+                else:
+                    # Read Excel file with error handling
+                    df = pd.read_excel(excel_file, engine='openpyxl')
+                    
+            except Exception as e:
+                return Response({
+                    'error': f'Failed to read file. The file may be corrupted or have encoding issues. Please try saving as a new .xlsx file or CSV with UTF-8 encoding. Technical error: {str(e)}',
+                    'suggestions': [
+                        'Save your Excel file as a new .xlsx file',
+                        'Try converting to CSV with UTF-8 encoding',
+                        'Check for special characters in your data',
+                        'Use the sample files as templates'
+                    ]
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             # Expected columns
             required_columns = [
