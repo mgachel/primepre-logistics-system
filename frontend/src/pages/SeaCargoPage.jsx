@@ -501,33 +501,48 @@ function SeaCargoPage() {
       console.log("File details:", {
         name: file.name,
         size: file.size,
-        type: file.type
+        type: file.type,
       });
-      
+
       // Get container ID - try different possible field names
-      const containerId = selectedItem.container_id || selectedItem.id || selectedItem.pk;
+      const containerId =
+        selectedItem.container_id || selectedItem.id || selectedItem.pk;
       console.log("Container ID for upload:", containerId);
-      
+
       if (!containerId) {
-        throw new Error("Container ID not found. Please select a valid container.");
+        throw new Error(
+          "Container ID not found. Please select a valid container."
+        );
       }
 
       // Validate file type
-      const allowedTypes = ['.xlsx', '.xls', '.csv'];
-      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+      const allowedTypes = [".xlsx", ".xls", ".csv"];
+      const fileExtension = file.name
+        .toLowerCase()
+        .substring(file.name.lastIndexOf("."));
       if (!allowedTypes.includes(fileExtension)) {
-        throw new Error(`Invalid file type. Only Excel files (.xlsx, .xls) and CSV files (.csv) are allowed. You uploaded: ${fileExtension}`);
+        throw new Error(
+          `Invalid file type. Only Excel files (.xlsx, .xls) and CSV files (.csv) are allowed. You uploaded: ${fileExtension}`
+        );
       }
 
       // Check file size (warn if too large)
       const maxSize = 10 * 1024 * 1024; // 10MB
       if (file.size > maxSize) {
-        throw new Error(`File too large. Maximum file size is 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`);
+        throw new Error(
+          `File too large. Maximum file size is 10MB. Your file is ${(
+            file.size /
+            1024 /
+            1024
+          ).toFixed(2)}MB.`
+        );
       }
 
       // Basic file corruption check
       if (file.size === 0) {
-        throw new Error("The selected file appears to be empty or corrupted. Please select a valid Excel file.");
+        throw new Error(
+          "The selected file appears to be empty or corrupted. Please select a valid Excel file."
+        );
       }
 
       // Prepare form data for bulk upload API
@@ -547,9 +562,11 @@ function SeaCargoPage() {
       );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: `HTTP error! status: ${response.status}` }));
         console.error("Bulk upload error details:", errorData);
-        
+
         // Extract detailed error message
         let errorMessage = "Upload failed";
         if (errorData.error) {
@@ -557,19 +574,32 @@ function SeaCargoPage() {
         } else if (errorData.detail) {
           errorMessage = errorData.detail;
         } else if (errorData.non_field_errors) {
-          errorMessage = Array.isArray(errorData.non_field_errors) 
-            ? errorData.non_field_errors.join(', ') 
+          errorMessage = Array.isArray(errorData.non_field_errors)
+            ? errorData.non_field_errors.join(", ")
             : errorData.non_field_errors;
         } else if (errorData.container_id) {
-          errorMessage = `Container ID error: ${Array.isArray(errorData.container_id) 
-            ? errorData.container_id.join(', ') 
-            : errorData.container_id}`;
+          errorMessage = `Container ID error: ${
+            Array.isArray(errorData.container_id)
+              ? errorData.container_id.join(", ")
+              : errorData.container_id
+          }`;
         } else if (errorData.excel_file) {
-          errorMessage = `File error: ${Array.isArray(errorData.excel_file) 
-            ? errorData.excel_file.join(', ') 
-            : errorData.excel_file}`;
+          errorMessage = `File error: ${
+            Array.isArray(errorData.excel_file)
+              ? errorData.excel_file.join(", ")
+              : errorData.excel_file
+          }`;
         }
-        
+
+        // Handle specific encoding errors
+        if (
+          errorMessage.includes("utf-8") ||
+          errorMessage.includes("codec") ||
+          errorMessage.includes("decode")
+        ) {
+          errorMessage = `File encoding error: The Excel file has character encoding issues. Please try: 1) Save as a new .xlsx file, 2) Remove special characters, 3) Use our sample template, or 4) Convert to CSV with UTF-8 encoding.`;
+        }
+
         throw new Error(errorMessage);
       }
 
@@ -580,21 +610,21 @@ function SeaCargoPage() {
       await handleRowAction(selectedItem);
 
       setShowExcelUploadModal(false);
-      
+
       // Enhanced success message
       const createdCount = result.created_items || 0;
       const errorCount = result.errors ? result.errors.length : 0;
       let message = `Upload successful! Created ${createdCount} items.`;
-      
+
       if (errorCount > 0) {
         message += ` ${errorCount} errors occurred. Check console for details.`;
         console.log("Upload errors:", result.errors);
       }
-      
+
       if (result.required_columns) {
         console.log("Required Excel columns:", result.required_columns);
       }
-      
+
       showNotification("success", "Bulk Upload Complete", message);
 
       // Refresh main data after a short delay to show the notification
@@ -603,23 +633,41 @@ function SeaCargoPage() {
       }, 1500);
     } catch (error) {
       console.error("Error uploading file:", error);
-      
+
       // Enhanced error message
       let errorMsg = error.message;
-      
-      if (error.message.includes("utf-8") || error.message.includes("codec can't decode")) {
-        errorMsg = "File encoding issue detected. Please try:\n\n" +
-          "1. Save your Excel file as a new .xlsx file\n" +
-          "2. Try saving as CSV and upload that instead\n" +
-          "3. Check for special characters in your data\n" +
-          "4. Use the sample files provided as templates\n\n" +
-          "Technical error: " + error.message;
+
+      if (
+        error.message.includes("utf-8") ||
+        error.message.includes("codec can't decode") ||
+        error.message.includes("encoding") ||
+        error.message.includes("decode byte")
+      ) {
+        errorMsg = `🔴 File Encoding Error Detected
+
+📋 Quick Solutions:
+• Save Excel file as NEW .xlsx (File → Save As → Excel Workbook)
+• Remove special characters, symbols, or emojis from data
+• Try converting to CSV with UTF-8 encoding
+• Use our sample template files as reference
+• Ensure file is not corrupted
+
+Technical Details: ${error.message}`;
       } else if (error.message.includes("required columns")) {
-        errorMsg += "\n\nRequired Excel columns: shipping_mark, item_description, quantity, cbm";
+        errorMsg = `🔴 Missing Required Columns
+
+📋 Your Excel file must have these exact column names:
+• shipping_mark (customer shipping mark)
+• item_description (cargo description)
+• quantity (number of items)  
+• cbm (cubic meter measurement)
+
+Optional columns: weight, unit_value, total_value, status`;
       } else if (error.message.includes("not found")) {
-        errorMsg += "\n\nPlease ensure all customers exist in the system before uploading.";
+        errorMsg +=
+          "\n\n💡 Tip: Please ensure all customers exist in the system before uploading.";
       }
-      
+
       showNotification("error", "Upload Failed", errorMsg);
     } finally {
       setActionLoading(false);
@@ -1910,6 +1958,21 @@ function SeaCargoPage() {
                           Customer must exist with the provided shipping_mark
                         </li>
                         <li>Supports .xlsx, .xls, and .csv files</li>
+                      </ul>
+                    </div>
+
+                    <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded">
+                      <p className="font-medium text-red-800">
+                        Troubleshooting File Issues:
+                      </p>
+                      <ul className="list-disc list-inside mt-1 space-y-1 text-red-700 text-xs">
+                        <li>
+                          If upload fails: Save as NEW .xlsx file using "Save
+                          As"
+                        </li>
+                        <li>Remove special characters, symbols, or emojis</li>
+                        <li>Use sample template files as reference</li>
+                        <li>Try converting to CSV with UTF-8 encoding</li>
                       </ul>
                     </div>
                   </div>
