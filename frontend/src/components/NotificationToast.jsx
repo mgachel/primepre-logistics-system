@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 const NotificationToast = ({
   show,
@@ -7,14 +7,29 @@ const NotificationToast = ({
   title,
   message,
   autoClose = true,
-  duration = 5000,
+  duration = 4000, // Increased from 5000 to 4000 for faster feedback
 }) => {
+  const [progress, setProgress] = useState(100);
+
   useEffect(() => {
     if (show && autoClose) {
+      setProgress(100);
+
+      const interval = setInterval(() => {
+        setProgress((prev) => {
+          const newProgress = prev - 100 / (duration / 100);
+          return newProgress <= 0 ? 0 : newProgress;
+        });
+      }, 100);
+
       const timer = setTimeout(() => {
         onClose();
       }, duration);
-      return () => clearTimeout(timer);
+
+      return () => {
+        clearTimeout(timer);
+        clearInterval(interval);
+      };
     }
   }, [show, autoClose, duration, onClose]);
 
@@ -107,6 +122,26 @@ const NotificationToast = ({
             </button>
           </div>
         </div>
+
+        {/* Progress bar */}
+        {autoClose && (
+          <div className="mt-3">
+            <div className="w-full bg-gray-200 rounded-full h-1">
+              <div
+                className={`h-1 rounded-full transition-all duration-100 ease-linear ${
+                  type === "success"
+                    ? "bg-green-600"
+                    : type === "error"
+                    ? "bg-red-600"
+                    : type === "warning"
+                    ? "bg-yellow-600"
+                    : "bg-blue-600"
+                }`}
+                style={{ width: `${progress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
