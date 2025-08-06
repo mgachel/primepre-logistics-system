@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useCallback } from "react";
 import StatusCard from "../components/StatusCard";
 import ControlPanel from "../components/ControlPanel";
 import DataTable from "../components/DataTable";
@@ -21,8 +21,8 @@ function SeaCargoPage() {
   const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showAddCargoItemModal, setShowAddCargoItemModal] = useState(false);
-  const [showExcelUploadModal, setShowExcelUploadModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+
   const [cargoItems, setCargoItems] = useState([]);
   const [loadingCargoItems, setLoadingCargoItems] = useState(false);
   const [updateForm, setUpdateForm] = useState({});
@@ -96,14 +96,14 @@ function SeaCargoPage() {
   }, [searchTimeout]);
 
   // Helper function to show notifications
-  const showNotification = (type, title, message) => {
+  const showNotification = useCallback((type, title, message) => {
     setNotification({
       show: true,
       type,
       title,
       message,
     });
-  };
+  }, []);
 
   // Helper function to close notifications
   const closeNotification = () => {
@@ -210,7 +210,7 @@ function SeaCargoPage() {
     searchItems(value);
   };
 
-  const handleRowAction = async (item) => {
+  const handleRowAction = useCallback(async (item) => {
     setSelectedItem(item);
     setLoadingCargoItems(true);
     setShowViewModal(true);
@@ -235,7 +235,7 @@ function SeaCargoPage() {
     } finally {
       setLoadingCargoItems(false);
     }
-  };
+  }, []);
   const handleUpdate = (item) => {
     setSelectedItem(item);
     setUpdateForm({
@@ -345,10 +345,6 @@ function SeaCargoPage() {
     setShowCustomerSuggestions(false);
     setAvailableCustomers([]);
     console.log("Updated form with customer:", customer.shipping_mark);
-  };
-
-  const handleExcelUpload = () => {
-    setShowExcelUploadModal(true);
   };
 
   const confirmAddItemToCargo = async () => {
@@ -485,142 +481,6 @@ function SeaCargoPage() {
     } catch (error) {
       console.error("Error adding item to cargo:", error);
       showNotification("error", "Failed to Add Item", error.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file || !selectedItem) return;
-
-    setActionLoading(true);
-    try {
-      // Debug: Check selectedItem structure
-      console.log("Selected item for bulk upload:", selectedItem);
-      console.log("File details:", {
-        name: file.name,
-        size: file.size,
-        type: file.type
-      });
-      
-      // Get container ID - try different possible field names
-      const containerId = selectedItem.container_id || selectedItem.id || selectedItem.pk;
-      console.log("Container ID for upload:", containerId);
-      
-      if (!containerId) {
-        throw new Error("Container ID not found. Please select a valid container.");
-      }
-
-      // Validate file type
-      const allowedTypes = ['.xlsx', '.xls', '.csv'];
-      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-      if (!allowedTypes.includes(fileExtension)) {
-        throw new Error(`Invalid file type. Only Excel files (.xlsx, .xls) and CSV files (.csv) are allowed. You uploaded: ${fileExtension}`);
-      }
-
-      // Check file size (warn if too large)
-      const maxSize = 10 * 1024 * 1024; // 10MB
-      if (file.size > maxSize) {
-        throw new Error(`File too large. Maximum file size is 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`);
-      }
-
-      // Basic file corruption check
-      if (file.size === 0) {
-        throw new Error("The selected file appears to be empty or corrupted. Please select a valid Excel file.");
-      }
-
-      // Prepare form data for bulk upload API
-      const formData = new FormData();
-      formData.append("excel_file", file);
-      formData.append("container_id", containerId);
-
-      // API call to upload Excel file for cargo items
-      const response = await authService.authenticatedFetch(
-        `${
-          import.meta.env.VITE_API_URL || "http://localhost:8000"
-        }/api/cargo/api/bulk-upload/`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
-        console.error("Bulk upload error details:", errorData);
-        
-        // Extract detailed error message
-        let errorMessage = "Upload failed";
-        if (errorData.error) {
-          errorMessage = errorData.error;
-        } else if (errorData.detail) {
-          errorMessage = errorData.detail;
-        } else if (errorData.non_field_errors) {
-          errorMessage = Array.isArray(errorData.non_field_errors) 
-            ? errorData.non_field_errors.join(', ') 
-            : errorData.non_field_errors;
-        } else if (errorData.container_id) {
-          errorMessage = `Container ID error: ${Array.isArray(errorData.container_id) 
-            ? errorData.container_id.join(', ') 
-            : errorData.container_id}`;
-        } else if (errorData.excel_file) {
-          errorMessage = `File error: ${Array.isArray(errorData.excel_file) 
-            ? errorData.excel_file.join(', ') 
-            : errorData.excel_file}`;
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      console.log("Bulk upload successful:", result);
-
-      // Refresh cargo items for the container
-      await handleRowAction(selectedItem);
-
-      setShowExcelUploadModal(false);
-      
-      // Enhanced success message
-      const createdCount = result.created_items || 0;
-      const errorCount = result.errors ? result.errors.length : 0;
-      let message = `Upload successful! Created ${createdCount} items.`;
-      
-      if (errorCount > 0) {
-        message += ` ${errorCount} errors occurred. Check console for details.`;
-        console.log("Upload errors:", result.errors);
-      }
-      
-      if (result.required_columns) {
-        console.log("Required Excel columns:", result.required_columns);
-      }
-      
-      showNotification("success", "Bulk Upload Complete", message);
-
-      // Refresh main data after a short delay to show the notification
-      setTimeout(() => {
-        refreshData();
-      }, 1500);
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      
-      // Enhanced error message
-      let errorMsg = error.message;
-      
-      if (error.message.includes("utf-8") || error.message.includes("codec can't decode")) {
-        errorMsg = "File encoding issue detected. Please try:\n\n" +
-          "1. Save your Excel file as a new .xlsx file\n" +
-          "2. Try saving as CSV and upload that instead\n" +
-          "3. Check for special characters in your data\n" +
-          "4. Use the sample files provided as templates\n\n" +
-          "Technical error: " + error.message;
-      } else if (error.message.includes("required columns")) {
-        errorMsg += "\n\nRequired Excel columns: shipping_mark, item_description, quantity, cbm";
-      } else if (error.message.includes("not found")) {
-        errorMsg += "\n\nPlease ensure all customers exist in the system before uploading.";
-      }
-      
-      showNotification("error", "Upload Failed", errorMsg);
     } finally {
       setActionLoading(false);
     }
@@ -1387,15 +1247,22 @@ function SeaCargoPage() {
               <div className="flex space-x-3 mb-6">
                 <button
                   onClick={handleAddItemToCargo}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center space-x-2"
                 >
-                  Add Item Manually
-                </button>
-                <button
-                  onClick={handleExcelUpload}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
-                  Upload Excel File
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  <span>Add Item</span>
                 </button>
               </div>
 
@@ -1433,7 +1300,7 @@ function SeaCargoPage() {
                       No items in this container yet
                     </p>
                     <p className="text-sm text-gray-400">
-                      Add items manually or upload an Excel file to get started
+                      Add items manually to get started
                     </p>
                   </div>
                 ) : (
@@ -1818,116 +1685,7 @@ function SeaCargoPage() {
         </div>
       )}
 
-      {/* Excel Upload Modal */}
-      {showExcelUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Upload Excel File
-                </h3>
-                <button
-                  onClick={() => setShowExcelUploadModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg
-                    className="w-6 h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Excel File
-                  </label>
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={handleFileUpload}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                  <h4 className="text-sm font-medium text-blue-900 mb-2">
-                    Excel File Format Requirements:
-                  </h4>
-                  <div className="text-xs text-blue-800 space-y-1">
-                    <p className="font-medium mb-2">
-                      Required Columns (must exist in Excel):
-                    </p>
-                    <ul className="list-disc list-inside space-y-1 ml-2">
-                      <li>
-                        <strong>shipping_mark</strong> - Customer shipping mark
-                      </li>
-                      <li>
-                        <strong>item_description</strong> - Description of the
-                        item
-                      </li>
-                      <li>
-                        <strong>quantity</strong> - Number of items
-                      </li>
-                      <li>
-                        <strong>cbm</strong> - Cubic meter measurement
-                      </li>
-                    </ul>
-
-                    <p className="font-medium mt-3 mb-2">Optional Columns:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-2">
-                      <li>
-                        <strong>weight</strong> - Weight in kg
-                      </li>
-                      <li>
-                        <strong>unit_value</strong> - Value per unit
-                      </li>
-                      <li>
-                        <strong>total_value</strong> - Total value
-                      </li>
-                      <li>
-                        <strong>status</strong> - Item status (default: pending)
-                      </li>
-                    </ul>
-
-                    <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                      <p className="font-medium">Important Notes:</p>
-                      <ul className="list-disc list-inside mt-1 space-y-1">
-                        <li>
-                          Column names must match exactly (case-sensitive)
-                        </li>
-                        <li>
-                          Customer must exist with the provided shipping_mark
-                        </li>
-                        <li>Supports .xlsx, .xls, and .csv files</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex space-x-3 mt-6">
-                <button
-                  onClick={() => setShowExcelUploadModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Update Container Modal */}
       {showUpdateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full">
