@@ -68,7 +68,7 @@ class CargoItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     container = models.ForeignKey(CargoContainer, on_delete=models.CASCADE, related_name='cargo_items')
     client = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cargo_items')
-    tracking_id = models.CharField(max_length=100, unique=True, editable=False)  # Auto-generated
+    tracking_id = models.CharField(max_length=100, unique=True, editable=True)  # Allow manual input
     
     # Item details
     item_description = models.TextField()
@@ -88,8 +88,8 @@ class CargoItem(models.Model):
         ordering = ['-created_at']
         
     def save(self, *args, **kwargs):
-        if not self.tracking_id:
-            # Generate tracking ID: CONT_MARK_YYYYMMDD_XXXX
+        if not self.tracking_id or self.tracking_id.strip() == "":
+            # Generate tracking ID only if not provided: CONT_MARK_YYYYMMDD_XXXX
             today = timezone.now().strftime('%Y%m%d')
             count = CargoItem.objects.filter(
                 client=self.client,
