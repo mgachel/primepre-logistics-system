@@ -1,59 +1,70 @@
 import { apiClient, ApiResponse, PaginatedResponse } from './api';
+import { User } from './authService';
 
 export interface Client {
-  id: string;
-  name: string;
-  email: string;
+  id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  company_name?: string;
+  email?: string;
   phone: string;
-  totalShipments: number;
-  activeShipments: number;
-  totalValue: string;
-  status: 'active' | 'inactive';
-  lastActivity: string;
-  location: string;
-  address?: string;
-  contactPerson?: string;
-  createdAt: string;
-  updatedAt: string;
+  region: string;
+  shipping_mark: string;
+  user_role: 'CUSTOMER' | 'STAFF' | 'ADMIN' | 'MANAGER' | 'SUPER_ADMIN';
+  user_type: 'INDIVIDUAL' | 'BUSINESS';
+  is_active: boolean;
+  date_joined: string;
+  total_shipments?: number;
+  active_shipments?: number;
+  total_value?: number;
+  last_activity?: string;
 }
 
 export interface CreateClientRequest {
-  name: string;
-  email: string;
+  first_name: string;
+  last_name: string;
+  company_name?: string;
+  email?: string;
   phone: string;
-  location: string;
-  address?: string;
-  contactPerson?: string;
+  region: string;
+  user_type: 'INDIVIDUAL' | 'BUSINESS';
+  password: string;
+  confirm_password: string;
 }
 
-export interface UpdateClientRequest extends Partial<CreateClientRequest> {
-  status?: 'active' | 'inactive';
-}
-
-export interface Shipment {
-  id: string;
-  trackingNumber: string;
-  clientId: string;
-  type: 'air' | 'sea';
-  origin: string;
-  destination: string;
-  status: 'pending' | 'in-transit' | 'delivered' | 'delayed';
-  createdAt: string;
-  updatedAt: string;
-  estimatedDelivery?: string;
-  actualDelivery?: string;
+export interface UpdateClientRequest {
+  first_name?: string;
+  last_name?: string;
+  company_name?: string;
+  email?: string;
+  region?: string;
+  user_type?: 'INDIVIDUAL' | 'BUSINESS';
+  is_active?: boolean;
 }
 
 export interface ClientFilters {
-  status?: string;
-  location?: string;
+  user_role?: string;
+  user_type?: string;
+  is_active?: boolean;
+  region?: string;
   search?: string;
   page?: number;
   limit?: number;
 }
 
+export interface ClientStats {
+  total_users: number;
+  active_users: number;
+  admin_users: number;
+  customer_users: number;
+  business_users: number;
+  individual_users: number;
+  recent_registrations: number;
+}
+
 export const clientService = {
-  // Get all clients with pagination and filters
+  // Get all clients/customers (admin/staff only)
   async getClients(filters: ClientFilters = {}): Promise<ApiResponse<PaginatedResponse<Client>>> {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
@@ -62,43 +73,64 @@ export const clientService = {
       }
     });
     
-    const endpoint = `/clients?${params.toString()}`;
+    const endpoint = `/api/cargo/customers/?${params.toString()}`;
     return apiClient.get<PaginatedResponse<Client>>(endpoint);
   },
 
-  // Get client by ID
-  async getClientById(id: string): Promise<ApiResponse<Client>> {
-    return apiClient.get<Client>(`/clients/${id}`);
+  // Get client by ID (admin/staff only)
+  async getClientById(id: number): Promise<ApiResponse<Client>> {
+    return apiClient.get<Client>(`/api/cargo/customers/${id}/`);
   },
 
-  // Create new client
+  // Create new client (admin/staff only) - this uses the user registration endpoint
   async createClient(data: CreateClientRequest): Promise<ApiResponse<Client>> {
-    return apiClient.post<Client>('/clients', data);
+    return apiClient.post<Client>('/api/auth/register/', data);
   },
 
-  // Update client
-  async updateClient(id: string, data: UpdateClientRequest): Promise<ApiResponse<Client>> {
-    return apiClient.put<Client>(`/clients/${id}`, data);
+  // Update client (admin/staff only)
+  async updateClient(id: number, data: UpdateClientRequest): Promise<ApiResponse<Client>> {
+    return apiClient.put<Client>(`/api/cargo/customers/${id}/`, data);
   },
 
-  // Delete client
-  async deleteClient(id: string): Promise<ApiResponse<void>> {
-    return apiClient.delete<void>(`/clients/${id}`);
+  // Delete client (admin/staff only)
+  async deleteClient(id: number): Promise<ApiResponse<void>> {
+    return apiClient.delete<void>(`/api/cargo/customers/${id}/`);
   },
 
-  // Get client statistics
-  async getClientStats(): Promise<ApiResponse<{
-    total: number;
-    active: number;
-    inactive: number;
-    newThisMonth: number;
-    totalValue: string;
-  }>> {
-    return apiClient.get('/clients/stats');
+  // Get client statistics (admin/staff only)
+  async getClientStats(): Promise<ApiResponse<ClientStats>> {
+    return apiClient.get<ClientStats>('/api/auth/user-stats/');
   },
 
-  // Get client shipments
-  async getClientShipments(clientId: string): Promise<ApiResponse<Shipment[]>> {
-    return apiClient.get(`/clients/${clientId}/shipments`);
+  // Get active clients
+  async getActiveClients(): Promise<ApiResponse<Client[]>> {
+    return this.getClients({ is_active: true }).then(response => ({
+      ...response,
+      data: response.data?.results || []
+    }));
   },
+
+  // Get business clients
+  async getBusinessClients(): Promise<ApiResponse<Client[]>> {
+    return this.getClients({ user_type: 'BUSINESS' }).then(response => ({
+      ...response,
+      data: response.data?.results || []
+    }));
+  },
+
+  // Get individual clients
+  async getIndividualClients(): Promise<ApiResponse<Client[]>> {
+    return this.getClients({ user_type: 'INDIVIDUAL' }).then(response => ({
+      ...response,
+      data: response.data?.results || []
+    }));
+  },
+
+  // Search clients
+  async searchClients(searchTerm: string): Promise<ApiResponse<Client[]>> {
+    return this.getClients({ search: searchTerm }).then(response => ({
+      ...response,
+      data: response.data?.results || []
+    }));
+  }
 }; 
