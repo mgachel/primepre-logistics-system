@@ -1,16 +1,20 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authService, User } from '@/services/authService';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (phone: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   loading: boolean;
   // Role-based helper functions
   isAdmin: () => boolean;
   isCustomer: () => boolean;
+  isStaff: () => boolean;
+  isManager: () => boolean;
+  isSuperAdmin: () => boolean;
   hasPermission: (permission: string) => boolean;
+  canAccessWarehouse: (warehouse: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,6 +23,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Setup automatic token refresh
+  const setupTokenRefresh = useCallback(() => {
+    const refreshInterval = setInterval(async () => {
+      try {
+        if (authService.getRefreshToken()) {
+          await authService.refreshToken();
+        }
+      } catch (error) {
+        console.error('Token refresh failed:', error);
+        logout();
+      }
+    }, 10 * 60 * 1000); // Refresh every 10 minutes
+
+    return () => clearInterval(refreshInterval);
+  }, []);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -29,15 +49,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (storedUser) {
             setIsAuthenticated(true);
             setUser(storedUser);
-          } else {
-            // Try to get current user from API
-            const response = await authService.getCurrentUser();
-            if (response.success) {
-              setIsAuthenticated(true);
-              setUser(response.data);
-            } else {
-              // Clear invalid auth
+            
+            // Verify token is still valid by getting current user
+            try {
+              const response = await authService.getCurrentUser();
+              if (response.success) {
+                setUser(response.data);
+                localStorage.setItem('user', JSON.stringify(response.data));
+              } else {
+                // Token invalid, clear auth
+                authService.logout();
+                setIsAuthenticated(false);
+                setUser(null);
+              }
+            } catch (error) {
+              console.error('Auth verification failed:', error);
               authService.logout();
+              setIsAuthenticated(false);
+              setUser(null);
             }
           }
         }
@@ -50,11 +79,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     checkAuth();
-  }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+    // Setup token refresh interval
+    const cleanup = setupTokenRefresh();
+    return cleanup;
+  }, [setupTokenRefresh]);
+
+  const login = async (phone: string, password: string): Promise<boolean> => {
     try {
-      const response = await authService.login({ username, password });
+      const response = await authService.login({ phone, password });
       if (response.success) {
         setIsAuthenticated(true);
         setUser(response.data.user);
@@ -78,39 +111,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Role-based helper functions
+  // Role-based helper functions using backend user_role format
   const isAdmin = (): boolean => {
-    return user?.role === 'admin' || user?.role === 'super_admin';
+    return user?.user_role === 'ADMIN';
   };
 
   const isCustomer = (): boolean => {
-    return user?.role === 'customer';
+    return user?.user_role === 'CUSTOMER';
+  };
+
+  const isStaff = (): boolean => {
+    return user?.user_role === 'STAFF';
+  };
+
+  const isManager = (): boolean => {
+    return user?.user_role === 'MANAGER';
+  };
+
+  const isSuperAdmin = (): boolean => {
+    return user?.user_role === 'SUPER_ADMIN';
   };
 
   const hasPermission = (permission: string): boolean => {
     if (!user) return false;
     
     // Super admin has all permissions
-    if (user.role === 'super_admin') return true;
+    if (user.user_role === 'SUPER_ADMIN') return true;
     
-    // Admin has most permissions except super admin specific ones
-    if (user.role === 'admin') {
-      const adminPermissions = [
-        'dashboard', 'clients', 'seaCargo', 'airCargo', 'chinaWarehouse', 
-        'ghanaWarehouse', 'claims', 'rates', 'settings'
-      ];
-      return adminPermissions.includes(permission);
+    // Check specific backend permissions
+    switch (permission) {
+      case 'create_users':
+        return user.can_create_users || false;
+      case 'manage_inventory':
+        return user.can_manage_inventory || false;
+      case 'view_analytics':
+        return user.can_view_analytics || false;
+      case 'manage_admins':
+        return user.can_manage_admins || false;
+      case 'admin_panel':
+        return user.can_access_admin_panel || false;
+      
+      // Page-level permissions based on role
+      case 'dashboard':
+        return ['ADMIN', 'MANAGER', 'STAFF', 'CUSTOMER'].includes(user.user_role);
+      case 'clients':
+        return ['ADMIN', 'MANAGER', 'STAFF'].includes(user.user_role);
+      case 'cargo':
+        return ['ADMIN', 'MANAGER', 'STAFF'].includes(user.user_role);
+      case 'warehouse':
+        return ['ADMIN', 'MANAGER', 'STAFF'].includes(user.user_role);
+      case 'claims':
+        return ['ADMIN', 'MANAGER', 'STAFF', 'CUSTOMER'].includes(user.user_role);
+      case 'rates':
+        return ['ADMIN', 'MANAGER'].includes(user.user_role);
+      case 'settings':
+        return ['ADMIN', 'SUPER_ADMIN'].includes(user.user_role);
+      case 'profile':
+        return true; // All authenticated users can access profile
+      case 'notifications':
+        return true; // All authenticated users can access notifications
+      
+      // Customer-specific permissions
+      case 'my_shipments':
+        return user.user_role === 'CUSTOMER';
+      case 'my_claims':
+        return user.user_role === 'CUSTOMER';
+      
+      default:
+        return false;
     }
+  };
+
+  const canAccessWarehouse = (warehouse: string): boolean => {
+    if (!user) return false;
     
-    // Customer has limited permissions
-    if (user.role === 'customer') {
-      const customerPermissions = [
-        'dashboard', 'myShipments', 'myClaims', 'profile', 'notifications'
-      ];
-      return customerPermissions.includes(permission);
-    }
+    // Super admin can access all warehouses
+    if (user.user_role === 'SUPER_ADMIN') return true;
     
-    return false;
+    // Check user's accessible warehouses
+    return user.accessible_warehouses.includes(warehouse.toLowerCase());
   };
 
   return (
@@ -122,7 +201,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       isAdmin,
       isCustomer,
-      hasPermission
+      isStaff,
+      isManager,
+      isSuperAdmin,
+      hasPermission,
+      canAccessWarehouse
     }}>
       {children}
     </AuthContext.Provider>
