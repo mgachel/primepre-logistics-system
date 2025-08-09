@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 export default function Login() {
-  const [username, setUsername] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -33,12 +33,12 @@ export default function Login() {
     setLoading(true);
     
     try {
-      const success = await login(username, password);
+      const success = await login(phone, password);
       if (success) {
         // Redirect will happen via route protection
         window.location.href = '/';
       } else {
-        setError('Invalid credentials. Please check your username and password.');
+        setError('Invalid credentials. Please check your phone number and password.');
       }
     } catch (error) {
       setError('Login failed. Please try again.');
@@ -47,11 +47,7 @@ export default function Login() {
     }
   };
 
-  const demoCredentials = [
-    { role: 'Super Admin', username: 'admin', password: 'password', color: 'bg-red-500' },
-    { role: 'Admin', username: 'manager', password: 'password', color: 'bg-blue-500' },
-    { role: 'Customer', username: 'customer', password: 'password', color: 'bg-green-500' },
-  ];
+  // Remove demo credentials since we're using real backend authentication
 
   return (
     <div className="min-h-screen flex">
@@ -141,13 +137,13 @@ export default function Login() {
                 )}
                 
                 <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="phone">Phone Number</Label>
                   <Input
-                    id="username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your username"
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Enter your phone number"
                     className="h-11"
                     required
                   />
