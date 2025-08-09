@@ -1,67 +1,81 @@
 import { apiClient, ApiResponse, PaginatedResponse } from './api';
 
 export interface WarehouseItem {
-  id: string;
-  sku: string;
-  productName: string;
-  category: string;
-  quantity: number;
-  unitPrice: number;
-  totalValue: number;
-  warehouseLocation: string;
-  status: 'available' | 'reserved' | 'low-stock' | 'out-of-stock';
-  lastUpdated: string;
+  id: number;
+  primepre_id: string;
+  customer: number;
+  customer_name?: string;
+  shipping_mark: string;
+  supply_tracking?: string;
+  item_id?: string;
   description?: string;
-  supplier?: string;
-  minimumStock?: number;
-  createdAt: string;
+  quantity: number;
+  cbm: number;
+  weight: number;
+  supplier_name?: string;
+  status: 'PENDING' | 'READY_FOR_SHIPPING' | 'SHIPPED' | 'FLAGGED' | 'CANCELLED';
+  warehouse_location?: string;
+  date_received?: string;
+  notes?: string;
+  flagged_reason?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CreateWarehouseItemRequest {
-  sku: string;
-  productName: string;
-  category: string;
-  quantity: number;
-  unitPrice: number;
-  warehouseLocation: string;
+  shipping_mark: string;
   description?: string;
-  supplier?: string;
-  minimumStock?: number;
+  quantity: number;
+  cbm: number;
+  weight: number;
+  supplier_name?: string;
+  warehouse_location?: string;
+  supply_tracking?: string;
+  item_id?: string;
+  notes?: string;
 }
 
 export interface UpdateWarehouseItemRequest {
-  productName?: string;
-  category?: string;
-  quantity?: number;
-  unitPrice?: number;
-  warehouseLocation?: string;
-  status?: 'available' | 'reserved' | 'low-stock' | 'out-of-stock';
+  shipping_mark?: string;
   description?: string;
-  supplier?: string;
-  minimumStock?: number;
+  quantity?: number;
+  cbm?: number;
+  weight?: number;
+  supplier_name?: string;
+  warehouse_location?: string;
+  status?: 'PENDING' | 'READY_FOR_SHIPPING' | 'SHIPPED' | 'FLAGGED' | 'CANCELLED';
+  supply_tracking?: string;
+  item_id?: string;
+  notes?: string;
+  flagged_reason?: string;
 }
 
 export interface WarehouseFilters {
   warehouse?: 'china' | 'ghana';
-  category?: string;
   status?: string;
+  supplier_name?: string;
   search?: string;
+  date_from?: string;
+  date_to?: string;
+  ordering?: string;
   page?: number;
   limit?: number;
 }
 
 export interface WarehouseStats {
-  totalItems: number;
-  availableStock: number;
-  reservedItems: number;
-  lowStockAlert: number;
-  totalValue: number;
-  categories: { name: string; count: number }[];
+  total_items: number;
+  pending: number;
+  ready_for_shipping: number;
+  shipped: number;
+  flagged: number;
+  cancelled: number;
+  total_cbm: number;
+  total_weight: number;
 }
 
 export const warehouseService = {
-  // Get all warehouse items
-  async getWarehouseItems(filters: WarehouseFilters = {}): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
+  // Get China warehouse items (customer view)
+  async getChinaWarehouseItems(filters: Omit<WarehouseFilters, 'warehouse'> = {}): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -69,34 +83,175 @@ export const warehouseService = {
       }
     });
     
-    const endpoint = `/warehouse/items?${params.toString()}`;
+    const endpoint = `/api/customer/goods/china/?${params.toString()}`;
     return apiClient.get<PaginatedResponse<WarehouseItem>>(endpoint);
   },
 
-  // Get warehouse item by ID
-  async getWarehouseItemById(id: string): Promise<ApiResponse<WarehouseItem>> {
-    return apiClient.get<WarehouseItem>(`/warehouse/items/${id}`);
+  // Get Ghana warehouse items (customer view)
+  async getGhanaWarehouseItems(filters: Omit<WarehouseFilters, 'warehouse'> = {}): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, value.toString());
+      }
+    });
+    
+    const endpoint = `/api/customer/goods/ghana/?${params.toString()}`;
+    return apiClient.get<PaginatedResponse<WarehouseItem>>(endpoint);
   },
 
-  // Create new warehouse item
-  async createWarehouseItem(data: CreateWarehouseItemRequest): Promise<ApiResponse<WarehouseItem>> {
-    return apiClient.post<WarehouseItem>('/warehouse/items', data);
+  // Get all warehouse items (for staff/admin - using both endpoints)
+  async getAllWarehouseItems(filters: WarehouseFilters = {}): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
+    const { warehouse, ...otherFilters } = filters;
+    
+    if (warehouse === 'china') {
+      return this.getChinaWarehouseItems(otherFilters);
+    } else if (warehouse === 'ghana') {
+      return this.getGhanaWarehouseItems(otherFilters);
+    } else {
+      // Default to China if not specified
+      return this.getChinaWarehouseItems(otherFilters);
+    }
   },
 
-  // Update warehouse item
-  async updateWarehouseItem(id: string, data: UpdateWarehouseItemRequest): Promise<ApiResponse<WarehouseItem>> {
-    return apiClient.put<WarehouseItem>(`/warehouse/items/${id}`, data);
+  // Get warehouse item by ID (China)
+  async getChinaWarehouseItemById(id: number): Promise<ApiResponse<WarehouseItem>> {
+    return apiClient.get<WarehouseItem>(`/api/customer/goods/china/${id}/`);
   },
 
-  // Delete warehouse item
-  async deleteWarehouseItem(id: string): Promise<ApiResponse<void>> {
-    return apiClient.delete<void>(`/warehouse/items/${id}`);
+  // Get warehouse item by ID (Ghana)
+  async getGhanaWarehouseItemById(id: number): Promise<ApiResponse<WarehouseItem>> {
+    return apiClient.get<WarehouseItem>(`/api/customer/goods/ghana/${id}/`);
   },
 
-  // Get China warehouse items
-  async getChinaWarehouseItems(filters: Omit<WarehouseFilters, 'warehouse'> = {}): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
-    return this.getWarehouseItems({ ...filters, warehouse: 'china' });
+  // Get China warehouse statistics
+  async getChinaWarehouseStats(): Promise<ApiResponse<WarehouseStats>> {
+    return apiClient.get<WarehouseStats>('/api/customer/goods/china/my_statistics/');
   },
+
+  // Get Ghana warehouse statistics  
+  async getGhanaWarehouseStats(): Promise<ApiResponse<WarehouseStats>> {
+    return apiClient.get<WarehouseStats>('/api/customer/goods/ghana/my_statistics/');
+  },
+
+  // Get flagged items (China)
+  async getChinaFlaggedItems(): Promise<ApiResponse<WarehouseItem[]>> {
+    return apiClient.get<WarehouseItem[]>('/api/customer/goods/china/my_flagged_items/');
+  },
+
+  // Get flagged items (Ghana)
+  async getGhanaFlaggedItems(): Promise<ApiResponse<WarehouseItem[]>> {
+    return apiClient.get<WarehouseItem[]>('/api/customer/goods/ghana/my_flagged_items/');
+  },
+
+  // Get ready for shipping items (China)
+  async getChinaReadyForShipping(): Promise<ApiResponse<WarehouseItem[]>> {
+    return apiClient.get<WarehouseItem[]>('/api/customer/goods/china/ready_for_shipping/');
+  },
+
+  // Get ready for shipping items (Ghana)
+  async getGhanaReadyForShipping(): Promise<ApiResponse<WarehouseItem[]>> {
+    return apiClient.get<WarehouseItem[]>('/api/customer/goods/ghana/ready_for_shipping/');
+  },
+
+  // Get overdue items (China)
+  async getChinaOverdueItems(days: number = 30): Promise<ApiResponse<WarehouseItem[]>> {
+    return apiClient.get<WarehouseItem[]>(`/api/customer/goods/china/overdue_items/?days=${days}`);
+  },
+
+  // Get overdue items (Ghana)
+  async getGhanaOverdueItems(days: number = 30): Promise<ApiResponse<WarehouseItem[]>> {
+    return apiClient.get<WarehouseItem[]>(`/api/customer/goods/ghana/overdue_items/?days=${days}`);
+  },
+
+  // Track by supply tracking ID (China)
+  async trackChinaBySupplyTracking(trackingId: string): Promise<ApiResponse<WarehouseItem>> {
+    return apiClient.get<WarehouseItem>(`/api/customer/goods/china/tracking/${trackingId}/`);
+  },
+
+  // Track by supply tracking ID (Ghana)
+  async trackGhanaBySupplyTracking(trackingId: string): Promise<ApiResponse<WarehouseItem>> {
+    return apiClient.get<WarehouseItem>(`/api/customer/goods/ghana/tracking/${trackingId}/`);
+  },
+
+  // Staff/Admin endpoints for creating and updating (these would use different endpoints)
+  // Note: These would need role-based endpoint switching between customer and admin endpoints
+  
+  // Create new China warehouse item (admin/staff only)
+  async createChinaWarehouseItem(data: CreateWarehouseItemRequest): Promise<ApiResponse<WarehouseItem>> {
+    return apiClient.post<WarehouseItem>('/api/goods/china/', data);
+  },
+
+  // Create new Ghana warehouse item (admin/staff only)
+  async createGhanaWarehouseItem(data: CreateWarehouseItemRequest): Promise<ApiResponse<WarehouseItem>> {
+    return apiClient.post<WarehouseItem>('/api/goods/ghana/', data);
+  },
+
+  // Update China warehouse item (admin/staff only)
+  async updateChinaWarehouseItem(id: number, data: UpdateWarehouseItemRequest): Promise<ApiResponse<WarehouseItem>> {
+    return apiClient.put<WarehouseItem>(`/api/goods/china/${id}/`, data);
+  },
+
+  // Update Ghana warehouse item (admin/staff only)
+  async updateGhanaWarehouseItem(id: number, data: UpdateWarehouseItemRequest): Promise<ApiResponse<WarehouseItem>> {
+    return apiClient.put<WarehouseItem>(`/api/goods/ghana/${id}/`, data);
+  },
+
+  // Delete China warehouse item (admin/staff only)
+  async deleteChinaWarehouseItem(id: number): Promise<ApiResponse<void>> {
+    return apiClient.delete<void>(`/api/goods/china/${id}/`);
+  },
+
+  // Delete Ghana warehouse item (admin/staff only)
+  async deleteGhanaWarehouseItem(id: number): Promise<ApiResponse<void>> {
+    return apiClient.delete<void>(`/api/goods/ghana/${id}/`);
+  },
+
+  // Bulk status update (admin/staff only)
+  async bulkUpdateChinaStatus(ids: number[], status: string): Promise<ApiResponse<void>> {
+    return apiClient.post<void>('/api/goods/china/bulk_status_update/', { ids, status });
+  },
+
+  async bulkUpdateGhanaStatus(ids: number[], status: string): Promise<ApiResponse<void>> {
+    return apiClient.post<void>('/api/goods/ghana/bulk_status_update/', { ids, status });
+  },
+
+  // Excel upload (admin/staff only)
+  async uploadChinaExcel(file: File): Promise<ApiResponse<any>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post<any>('/api/goods/china/upload_excel/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  async uploadGhanaExcel(file: File): Promise<ApiResponse<any>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post<any>('/api/goods/ghana/upload_excel/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  // Download templates (admin/staff only)
+  async downloadChinaTemplate(): Promise<Blob> {
+    const response = await fetch('/api/goods/china/download_template/', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+      }
+    });
+    return response.blob();
+  },
+
+  async downloadGhanaTemplate(): Promise<Blob> {
+    const response = await fetch('/api/goods/ghana/download_template/', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+      }
+    });
+    return response.blob();
+  }
+};
 
   // Get Ghana warehouse items
   async getGhanaWarehouseItems(filters: Omit<WarehouseFilters, 'warehouse'> = {}): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
