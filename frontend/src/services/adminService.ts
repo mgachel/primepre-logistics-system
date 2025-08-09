@@ -1,67 +1,86 @@
 import { apiClient, ApiResponse, PaginatedResponse } from './api';
+import { User } from './authService';
 
 export interface AdminUser {
-  id: string;
-  name: string;
-  email: string;
+  id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  company_name?: string;
+  email?: string;
   phone: string;
-  role: string;
-  verification: 'verified' | 'not-verified';
-  createdBy: string;
-  createdAt: string;
-  lastLogin?: string;
-  status: 'active' | 'inactive';
-}
-
-export interface Role {
-  id: string;
-  name: string;
-  description: string;
-  permissions: string[];
-  createdAt: string;
-  updatedAt: string;
+  region: string;
+  user_role: 'STAFF' | 'ADMIN' | 'MANAGER' | 'SUPER_ADMIN';
+  user_type: 'INDIVIDUAL' | 'BUSINESS';
+  is_active: boolean;
+  is_admin_user: boolean;
+  accessible_warehouses: string[];
+  can_create_users: boolean;
+  can_manage_inventory: boolean;
+  can_view_analytics: boolean;
+  can_manage_admins: boolean;
+  can_access_admin_panel: boolean;
+  created_by?: number;
+  date_joined: string;
+  last_login?: string;
+  last_login_ip?: string;
 }
 
 export interface CreateAdminRequest {
-  name: string;
-  email: string;
+  first_name: string;
+  last_name: string;
+  company_name?: string;
+  email?: string;
   phone: string;
-  role: string;
+  region: string;
+  user_role: 'STAFF' | 'ADMIN' | 'MANAGER' | 'SUPER_ADMIN';
+  user_type: 'INDIVIDUAL' | 'BUSINESS';
+  accessible_warehouses: string[];
+  can_create_users: boolean;
+  can_manage_inventory: boolean;
+  can_view_analytics: boolean;
+  can_manage_admins: boolean;
   password: string;
+  confirm_password: string;
 }
 
 export interface UpdateAdminRequest {
-  name?: string;
+  first_name?: string;
+  last_name?: string;
+  company_name?: string;
   email?: string;
-  phone?: string;
-  role?: string;
-  status?: 'active' | 'inactive';
-}
-
-export interface CreateRoleRequest {
-  name: string;
-  description: string;
-  permissions: string[];
-}
-
-export interface UpdateRoleRequest {
-  name?: string;
-  description?: string;
-  permissions?: string[];
+  region?: string;
+  user_role?: 'STAFF' | 'ADMIN' | 'MANAGER' | 'SUPER_ADMIN';
+  is_active?: boolean;
+  accessible_warehouses?: string[];
+  can_create_users?: boolean;
+  can_manage_inventory?: boolean;
+  can_view_analytics?: boolean;
+  can_manage_admins?: boolean;
 }
 
 export interface AdminFilters {
-  role?: string;
-  status?: string;
-  verification?: string;
+  user_role?: string;
+  is_active?: boolean;
+  region?: string;
   search?: string;
   page?: number;
   limit?: number;
 }
 
+export interface UserStats {
+  total_users: number;
+  active_users: number;
+  admin_users: number;
+  customer_users: number;
+  business_users: number;
+  individual_users: number;
+  recent_registrations: number;
+}
+
 export const adminService = {
-  // Get all admin users
-  async getAdmins(filters: AdminFilters = {}): Promise<ApiResponse<PaginatedResponse<AdminUser>>> {
+  // Get all admin users (requires appropriate permissions)
+  async getAdminUsers(filters: AdminFilters = {}): Promise<ApiResponse<PaginatedResponse<AdminUser>>> {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -69,64 +88,129 @@ export const adminService = {
       }
     });
     
-    const endpoint = `/admin/users?${params.toString()}`;
+    const endpoint = `/api/auth/admin-users/?${params.toString()}`;
     return apiClient.get<PaginatedResponse<AdminUser>>(endpoint);
   },
 
-  // Get admin by ID
-  async getAdminById(id: string): Promise<ApiResponse<AdminUser>> {
-    return apiClient.get<AdminUser>(`/admin/users/${id}`);
+  // Get admin user by ID
+  async getAdminUserById(id: number): Promise<ApiResponse<AdminUser>> {
+    return apiClient.get<AdminUser>(`/api/auth/admin-users/${id}/`);
   },
 
-  // Create new admin
-  async createAdmin(data: CreateAdminRequest): Promise<ApiResponse<AdminUser>> {
-    return apiClient.post<AdminUser>('/admin/users', data);
+  // Create new admin user (requires SUPER_ADMIN or MANAGER permissions)
+  async createAdminUser(data: CreateAdminRequest): Promise<ApiResponse<AdminUser>> {
+    return apiClient.post<AdminUser>('/api/auth/admin-users/', data);
   },
 
-  // Update admin
-  async updateAdmin(id: string, data: UpdateAdminRequest): Promise<ApiResponse<AdminUser>> {
-    return apiClient.put<AdminUser>(`/admin/users/${id}`, data);
+  // Update admin user (requires appropriate permissions)
+  async updateAdminUser(id: number, data: UpdateAdminRequest): Promise<ApiResponse<AdminUser>> {
+    return apiClient.put<AdminUser>(`/api/auth/admin-users/${id}/`, data);
   },
 
-  // Delete admin
-  async deleteAdmin(id: string): Promise<ApiResponse<void>> {
-    return apiClient.delete<void>(`/admin/users/${id}`);
+  // Delete admin user (requires SUPER_ADMIN permissions)
+  async deleteAdminUser(id: number): Promise<ApiResponse<void>> {
+    return apiClient.delete<void>(`/api/auth/admin-users/${id}/`);
   },
 
-  // Get all roles
-  async getRoles(): Promise<ApiResponse<Role[]>> {
-    return apiClient.get<Role[]>('/admin/roles');
+  // Get user statistics (admin only)
+  async getUserStats(): Promise<ApiResponse<UserStats>> {
+    return apiClient.get<UserStats>('/api/auth/user-stats/');
   },
 
-  // Get role by ID
-  async getRoleById(id: string): Promise<ApiResponse<Role>> {
-    return apiClient.get<Role>(`/admin/roles/${id}`);
+  // Get current user profile
+  async getCurrentUserProfile(): Promise<ApiResponse<User>> {
+    return apiClient.get<User>('/api/auth/profile/');
   },
 
-  // Create new role
-  async createRole(data: CreateRoleRequest): Promise<ApiResponse<Role>> {
-    return apiClient.post<Role>('/admin/roles', data);
+  // Update current user profile
+  async updateCurrentUserProfile(data: Partial<User>): Promise<ApiResponse<User>> {
+    return apiClient.put<User>('/api/auth/profile/', data);
   },
 
-  // Update role
-  async updateRole(id: string, data: UpdateRoleRequest): Promise<ApiResponse<Role>> {
-    return apiClient.put<Role>(`/admin/roles/${id}`, data);
+  // Change password
+  async changePassword(data: {
+    current_password: string;
+    new_password: string;
+    confirm_password: string;
+  }): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.post<{ message: string }>('/api/auth/password-change/', data);
   },
 
-  // Delete role
-  async deleteRole(id: string): Promise<ApiResponse<void>> {
-    return apiClient.delete<void>(`/admin/roles/${id}`);
+  // Get all users (super admin only) 
+  async getAllUsers(filters: AdminFilters = {}): Promise<ApiResponse<PaginatedResponse<User>>> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, value.toString());
+      }
+    });
+    
+    const endpoint = `/api/auth/users/?${params.toString()}`;
+    return apiClient.get<PaginatedResponse<User>>(endpoint);
   },
 
-  // Get admin statistics
-  async getAdminStats(): Promise<ApiResponse<{
-    total: number;
-    active: number;
-    inactive: number;
-    verified: number;
-    unverified: number;
-    roles: number;
+  // Get users by role
+  async getUsersByRole(role: string): Promise<ApiResponse<User[]>> {
+    return this.getAllUsers({ user_role: role }).then(response => ({
+      ...response,
+      data: response.data?.results || []
+    }));
+  },
+
+  // Get active users
+  async getActiveUsers(): Promise<ApiResponse<User[]>> {
+    return this.getAllUsers({ is_active: true }).then(response => ({
+      ...response,
+      data: response.data?.results || []
+    }));
+  },
+
+  // Toggle user active status (admin only)
+  async toggleUserStatus(id: number, isActive: boolean): Promise<ApiResponse<AdminUser>> {
+    return this.updateAdminUser(id, { is_active: isActive });
+  },
+
+  // Get user permissions summary
+  async getUserPermissions(id: number): Promise<ApiResponse<{
+    permissions: string[];
+    accessible_warehouses: string[];
+    admin_capabilities: string[];
   }>> {
-    return apiClient.get('/admin/stats');
-  },
+    const user = await this.getAdminUserById(id);
+    if (!user.data) throw new Error('User not found');
+    
+    const permissions: string[] = [];
+    const adminCapabilities: string[] = [];
+    
+    if (user.data.can_create_users) {
+      permissions.push('CREATE_USERS');
+      adminCapabilities.push('User Management');
+    }
+    if (user.data.can_manage_inventory) {
+      permissions.push('MANAGE_INVENTORY');
+      adminCapabilities.push('Inventory Management');
+    }
+    if (user.data.can_view_analytics) {
+      permissions.push('VIEW_ANALYTICS');
+      adminCapabilities.push('Analytics Access');
+    }
+    if (user.data.can_manage_admins) {
+      permissions.push('MANAGE_ADMINS');
+      adminCapabilities.push('Admin Management');
+    }
+    if (user.data.can_access_admin_panel) {
+      permissions.push('ADMIN_PANEL_ACCESS');
+      adminCapabilities.push('Admin Panel Access');
+    }
+    
+    return {
+      data: {
+        permissions,
+        accessible_warehouses: user.data.accessible_warehouses,
+        admin_capabilities: adminCapabilities
+      },
+      success: true,
+      message: 'User permissions retrieved successfully'
+    };
+  }
 }; 
