@@ -1,5 +1,5 @@
 // API Base Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 // Common API response types
 export interface ApiResponse<T> {
@@ -9,13 +9,10 @@ export interface ApiResponse<T> {
 }
 
 export interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
 }
 
 // API Client
@@ -33,15 +30,11 @@ class ApiClient {
     const url = `${this.baseURL}${endpoint}`;
     
     const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
       ...options,
     };
 
     // Add auth token if available
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('access_token');
     if (token) {
       config.headers = {
         ...config.headers,
@@ -49,18 +42,88 @@ class ApiClient {
       };
     }
 
+    // Only set Content-Type to application/json if body is not FormData
+    if (!(config.body instanceof FormData) && !config.headers?.['Content-Type']) {
+      config.headers = {
+        ...config.headers,
+        'Content-Type': 'application/json',
+      };
+    }
+
     try {
       const response = await fetch(url, config);
       
+      // Handle 401 (unauthorized) responses - try to refresh token
+      if (response.status === 401) {
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
+          try {
+            // Try to refresh the access token
+            const refreshResponse = await fetch(`${this.baseURL}/api/auth/token/refresh/`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ refresh: refreshToken }),
+            });
+
+            if (refreshResponse.ok) {
+              const refreshData = await refreshResponse.json();
+              localStorage.setItem('access_token', refreshData.access);
+              
+              // Retry the original request with new token
+              config.headers = {
+                ...config.headers,
+                Authorization: `Bearer ${refreshData.access}`,
+              };
+              
+              const retryResponse = await fetch(url, config);
+              if (retryResponse.ok) {
+                const retryData = await retryResponse.json();
+                return {
+                  data: retryData,
+                  success: true,
+                  message: 'Success'
+                };
+              }
+            }
+          } catch (refreshError) {
+            console.error('Token refresh failed:', refreshError);
+            // Clear tokens and redirect to login
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('admin_info');
+            window.location.href = '/login';
+          }
+        }
+        return {
+          data: {} as T,
+          success: false,
+          message: 'Authentication failed'
+        };
+      }
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      return data;
+      
+      // Django REST Framework returns data directly, wrap it in our ApiResponse format
+      return {
+        data,
+        success: true,
+        message: 'Success'
+      };
     } catch (error) {
       console.error('API request failed:', error);
-      throw error;
+      return {
+        data: {} as T,
+        success: false,
+        message: error instanceof Error ? error.message : 'An error occurred'
+      };
     }
   }
 
@@ -71,10 +134,17 @@ class ApiClient {
 
   // POST request
   async post<T, D = unknown>(endpoint: string, data?: D): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
+    const options: RequestInit = {
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
-    });
+    };
+
+    if (data instanceof FormData) {
+      options.body = data;
+    } else if (data) {
+      options.body = JSON.stringify(data);
+    }
+
+    return this.request<T>(endpoint, options);
   }
 
   // PUT request
