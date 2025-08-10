@@ -5,6 +5,17 @@ interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   login: (phone: string, password: string) => Promise<boolean>;
+  register: (data: {
+    first_name: string;
+    last_name: string;
+    company_name?: string;
+    email?: string;
+    phone: string;
+    region: string;
+    user_type: 'INDIVIDUAL' | 'BUSINESS';
+    password: string;
+    confirm_password: string;
+  }) => Promise<boolean>;
   logout: () => Promise<void>;
   loading: boolean;
   // Role-based helper functions
@@ -96,6 +107,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     } catch (error) {
       console.error('Login failed:', error);
+      return false;
+    }
+  };
+
+  const register = async (data: {
+    first_name: string;
+    last_name: string;
+    company_name?: string;
+    email?: string;
+    phone: string;
+    region: string;
+    user_type: 'INDIVIDUAL' | 'BUSINESS';
+    password: string;
+    confirm_password: string;
+  }): Promise<boolean> => {
+    try {
+      const response = await authService.register(data);
+      if (response.success) {
+        setIsAuthenticated(true);
+        setUser(response.data.user);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Registration failed:', error);
       return false;
     }
   };
@@ -196,7 +232,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{ 
       isAuthenticated, 
       user, 
-      login, 
+      login,
+      register,
       logout, 
       loading,
       isAdmin,
@@ -212,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
