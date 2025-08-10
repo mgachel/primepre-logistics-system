@@ -150,8 +150,12 @@ export default function GhanaWarehouse() {
               </TableHeader>
               <TableBody>
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                    No goods data available. Start by importing from Excel or adding items manually.
+                  <TableCell colSpan={10} className="py-10">
+                    <div className="text-center space-y-2">
+                      <div className="text-muted-foreground">No goods yet. Add Goods or Import from Excel.</div>
+                      <div className="text-xs text-muted-foreground">You can download a sample CSV template to get started.</div>
+                      <a className="text-primary underline text-sm" href="#" onClick={(e)=>{e.preventDefault(); const csv = "SKU,Product,Category,Quantity,Unit Price\nSKU001,Sample,General,10,5"; const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='warehouse-template.csv'; a.click(); URL.revokeObjectURL(url);}}>Download sample CSV</a>
+                    </div>
                   </TableCell>
                 </TableRow>
               </TableBody>
