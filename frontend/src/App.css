@@ -40,3 +40,42 @@
 .read-the-docs {
   color: #888;
 }
+
+/* App-specific lightweight styles */
+.logistics-card {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+.logistics-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.logistics-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--background);
+  z-index: 5;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.logistics-table tbody td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.logistics-table tbody tr:hover {
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 500;
+}
