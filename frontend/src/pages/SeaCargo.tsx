@@ -125,7 +125,7 @@ export default function SeaCargo() {
         </div>
         <Button onClick={() => setShowNewSeaCargoDialog(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          Add Sea Cargo
+          Add Cargo
         </Button>
       </div>
 
