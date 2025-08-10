@@ -104,7 +104,7 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Monitor your logistics operations and key metrics</p>
+          <p className="text-muted-foreground mt-1">Monitor your logistics operations and key metrics • All times shown in your local time zone</p>
         </div>
         <div className="flex items-center space-x-3 mt-4 sm:mt-0">
           <Button variant="outline" size="sm">
@@ -120,10 +120,10 @@ export default function Dashboard() {
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard title="CBM in Warehouse" value={stats.cbmInWarehouse.toString()} icon={Package} />
-        <MetricCard title="Active Shipments" value={stats.activeShipments.toString()} icon={Truck} />
-        <MetricCard title="Total Cargo Items" value={stats.totalCargoItems.toString()} icon={TrendingUp} />
-        <MetricCard title="Active Clients" value={stats.activeClients.toString()} icon={Users} />
+  <MetricCard title="CBM in Warehouse" value={stats.cbmInWarehouse.toString()} icon={Package} change={{ value: "+2.1%", type: "increase" }} />
+  <MetricCard title="Active Shipments" value={stats.activeShipments.toString()} icon={Truck} change={{ value: "-1.3%", type: "decrease" }} />
+  <MetricCard title="Total Cargo Items" value={stats.totalCargoItems.toString()} icon={TrendingUp} change={{ value: "+0.4%", type: "increase" }} />
+  <MetricCard title="Active Clients" value={stats.activeClients.toString()} icon={Users} change={{ value: "0%", type: "neutral" }} />
       </div>
 
       {/* Content Grid */}
