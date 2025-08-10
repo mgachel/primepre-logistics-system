@@ -1,4 +1,4 @@
-import { Package, Truck, Users, Ship, Plane, TrendingUp, Calendar, Plus } from "lucide-react";
+import { Package, Truck, Users, Ship, Plane, TrendingUp, Calendar, Plus, Upload, RefreshCcw } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,9 @@ import { adminService, UserStats } from "@/services/adminService";
 import { apiClient } from "@/services/api";
 import type { ApiResponse, PaginatedResponse } from "@/services/api";
 import type { User } from "@/services/authService";
+import { DataTable, Column } from "@/components/data-table/DataTable";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
 
 type GoodsStats = { total_cbm?: number };
 type CargoContainer = {
@@ -30,33 +33,33 @@ export default function Dashboard() {
   const [showNewShipmentDialog, setShowNewShipmentDialog] = useState(false);
 
   // Admin/user stats
-  const { data: userStats } = useQuery({
+  const { data: userStats, isLoading: loadingUsers } = useQuery({
     queryKey: ["admin-user-stats"],
     queryFn: () => adminService.getUserStats(),
   });
 
   // Goods statistics (admin endpoints)
-  const { data: chinaStats } = useQuery({
+  const { data: chinaStats, isLoading: loadingChina } = useQuery({
     queryKey: ["goods-stats", "china"],
     queryFn: () => apiClient.get<GoodsStats>("/api/goods/china/statistics/"),
   });
-  const { data: ghanaStats } = useQuery({
+  const { data: ghanaStats, isLoading: loadingGhana } = useQuery({
     queryKey: ["goods-stats", "ghana"],
     queryFn: () => apiClient.get<GoodsStats>("/api/goods/ghana/statistics/"),
   });
 
   // Cargo dashboard (sea and air)
-  const { data: seaCargo } = useQuery({
+  const { data: seaCargo, isLoading: loadingSea } = useQuery({
     queryKey: ["cargo-dashboard", "sea"],
     queryFn: () => apiClient.get<CargoDashboard>("/api/cargo/dashboard/?cargo_type=sea"),
   });
-  const { data: airCargo } = useQuery({
+  const { data: airCargo, isLoading: loadingAir } = useQuery({
     queryKey: ["cargo-dashboard", "air"],
     queryFn: () => apiClient.get<CargoDashboard>("/api/cargo/dashboard/?cargo_type=air"),
   });
 
   // Recent users for activity (latest)
-  const { data: recentUsers } = useQuery<ApiResponse<PaginatedResponse<User>>>({
+  const { data: recentUsers, isLoading: loadingRecentUsers } = useQuery<ApiResponse<PaginatedResponse<User>>>({
     queryKey: ["recent-users"],
     queryFn: () => apiClient.get<PaginatedResponse<User>>("/api/auth/admin/users/?ordering=-date_joined"),
   });
@@ -98,6 +101,54 @@ export default function Dashboard() {
     }));
   }, [recentUsers]);
 
+  const loadingStats = loadingChina || loadingGhana || loadingSea || loadingAir || loadingUsers;
+  const loadingTransiting = loadingSea || loadingAir;
+
+  type Row = {
+    id: string;
+    type: "sea" | "air";
+    container: string;
+    client: string;
+    route: string;
+    eta: string | null;
+    status: "in-transit";
+  };
+
+  const rows: Row[] = transitingCargo.map(c => ({
+    id: c.id,
+    type: c.type,
+    container: c.container,
+    client: c.client,
+    route: c.route,
+    eta: c.eta || null,
+    status: "in-transit",
+  }));
+
+  const columns: Column<Row>[] = [
+    { id: "id", header: "Tracking ID", accessor: r => <span className="font-medium">{r.id}</span>, sort: (a,b)=>a.id.localeCompare(b.id), sticky: true },
+    { id: "type", header: "Type", accessor: r => (
+      <div className="flex items-center gap-2">
+        {r.type === "sea" ? <Ship className="h-4 w-4 text-primary" /> : <Plane className="h-4 w-4 text-primary" />}
+        <span className="capitalize">{r.type}</span>
+      </div>
+    ) },
+    { id: "container", header: "Container/AWB", accessor: r => <code className="text-xs">{r.container}</code>, sort: (a,b)=>a.container.localeCompare(b.container) },
+    { id: "client", header: "Client", accessor: r => r.client, sort: (a,b)=>a.client.localeCompare(b.client) },
+    { id: "route", header: "Route", accessor: r => r.route, sort: (a,b)=> (a.route||"").localeCompare(b.route||"") },
+    { id: "eta", header: "ETA", accessor: r => {
+      if (!r.eta) return <span className="text-sm text-muted-foreground">-</span>;
+      const d = new Date(r.eta);
+      const overdue = isOverdue(d);
+      return (
+        <div className="text-sm">
+          <div className={overdue ? "text-destructive font-medium" : undefined}>{formatDate(d)}</div>
+          <div className={"text-xs " + (overdue ? "text-destructive" : "text-muted-foreground")}>{overdue ? `${daysLate(d)} days late` : formatRelative(d)}</div>
+        </div>
+      );
+    }, sort: (a,b)=> (a.eta||"").localeCompare(b.eta||"") },
+    { id: "status", header: "Status", accessor: r => <StatusBadge status={r.status} /> },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -113,17 +164,28 @@ export default function Dashboard() {
           </Button>
           <Button size="sm" onClick={() => setShowNewShipmentDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            New Shipment
+            Add Cargo
           </Button>
         </div>
       </div>
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-  <MetricCard title="CBM in Warehouse" value={stats.cbmInWarehouse.toString()} icon={Package} change={{ value: "+2.1%", type: "increase" }} />
-  <MetricCard title="Active Shipments" value={stats.activeShipments.toString()} icon={Truck} change={{ value: "-1.3%", type: "decrease" }} />
-  <MetricCard title="Total Cargo Items" value={stats.totalCargoItems.toString()} icon={TrendingUp} change={{ value: "+0.4%", type: "increase" }} />
-  <MetricCard title="Active Clients" value={stats.activeClients.toString()} icon={Users} change={{ value: "0%", type: "neutral" }} />
+        {loadingStats ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="logistics-card p-6">
+              <Skeleton className="h-4 w-24 mb-4" />
+              <Skeleton className="h-8 w-32" />
+            </div>
+          ))
+        ) : (
+          <>
+            <MetricCard title="CBM in Warehouse" value={stats.cbmInWarehouse.toString()} icon={Package} change={{ value: "+2.1%", type: "increase" }} />
+            <MetricCard title="Active Shipments" value={stats.activeShipments.toString()} icon={Truck} change={{ value: "-1.3%", type: "decrease" }} />
+            <MetricCard title="Total Cargo Items" value={stats.totalCargoItems.toString()} icon={TrendingUp} change={{ value: "+0.4%", type: "increase" }} />
+            <MetricCard title="Active Clients" value={stats.activeClients.toString()} icon={Users} change={{ value: "0%", type: "neutral" }} />
+          </>
+        )}
       </div>
 
       {/* Content Grid */}
@@ -134,50 +196,40 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Cargo in Transit</h3>
               <Link to="/cargos/sea">
-                <Button variant="ghost" size="sm">
-                  View All
-                </Button>
+                <Button variant="ghost" size="sm">View All</Button>
               </Link>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="logistics-table">
-              <thead>
-                <tr>
-                  <th>Tracking ID</th>
-                  <th>Type</th>
-                  <th>Container/AWB</th>
-                  <th>Client</th>
-                  <th>Route</th>
-                  <th>ETA</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transitingCargo.map((cargo) => (
-                  <tr key={cargo.id} className="hover:bg-muted/50">
-                    <td className="font-medium">{cargo.id}</td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        {cargo.type === "sea" ? (
-                          <Ship className="h-4 w-4 text-blue-500" />
-                        ) : (
-                          <Plane className="h-4 w-4 text-green-500" />
-                        )}
-                        <span className="capitalize">{cargo.type}</span>
-                      </div>
-                    </td>
-                    <td className="font-mono text-sm">{cargo.container}</td>
-                    <td>{cargo.client}</td>
-                    <td>{cargo.route}</td>
-                    <td>{cargo.eta}</td>
-                    <td>
-                      <StatusBadge status={cargo.status} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-4">
+            <DataTable
+              id="dashboard-transit"
+              rows={rows}
+              columns={columns}
+              loading={loadingTransiting}
+              empty={
+                <div className="text-center space-y-2">
+                  <div className="text-muted-foreground">No cargo currently in transit.</div>
+                  <div className="flex items-center justify-center gap-2">
+                    <Button size="sm" onClick={() => setShowNewShipmentDialog(true)}>
+                      <Plus className="h-4 w-4 mr-1"/> Add Cargo
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.xlsx,.xls,.csv';
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (file) console.log('Uploading file:', file.name);
+                      };
+                      input.click();
+                    }}>
+                      <Upload className="h-4 w-4 mr-1"/> Import Excel
+                    </Button>
+                  </div>
+                  <a className="text-primary underline text-sm" href="#" onClick={(e)=>{e.preventDefault(); const csv = "Tracking ID,Type,Container/AWB,Client,Route,ETA\nAA-0001,Air,000-12345678,Sample Client,PVG-ACC,2025-08-15"; const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='transit-template.csv'; a.click(); URL.revokeObjectURL(url);}}>Download sample CSV</a>
+                </div>
+              }
+            />
           </div>
         </div>
 
