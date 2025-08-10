@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Plus, Filter, Ship, MapPin, Calendar, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { NewSeaCargoDialog } from "@/components/dialogs/NewSeaCargoDialog";
 import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
+import { cargoService, BackendCargoContainer, CargoDashboardStats } from "@/services/cargoService";
 
 interface SeaCargoItem {
   id: string;
@@ -23,56 +24,60 @@ interface SeaCargoItem {
   notes: string;
 }
 
+function mapStatus(status: BackendCargoContainer["status"]): "in-transit" | "delivered" | "pending" | "delayed" {
+  switch (status) {
+    case "in_transit":
+      return "in-transit";
+    case "delivered":
+      return "delivered";
+    case "pending":
+      return "pending";
+    case "demurrage":
+      return "delayed"; // closest visual
+    default:
+      return "pending";
+  }
+}
+
 export default function SeaCargo() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewSeaCargoDialog, setShowNewSeaCargoDialog] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState<SeaCargoItem | null>(null);
   const [showContainerDetails, setShowContainerDetails] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "in-transit" | "pending" | "delivered">("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [containers, setContainers] = useState<BackendCargoContainer[]>([]);
+  const [dashboard, setDashboard] = useState<CargoDashboardStats | null>(null);
 
-  // Static sea cargo data
-  const seaCargo = [
-    {
-      id: "SC001",
-      containerNo: "MSKU7823456",
-      client: "Global Traders Ltd",
-      origin: "Shanghai Port",
-      destination: "Tema Port",
-      loadingDate: "2024-07-15",
-      eta: "2024-08-15",
-      cbm: "67.5",
-      weight: "12,400 kg",
-      status: "in-transit" as const,
-      vessel: "MSC MEDITERRANEAN",
-      voyage: "24W28",
-      goods: "Electronics & Machinery",
-      notes: "Priority shipment for urgent delivery"
-    },
-    {
-      id: "SC002",
-      containerNo: "COSCO8901234",
-      client: "West African Supplies",
-      origin: "Shenzhen Port",
-      destination: "Tema Port",
-      loadingDate: "2024-07-20",
-      eta: "2024-08-20",
-      cbm: "45.2",
-      weight: "8,900 kg",
-      status: "in-transit" as const,
-      vessel: "COSCO SHIPPING",
-      voyage: "24W29",
-      goods: "Textiles & Furniture",
-      notes: "Samples for trade show"
-    }
-  ];
+  // Load containers and dashboard
+  useEffect(() => {
+    let ignore = false;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const statusParam = statusFilter === "all" ? undefined : (statusFilter === "in-transit" ? "in_transit" : statusFilter);
+        const [listRes, dashRes] = await Promise.all([
+          cargoService.getContainers({ cargo_type: "sea", search: searchTerm || undefined, status: statusParam }),
+          cargoService.getDashboard("sea"),
+        ]);
+        if (!ignore) {
+          setContainers(listRes.data?.results || []);
+          setDashboard(dashRes.data || null);
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Failed to load sea cargo';
+        if (!ignore) setError(msg);
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+    load();
+    return () => { ignore = true; };
+  }, [searchTerm, statusFilter]);
 
-  const filteredCargo = seaCargo.filter((cargo) => {
-    const matchesSearch = cargo.containerNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         cargo.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         cargo.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || cargo.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredCargo = useMemo(() => containers, [containers]);
 
   return (
     <div className="space-y-6">
@@ -93,13 +98,13 @@ export default function SeaCargo() {
         </Button>
       </div>
 
-      {/* Summary Cards */}
+  {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="logistics-card p-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm text-muted-foreground">Total Containers</div>
-              <div className="text-2xl font-semibold mt-1">{seaCargo.length}</div>
+      <div className="text-2xl font-semibold mt-1">{dashboard?.total_containers ?? 0}</div>
             </div>
             <Package className="h-8 w-8 text-primary/60" />
           </div>
@@ -108,7 +113,7 @@ export default function SeaCargo() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm text-muted-foreground">In Transit</div>
-              <div className="text-2xl font-semibold mt-1">{seaCargo.filter(c => c.status === "in-transit").length}</div>
+      <div className="text-2xl font-semibold mt-1">{dashboard?.containers_in_transit ?? 0}</div>
             </div>
             <Ship className="h-8 w-8 text-secondary/60" />
           </div>
@@ -117,7 +122,7 @@ export default function SeaCargo() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm text-muted-foreground">Total CBM</div>
-              <div className="text-2xl font-semibold mt-1">{seaCargo.reduce((sum, c) => sum + parseFloat(c.cbm), 0).toFixed(1)}</div>
+      <div className="text-2xl font-semibold mt-1">{filteredCargo.reduce((sum, c) => sum + (c.cbm || 0), 0).toFixed(1)}</div>
             </div>
             <Package className="h-8 w-8 text-accent/60" />
           </div>
@@ -206,7 +211,19 @@ export default function SeaCargo() {
               </tr>
             </thead>
             <tbody>
-              {filteredCargo.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 inline animate-spin mr-2" /> Loading...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={10} className="text-center py-8 text-destructive">
+                    {error}
+                  </td>
+                </tr>
+              ) : filteredCargo.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="text-center py-8 text-muted-foreground">
                     No sea cargo data available. Start by adding your first cargo shipment.
@@ -215,10 +232,27 @@ export default function SeaCargo() {
               ) : (
                 filteredCargo.map((cargo) => (
                   <tr 
-                    key={cargo.id}
+                    key={cargo.container_id}
                     className="hover:bg-muted/50 cursor-pointer transition-colors"
                     onClick={() => {
-                      setSelectedContainer(cargo);
+                      // Map backend container to dialog shape minimally
+                      const mapped: SeaCargoItem = {
+                        id: cargo.container_id,
+                        containerNo: cargo.container_id,
+                        client: `${cargo.total_clients} clients`,
+                        origin: cargo.route?.split(" to ")[0] || "-",
+                        destination: cargo.route?.split(" to ")[1] || "-",
+                        loadingDate: cargo.load_date,
+                        eta: cargo.eta,
+                        cbm: String(cargo.cbm ?? 0),
+                        weight: cargo.weight ? `${cargo.weight} kg` : "-",
+                        status: mapStatus(cargo.status),
+                        vessel: "-",
+                        voyage: "-",
+                        goods: "-",
+                        notes: "",
+                      };
+                      setSelectedContainer(mapped);
                       setShowContainerDetails(true);
                     }}
                   >
@@ -226,25 +260,25 @@ export default function SeaCargo() {
                       <input 
                         type="checkbox" 
                         className="rounded"
-                        aria-label={`Select ${cargo.id}`}
-                        title={`Select cargo ${cargo.id}`}
+                        aria-label={`Select ${cargo.container_id}`}
+                        title={`Select cargo ${cargo.container_id}`}
                       />
                     </td>
-                    <td className="font-medium">{cargo.id}</td>
-                    <td className="font-mono text-sm">{cargo.containerNo}</td>
-                    <td>{cargo.client}</td>
+                    <td className="font-medium">{cargo.container_id}</td>
+                    <td className="font-mono text-sm">{cargo.container_id}</td>
+                    <td>{cargo.total_clients} clients</td>
                     <td>
                       <div className="flex items-center text-sm">
                         <MapPin className="h-3 w-3 mr-1 text-muted-foreground" />
-                        {cargo.origin.split(' ')[0]} → {cargo.destination.split(' ')[0]}
+                        {(cargo.route?.split(' to ')[0] || '-')} → {(cargo.route?.split(' to ')[1] || '-')}
                       </div>
                     </td>
-                    <td className="text-sm">{cargo.vessel}</td>
-                    <td className="text-sm">{cargo.voyage}</td>
-                    <td className="text-sm">{cargo.loadingDate}</td>
+                    <td className="text-sm">-</td>
+                    <td className="text-sm">-</td>
+                    <td className="text-sm">{cargo.load_date}</td>
                     <td className="text-sm">{cargo.eta}</td>
                     <td>
-                      <StatusBadge status={cargo.status} />
+                      <StatusBadge status={mapStatus(cargo.status)} />
                     </td>
                   </tr>
                 ))
