@@ -9,6 +9,9 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { RoleBasedRoute } from "@/components/RoleBasedRoute";
 import Dashboard from "./pages/Dashboard";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import Clients from "./pages/Clients";
 import SeaCargo from "./pages/SeaCargo";
@@ -42,6 +45,10 @@ const App = () => (
           }}
         >
           <Routes>
+            {/* Public auth routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             {/* Dashboard - Role-based */}
             <Route
               path="/"
