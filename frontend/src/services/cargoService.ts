@@ -1,5 +1,60 @@
 import { apiClient, ApiResponse, PaginatedResponse } from './api';
 
+// Backend-aligned cargo models (from Django cargo app)
+export interface BackendCargoContainer {
+  container_id: string;
+  cargo_type: 'sea' | 'air';
+  weight?: number | null;
+  cbm?: number | null;
+  load_date: string;
+  eta: string;
+  unloading_date?: string | null;
+  route: string;
+  rates?: string | number | null;
+  stay_days: number;
+  delay_days: number;
+  status: 'pending' | 'in_transit' | 'delivered' | 'demurrage';
+  total_cargo_items: number;
+  total_clients: number;
+  is_demurrage: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BackendCargoItem {
+  id: string; // UUID
+  container: string; // container_id
+  client: number;
+  client_name?: string;
+  client_shipping_mark?: string;
+  tracking_id: string;
+  item_description: string;
+  quantity: number;
+  weight?: number | null;
+  cbm: number;
+  unit_value?: number | null;
+  total_value?: number | null;
+  status: 'pending' | 'in_transit' | 'delivered' | 'delayed';
+  delivered_date?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CargoListFilters {
+  cargo_type?: 'sea' | 'air';
+  status?: string;
+  search?: string;
+  page?: number;
+}
+
+export interface CargoItemFilters {
+  container_id?: string;
+  shipping_mark?: string;
+  status?: string;
+  client?: number;
+  page?: number;
+}
+
 export interface CargoContainer {
   id: number;
   container_number: string;
@@ -86,12 +141,12 @@ export interface CargoFilters {
 
 export interface CargoDashboardStats {
   total_containers: number;
+  containers_in_transit: number;
+  demurrage_containers: number;
+  delivered_containers: number;
+  pending_containers: number;
   total_cargo_items: number;
-  pending_items: number;
-  in_transit_items: number;
-  delivered_items: number;
-  total_weight: number;
-  total_cbm: number;
+  recent_containers: BackendCargoContainer[];
 }
 
 export interface BulkUploadResult {
@@ -102,6 +157,43 @@ export interface BulkUploadResult {
 }
 
 export const cargoService = {
+  // ================== BACKEND (DJANGO) CARGO ENDPOINTS ==================
+
+  // List cargo containers (admin/staff)
+  async getContainers(filters: CargoListFilters = {}): Promise<ApiResponse<PaginatedResponse<BackendCargoContainer>>> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value));
+      }
+    });
+    const endpoint = `/api/cargo/containers/?${params.toString()}`;
+    return apiClient.get<PaginatedResponse<BackendCargoContainer>>(endpoint);
+  },
+
+  // Get a single container by ID (container_id)
+  async getContainer(containerId: string): Promise<ApiResponse<BackendCargoContainer>> {
+    return apiClient.get<BackendCargoContainer>(`/api/cargo/containers/${encodeURIComponent(containerId)}/`);
+  },
+
+  // List cargo items
+  async getCargoItems(filters: CargoItemFilters = {}): Promise<ApiResponse<PaginatedResponse<BackendCargoItem>>> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value));
+      }
+    });
+    const endpoint = `/api/cargo/cargo-items/?${params.toString()}`;
+    return apiClient.get<PaginatedResponse<BackendCargoItem>>(endpoint);
+  },
+
+  // Admin cargo dashboard with optional cargo_type filter (sea/air)
+  async getDashboard(cargoType?: 'sea' | 'air'): Promise<ApiResponse<CargoDashboardStats>> {
+    const qs = cargoType ? `?cargo_type=${cargoType}` : '';
+    return apiClient.get<CargoDashboardStats>(`/api/cargo/dashboard/${qs}`);
+  },
+
   // ================== CUSTOMER ENDPOINTS ==================
   
   // Get customer's cargo containers
