@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { MoreHorizontal, Settings2 } from "lucide-react";
 import { persistGet, persistSet } from "@/lib/persist";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type Column<T> = {
   id: string;
@@ -50,10 +51,10 @@ export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, ro
   const header = (
     <TableHeader className="sticky top-0 bg-background z-10">
       <TableRow>
-        {columns.map((c, idx) => visible[c.id] !== false && (
+        {columns.map((c) => visible[c.id] !== false && (
           <TableHead
             key={c.id}
-            className={cn(idx < 2 && "sticky left-0 bg-background", c.align === "right" && "text-right")}
+            className={cn(c.sticky && "sticky left-0 bg-background", c.align === "right" && "text-right")}
             style={{ width: c.width }}
             onClick={() => {
               if (!c.sort) return;
@@ -110,9 +111,18 @@ export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, ro
           {header}
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={columns.length + 1} className="text-center py-8 text-muted-foreground">Loading…</TableCell>
-              </TableRow>
+              Array.from({ length: 3 }).map((_, rIdx) => (
+                <TableRow key={`sk-${rIdx}`}>
+                  {columns.map((c) => visible[c.id] !== false && (
+                    <TableCell key={`skc-${c.id}-${rIdx}`}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                  <TableCell className="text-right">
+                    <Skeleton className="h-4 w-10 ml-auto" />
+                  </TableCell>
+                </TableRow>
+              ))
             ) : (ordered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length + 1} className="text-center py-10">
@@ -121,8 +131,8 @@ export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, ro
               </TableRow>
             ) : ordered.map((row, rIdx) => (
               <TableRow key={rIdx} className={cn(onRowClick && "cursor-pointer")} onClick={() => onRowClick?.(row)}>
-                {columns.map((c, idx) => visible[c.id] !== false && (
-                  <TableCell key={c.id} className={cn(idx < 2 && "sticky left-0 bg-background", c.align === "right" && "text-right")}
+                {columns.map((c) => visible[c.id] !== false && (
+                  <TableCell key={c.id} className={cn(c.sticky && "sticky left-0 bg-background", c.align === "right" && "text-right")}
                     style={{ width: c.width }}>
                     <div className={cn(c.clickable && "underline")}>
                       {c.id === 'select' ? (
