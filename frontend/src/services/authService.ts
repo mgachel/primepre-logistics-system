@@ -228,4 +228,49 @@ export const authService = {
       };
     }
   },
+
+  // Request password reset by email
+  async requestPasswordReset(email: string): Promise<ApiResponse<{ detail?: string }>> {
+    try {
+      return await apiClient.post<{ detail?: string }>('/api/auth/password-reset/request/', { email });
+    } catch (error) {
+      console.error('Password reset request error:', error);
+      return {
+        success: false,
+        data: {} as { detail?: string },
+        message: 'Failed to request password reset',
+      };
+    }
+  },
+
+  // Verify password reset code
+  async verifyPasswordResetCode(email: string, code: string): Promise<ApiResponse<{ detail?: string }>> {
+    try {
+      return await apiClient.post<{ detail?: string }>('/api/auth/password-reset/verify/', { email, code });
+    } catch (error) {
+      console.error('Password reset verify error:', error);
+      return {
+        success: false,
+        data: {} as { detail?: string },
+        message: 'Failed to verify code',
+      };
+    }
+  },
+
+  // Confirm password reset with new password
+  async confirmPasswordReset(params: { email: string; code: string; new_password: string; confirm_password: string; }): Promise<ApiResponse<{ detail?: string }>> {
+    try {
+      return await apiClient.post<{ detail?: string }>(
+        '/api/auth/password-reset/confirm/',
+        params
+      );
+    } catch (error) {
+      console.error('Password reset confirm error:', error);
+      return {
+        success: false,
+        data: {} as { detail?: string },
+        message: 'Failed to reset password',
+      };
+    }
+  },
 }; 
