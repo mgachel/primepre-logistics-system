@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, Filter, Ship, MapPin, Calendar, Package, Loader2 } from "lucide-react";
+import { Search, Plus, Ship, MapPin, Calendar, Package, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { NewSeaCargoDialog } from "@/components/dialogs/NewSeaCargoDialog";
 import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
 import { cargoService, BackendCargoContainer, CargoDashboardStats } from "@/services/cargoService";
+import { DataTable, Column } from "@/components/data-table/DataTable";
+import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
 
 interface SeaCargoItem {
   id: string;
@@ -79,6 +81,37 @@ export default function SeaCargo() {
 
   const filteredCargo = useMemo(() => containers, [containers]);
 
+  const cols: Column<BackendCargoContainer>[] = [
+    {
+      id: "select",
+      header: <input aria-label="Select all" type="checkbox" className="rounded" />,
+      accessor: (c) => <input aria-label={`Select ${c.container_id}`} type="checkbox" className="rounded" />,
+      width: "48px",
+      sticky: true,
+    },
+    {
+      id: "tracking",
+      header: "Tracking ID",
+      accessor: (c) => <span className="font-medium">{c.container_id}</span>,
+      sort: (a, b) => a.container_id.localeCompare(b.container_id),
+      sticky: true,
+      clickable: true,
+    },
+    { id: "container", header: "Container No.", accessor: (c) => <code className="text-xs">{c.container_id}</code>, sort: (a,b)=>a.container_id.localeCompare(b.container_id) },
+    { id: "clients", header: "Clients", accessor: (c) => `${c.total_clients}`, sort: (a,b)=>(a.total_clients)-(b.total_clients), align: "right", width: "110px" },
+    { id: "route", header: "Route", accessor: (c) => (
+      <div className="flex items-center text-sm"><MapPin className="h-3 w-3 mr-1 text-muted-foreground" />{(c.route?.split(' to ')[0] || '-') + ' → ' + (c.route?.split(' to ')[1] || '-')}</div>
+    ), sort: (a,b)=> (a.route||'').localeCompare(b.route||'') },
+    { id: "load", header: "Loading Date", accessor: (c) => formatDate(c.load_date), sort: (a,b)=> (a.load_date||'').localeCompare(b.load_date||'') },
+    { id: "eta", header: "ETA", accessor: (c) => (
+      <div>
+        <div className={isOverdue(c.eta) ? "text-red-600 font-medium" : undefined}>{formatDate(c.eta)}</div>
+        <div className="text-xs text-muted-foreground">{isOverdue(c.eta) ? `${daysLate(c.eta)} days late` : (formatRelative(c.eta) || "")}</div>
+      </div>
+    ), sort: (a,b)=> (a.eta||'').localeCompare(b.eta||'') },
+    { id: "status", header: "Status", accessor: (c) => <StatusBadge status={mapStatus(c.status)} /> },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -88,9 +121,7 @@ export default function SeaCargo() {
             <Ship className="h-6 w-6 mr-3 text-primary" />
             Sea Cargo
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Track and manage all sea freight shipments
-          </p>
+          <p className="text-muted-foreground mt-1">Track and manage all sea freight shipments • All times shown in your local time zone</p>
         </div>
         <Button onClick={() => setShowNewSeaCargoDialog(true)}>
           <Plus className="h-4 w-4 mr-2" />
@@ -178,114 +209,49 @@ export default function SeaCargo() {
           >
             Delivered
           </Button>
+          <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }}>
+            <RefreshCcw className="h-4 w-4 mr-1" /> Reset filters
+          </Button>
         </div>
       </div>
 
       {/* Cargo Table */}
-      <div className="logistics-card">
-        <div className="p-6 border-b border-border">
-          <h3 className="text-lg font-semibold">Sea Cargo Management</h3>
-          <p className="text-muted-foreground">Track and manage all sea cargo shipments and their current status</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="logistics-table">
-            <thead>
-              <tr>
-                <th className="w-12">
-                  <input 
-                    type="checkbox" 
-                    className="rounded"
-                    aria-label="Select all sea cargo"
-                    title="Select all sea cargo"
-                  />
-                </th>
-                <th>Tracking ID</th>
-                <th>Container No.</th>
-                <th>Client</th>
-                <th>Route</th>
-                <th>Vessel</th>
-                <th>Voyage</th>
-                <th>Loading Date</th>
-                <th>ETA</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={10} className="text-center py-8 text-muted-foreground">
-                    <Loader2 className="h-5 w-5 inline animate-spin mr-2" /> Loading...
-                  </td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan={10} className="text-center py-8 text-destructive">
-                    {error}
-                  </td>
-                </tr>
-              ) : filteredCargo.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="text-center py-8 text-muted-foreground">
-                    No sea cargo data available. Start by adding your first cargo shipment.
-                  </td>
-                </tr>
-              ) : (
-                filteredCargo.map((cargo) => (
-                  <tr 
-                    key={cargo.container_id}
-                    className="hover:bg-muted/50 cursor-pointer transition-colors"
-                    onClick={() => {
-                      // Map backend container to dialog shape minimally
-                      const mapped: SeaCargoItem = {
-                        id: cargo.container_id,
-                        containerNo: cargo.container_id,
-                        client: `${cargo.total_clients} clients`,
-                        origin: cargo.route?.split(" to ")[0] || "-",
-                        destination: cargo.route?.split(" to ")[1] || "-",
-                        loadingDate: cargo.load_date,
-                        eta: cargo.eta,
-                        cbm: String(cargo.cbm ?? 0),
-                        weight: cargo.weight ? `${cargo.weight} kg` : "-",
-                        status: mapStatus(cargo.status),
-                        vessel: "-",
-                        voyage: "-",
-                        goods: "-",
-                        notes: "",
-                      };
-                      setSelectedContainer(mapped);
-                      setShowContainerDetails(true);
-                    }}
-                  >
-                    <td>
-                      <input 
-                        type="checkbox" 
-                        className="rounded"
-                        aria-label={`Select ${cargo.container_id}`}
-                        title={`Select cargo ${cargo.container_id}`}
-                      />
-                    </td>
-                    <td className="font-medium">{cargo.container_id}</td>
-                    <td className="font-mono text-sm">{cargo.container_id}</td>
-                    <td>{cargo.total_clients} clients</td>
-                    <td>
-                      <div className="flex items-center text-sm">
-                        <MapPin className="h-3 w-3 mr-1 text-muted-foreground" />
-                        {(cargo.route?.split(' to ')[0] || '-')} → {(cargo.route?.split(' to ')[1] || '-')}
-                      </div>
-                    </td>
-                    <td className="text-sm">-</td>
-                    <td className="text-sm">-</td>
-                    <td className="text-sm">{cargo.load_date}</td>
-                    <td className="text-sm">{cargo.eta}</td>
-                    <td>
-                      <StatusBadge status={mapStatus(cargo.status)} />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="logistics-card p-4">
+        <DataTable
+          id="sea-cargo"
+          rows={filteredCargo}
+          columns={cols}
+          loading={loading}
+          empty={<div className="text-muted-foreground">No sea cargo yet. Add Cargo or Import from Excel.</div>}
+          renderBulkBar={(rows) => (
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline">Update Status</Button>
+              <Button size="sm" variant="outline">Export</Button>
+              <Button size="sm" variant="outline">Assign</Button>
+              <Button size="sm" variant="destructive">Delete</Button>
+            </div>
+          )}
+          onRowClick={(cargo) => {
+            const mapped: SeaCargoItem = {
+              id: cargo.container_id,
+              containerNo: cargo.container_id,
+              client: `${cargo.total_clients} clients`,
+              origin: cargo.route?.split(" to ")[0] || "-",
+              destination: cargo.route?.split(" to ")[1] || "-",
+              loadingDate: cargo.load_date,
+              eta: cargo.eta,
+              cbm: String(cargo.cbm ?? 0),
+              weight: cargo.weight ? `${cargo.weight} kg` : "-",
+              status: mapStatus(cargo.status),
+              vessel: "-",
+              voyage: "-",
+              goods: "-",
+              notes: "",
+            };
+            setSelectedContainer(mapped);
+            setShowContainerDetails(true);
+          }}
+        />
       </div>
 
       <NewSeaCargoDialog 
