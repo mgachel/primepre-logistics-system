@@ -188,7 +188,7 @@ export default function AirCargo() {
           </Button>
           <Button size="sm" onClick={() => setShowNewAirCargoDialog(true)}>
             <Plus className="h-4 w-4" />
-            Quick Create
+            Add Cargo
           </Button>
         </div>
       </div>
