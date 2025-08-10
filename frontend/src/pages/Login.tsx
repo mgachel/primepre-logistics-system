@@ -18,6 +18,7 @@ import {
   Package,
   ArrowRight
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Login() {
   const [phone, setPhone] = useState('');
@@ -187,6 +188,14 @@ export default function Login() {
               </form>
             </CardContent>
           </Card>
+
+          <div className="flex items-center justify-between text-sm">
+            <Link to="/forgot-password" className="text-primary hover:underline">Forgot password?</Link>
+            <div>
+              Don't have an account?{' '}
+              <Link to="/signup" className="text-primary hover:underline">Sign up</Link>
+            </div>
+          </div>
 
           {/* Demo Credentials
           <Card className="border-dashed">
