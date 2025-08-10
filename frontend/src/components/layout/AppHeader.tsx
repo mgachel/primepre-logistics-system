@@ -9,8 +9,8 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Bell, User, ChevronDown, Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Bell, User, ChevronDown } from 'lucide-react';
+import { GlobalSearch } from '@/components/GlobalSearch';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -87,13 +87,10 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
         )}
 
         {/* Search */}
-        <div className={cn("flex-1", isMobile ? "ml-4 max-w-xs" : "max-w-md")}>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={isMobile ? "Search..." : "Search cargo, clients, or tracking numbers..."}
-              className="pl-10 bg-muted/50 border-0 focus-visible:ring-1"
-            />
+        <div className={cn("flex-1", isMobile ? "ml-2" : "max-w-md")}> 
+          <div className="flex items-center">
+            <GlobalSearch />
+            <span className="ml-2 hidden md:inline text-xs text-muted-foreground">Search tracking IDs, clients, containers, routes</span>
           </div>
         </div>
 
@@ -125,7 +122,7 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
                   <User className="h-4 w-4 text-primary-foreground" />
                 </div>
                 <div className="hidden md:block text-left">
-                  <div className="text-sm font-medium">{user?.name || 'User'}</div>
+                  <div className="text-sm font-medium">{user?.full_name || `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || 'User'}</div>
                   <div className="text-xs text-muted-foreground">{user?.email || 'user@example.com'}</div>
                 </div>
                 <ChevronDown className="h-4 w-4" />
