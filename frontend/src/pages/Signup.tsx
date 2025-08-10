@@ -18,7 +18,7 @@ export default function Signup() {
     company_name: '',
     email: '',
     phone: '',
-    region: '',
+    region: 'Accra',
     user_type: 'INDIVIDUAL' as 'INDIVIDUAL' | 'BUSINESS',
     password: '',
     confirm_password: '',
@@ -136,7 +136,17 @@ export default function Signup() {
 
                 <div className="space-y-2">
                   <Label htmlFor="region">Region</Label>
-                  <Input id="region" value={form.region} onChange={onChange} required className="h-11" placeholder="e.g., Ghana" />
+                  <select
+                    id="region"
+                    aria-label="Region"
+                    value={form.region}
+                    onChange={onChange}
+                    className="w-full h-11 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="Accra">Accra</option>
+                    <option value="Kumasi">Kumasi</option>
+                    <option value="Tamale">Tamale</option>
+                  </select>
                 </div>
 
                 <div className="space-y-2">
