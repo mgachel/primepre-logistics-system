@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, Plus, Filter, MoreHorizontal, Eye, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,69 +10,54 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NewClientDialog } from "@/components/dialogs/NewClientDialog";
+import { useQuery } from "@tanstack/react-query";
+import { adminService } from "@/services/adminService";
+import type { User } from "@/services/authService";
 
 export default function Clients() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
   const [showNewClientDialog, setShowNewClientDialog] = useState(false);
 
-  // Static clients data
-  const clients = [
-    {
-      id: "CL001",
-      name: "Global Traders Ltd",
-      email: "contact@globaltraders.com",
-      phone: "+233 24 123 4567",
-      totalShipments: 24,
-      activeShipments: 3,
-      totalValue: "$45,600",
-      status: "active" as const,
-      lastActivity: "2024-08-01",
-      location: "Accra, Ghana",
-    },
-    {
-      id: "CL002", 
-      name: "Express Imports Co.",
-      email: "info@expressimports.gh",
-      phone: "+233 20 987 6543",
-      totalShipments: 18,
-      activeShipments: 1,
-      totalValue: "$32,400",
-      status: "active" as const,
-      lastActivity: "2024-07-30",
-      location: "Kumasi, Ghana",
-    },
-    {
-      id: "CL003",
-      name: "West African Supplies",
-      email: "admin@wasupplies.com", 
-      phone: "+233 26 555 7890",
-      totalShipments: 42,
-      activeShipments: 5,
-      totalValue: "$78,900",
-      status: "active" as const,
-      lastActivity: "2024-08-01",
-      location: "Tema, Ghana",
-    },
-    {
-      id: "CL004",
-      name: "Modern Electronics",
-      email: "sales@modernelec.gh",
-      phone: "+233 23 444 1122",
-      totalShipments: 6,
-      activeShipments: 0,
-      totalValue: "$15,200",
-      status: "inactive" as const,
-      lastActivity: "2024-06-15",
-      location: "Takoradi, Ghana",
-    },
-  ];
+  const queryParams = useMemo(() => {
+    const params: Record<string, string | boolean> = {
+      user_role: 'CUSTOMER',
+      ordering: '-date_joined',
+    };
+    if (searchTerm) params.search = searchTerm;
+    if (filterStatus !== 'all') params.is_active = filterStatus === 'active';
+    return params;
+  }, [searchTerm, filterStatus]);
 
-  const filteredClients = clients.filter((client) => {
-    const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         client.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === "all" || client.status === filterStatus;
-    return matchesSearch && matchesFilter;
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['clients', queryParams],
+    queryFn: async () => {
+      const search = new URLSearchParams();
+      Object.entries(queryParams).forEach(([k, v]) => search.append(k, String(v)));
+      return adminService.getAllUsers(Object.fromEntries(search.entries()));
+    },
+  });
+
+  const clients = ((data?.data?.results || []) as User[]).map((u) => {
+    const name = u.full_name || `${u.first_name} ${u.last_name}`.trim();
+    const lastActivity = u.date_joined ? new Date(u.date_joined).toISOString().slice(0, 10) : '-';
+    // Placeholders until shipment aggregation is wired
+    const totalShipments = (u as unknown as { total_shipments?: number })?.total_shipments ?? 0;
+    const activeShipments = (u as unknown as { active_shipments?: number })?.active_shipments ?? 0;
+    const totalValueNum = (u as unknown as { total_value?: number })?.total_value;
+    const totalValue = typeof totalValueNum === 'number' ? `$${totalValueNum}` : '-';
+    return {
+      id: u.id,
+      name,
+      email: u.email || '-',
+      phone: u.phone || '-',
+      region: u.region || '-',
+      status: u.is_active ? ('active' as const) : ('inactive' as const),
+      lastActivity,
+      totalShipments,
+      activeShipments,
+      totalValue,
+    };
   });
 
   return (
@@ -143,7 +128,7 @@ export default function Clients() {
                 </th>
                 <th>Client</th>
                 <th>Contact</th>
-                <th>Location</th>
+                <th>Region</th>
                 <th>Shipments</th>
                 <th>Total Value</th>
                 <th>Status</th>
@@ -152,14 +137,26 @@ export default function Clients() {
               </tr>
             </thead>
             <tbody>
-              {filteredClients.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-8 text-muted-foreground">
+                    Loading clients...
+                  </td>
+                </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-8 text-destructive">
+                    Failed to load clients.
+                  </td>
+                </tr>
+              ) : clients.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="text-center py-8 text-muted-foreground">
                     No clients found matching your criteria.
                   </td>
                 </tr>
               ) : (
-                filteredClients.map((client) => (
+                clients.map((client) => (
                   <tr key={client.id} className="hover:bg-muted/50">
                     <td>
                       <input 
@@ -179,7 +176,7 @@ export default function Clients() {
                       <div className="text-sm">{client.phone}</div>
                     </td>
                     <td>
-                      <div className="text-sm">{client.location}</div>
+                      <div className="text-sm">{client.region}</div>
                     </td>
                     <td>
                       <div>
