@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 interface StatusBadgeProps {
-  status: "active" | "pending" | "inactive" | "delivered" | "in-transit" | "delayed" | "completed" | "demurrage" | "risk";
+  status: "active" | "pending" | "inactive" | "delivered" | "in-transit" | "delayed" | "completed" | "demurrage" | "risk" | "error" | "failed";
   className?: string;
 }
 
@@ -13,8 +13,10 @@ const statusConfig: Record<StatusBadgeProps["status"], { label: string; classNam
   inactive: { label: "Inactive", className: "bg-slate-100 text-slate-700" },
   "in-transit": { label: "In Transit", className: "bg-blue-100 text-blue-700" },
   delayed: { label: "Delayed", className: "bg-yellow-100 text-yellow-800" },
-  demurrage: { label: "Demurrage", className: "bg-orange-100 text-orange-800" },
-  risk: { label: "Risk", className: "bg-red-100 text-red-800" },
+  demurrage: { label: "Demurrage", className: "bg-yellow-100 text-yellow-800" },
+  risk: { label: "Risk", className: "bg-yellow-100 text-yellow-800" },
+  error: { label: "Error", className: "bg-red-100 text-red-800" },
+  failed: { label: "Failed", className: "bg-red-100 text-red-800" },
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
