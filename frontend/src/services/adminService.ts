@@ -88,33 +88,33 @@ export const adminService = {
       }
     });
     
-    const endpoint = `/api/auth/admin-users/?${params.toString()}`;
+  const endpoint = `/api/auth/admin/users/?user_role=ADMIN&${params.toString()}`;
     return apiClient.get<PaginatedResponse<AdminUser>>(endpoint);
   },
 
   // Get admin user by ID
   async getAdminUserById(id: number): Promise<ApiResponse<AdminUser>> {
-    return apiClient.get<AdminUser>(`/api/auth/admin-users/${id}/`);
+  return apiClient.get<AdminUser>(`/api/auth/admin/users/${id}/`);
   },
 
   // Create new admin user (requires SUPER_ADMIN or MANAGER permissions)
   async createAdminUser(data: CreateAdminRequest): Promise<ApiResponse<AdminUser>> {
-    return apiClient.post<AdminUser>('/api/auth/admin-users/', data);
+  return apiClient.post<AdminUser>('/api/auth/admin/users/', data);
   },
 
   // Update admin user (requires appropriate permissions)
   async updateAdminUser(id: number, data: UpdateAdminRequest): Promise<ApiResponse<AdminUser>> {
-    return apiClient.put<AdminUser>(`/api/auth/admin-users/${id}/`, data);
+  return apiClient.put<AdminUser>(`/api/auth/admin/users/${id}/`, data);
   },
 
   // Delete admin user (requires SUPER_ADMIN permissions)
   async deleteAdminUser(id: number): Promise<ApiResponse<void>> {
-    return apiClient.delete<void>(`/api/auth/admin-users/${id}/`);
+  return apiClient.delete<void>(`/api/auth/admin/users/${id}/`);
   },
 
   // Get user statistics (admin only)
   async getUserStats(): Promise<ApiResponse<UserStats>> {
-    return apiClient.get<UserStats>('/api/auth/user-stats/');
+  return apiClient.get<UserStats>('/api/auth/admin/users/statistics/');
   },
 
   // Get current user profile
@@ -145,7 +145,7 @@ export const adminService = {
       }
     });
     
-    const endpoint = `/api/auth/users/?${params.toString()}`;
+  const endpoint = `/api/auth/admin/users/?${params.toString()}`;
     return apiClient.get<PaginatedResponse<User>>(endpoint);
   },
 
