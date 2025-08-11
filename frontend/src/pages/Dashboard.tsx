@@ -4,7 +4,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { NewShipmentDialog } from "@/components/dialogs/NewShipmentDialog";
+import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
 import { useQuery } from "@tanstack/react-query";
 import { adminService, UserStats } from "@/services/adminService";
 import { apiClient } from "@/services/api";
@@ -30,7 +30,7 @@ type CargoDashboard = {
 // --
 
 export default function Dashboard() {
-  const [showNewShipmentDialog, setShowNewShipmentDialog] = useState(false);
+  const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
 
   // Admin/user stats
   const { data: userStats, isLoading: loadingUsers } = useQuery({
@@ -162,7 +162,7 @@ export default function Dashboard() {
             <Calendar className="h-4 w-4 mr-2" />
             Last 30 days
           </Button>
-          <Button size="sm" onClick={() => setShowNewShipmentDialog(true)}>
+          <Button size="sm" onClick={() => setShowNewCargoDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Cargo
           </Button>
@@ -210,7 +210,7 @@ export default function Dashboard() {
                 <div className="text-center space-y-2">
                   <div className="text-muted-foreground">No cargo currently in transit.</div>
                   <div className="flex items-center justify-center gap-2">
-                    <Button size="sm" onClick={() => setShowNewShipmentDialog(true)}>
+                    <Button size="sm" onClick={() => setShowNewCargoDialog(true)}>
                       <Plus className="h-4 w-4 mr-1"/> Add Cargo
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => {
@@ -260,7 +260,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <NewShipmentDialog open={showNewShipmentDialog} onOpenChange={setShowNewShipmentDialog} />
+  <NewCargoContainerDialog open={showNewCargoDialog} onOpenChange={setShowNewCargoDialog} />
     </div>
   );
 }
