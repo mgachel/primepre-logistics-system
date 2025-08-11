@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { NewAirCargoDialog } from "@/components/dialogs/NewAirCargoDialog";
+import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
 import { useNavigate } from "react-router-dom";
 import { cargoService, BackendCargoContainer, BackendCargoItem, CargoDashboardStats } from "@/services/cargoService";
 import { DataTable, Column } from "@/components/data-table/DataTable";
@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
 import { persistGet, persistSet } from "@/lib/persist";
+import { useToast } from "@/hooks/use-toast";
 
 interface AirCargoItem {
   id: string;
@@ -32,8 +33,9 @@ interface AirCargoItem {
 }
 
 export default function AirCargo() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("air-cargos");
-  const [showNewAirCargoDialog, setShowNewAirCargoDialog] = useState(false);
+  const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -186,7 +188,7 @@ export default function AirCargo() {
             <Upload className="h-4 w-4" />
             Import Excel
           </Button>
-          <Button size="sm" onClick={() => setShowNewAirCargoDialog(true)}>
+          <Button size="sm" onClick={() => setShowNewCargoDialog(true)}>
             <Plus className="h-4 w-4" />
             Add Cargo
           </Button>
@@ -281,7 +283,7 @@ export default function AirCargo() {
                   <Upload className="h-4 w-4" />
                   Import Excel
                 </Button>
-                <Button size="sm" onClick={() => setShowNewAirCargoDialog(true)}>
+                <Button size="sm" onClick={() => setShowNewCargoDialog(true)}>
                   <Plus className="h-4 w-4" />
                   Add Cargo
                 </Button>
@@ -303,9 +305,27 @@ export default function AirCargo() {
               )}
               rowActions={(row) => (
                 <>
-                  <DropdownMenuItem><Eye className="h-4 w-4 mr-2"/>View</DropdownMenuItem>
+                  <DropdownMenuItem onClick={async ()=>{
+                    const next: BackendCargoItem['status'] = row._raw.status === 'pending' ? 'in_transit' : (row._raw.status === 'in_transit' ? 'delivered' : 'pending');
+                    try {
+                      await cargoService.updateBackendCargoItem(row._raw.id, { status: next });
+                      setItems((prev)=> prev.map(i=> i.id===row._raw.id ? { ...i, status: next } : i));
+                      toast({ title: 'Status updated', description: `${row.tracking} → ${next.replace('_',' ')}` });
+                    } catch (e: unknown) {
+                      toast({ title: 'Update failed', description: e instanceof Error ? e.message : 'Unable to update', variant: 'destructive' });
+                    }
+                  }}><Settings className="h-4 w-4 mr-2"/>Update Status</DropdownMenuItem>
                   <DropdownMenuItem><Edit className="h-4 w-4 mr-2"/>Edit</DropdownMenuItem>
-                  <DropdownMenuItem><FileDown className="h-4 w-4 mr-2"/>Export</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={async ()=>{
+                    if (!confirm(`Delete cargo item ${row.tracking}?`)) return;
+                    try {
+                      await cargoService.deleteBackendCargoItem(row._raw.id);
+                      setItems((prev)=> prev.filter(i=> i.id!==row._raw.id));
+                      toast({ title: 'Deleted', description: `${row.tracking} removed.` });
+                    } catch (e: unknown) {
+                      toast({ title: 'Delete failed', description: e instanceof Error ? e.message : 'Unable to delete', variant: 'destructive' });
+                    }
+                  }}><Trash2 className="h-4 w-4 mr-2"/>Delete</DropdownMenuItem>
                 </>
               )}
             />
@@ -323,10 +343,7 @@ export default function AirCargo() {
         </TabsContent>
       </Tabs>
 
-      <NewAirCargoDialog 
-        open={showNewAirCargoDialog} 
-        onOpenChange={setShowNewAirCargoDialog} 
-      />
+  <NewCargoContainerDialog open={showNewCargoDialog} onOpenChange={setShowNewCargoDialog} defaultType="air" />
     </div>
   );
 }
