@@ -50,6 +50,19 @@ class ApiClient {
       };
     }
 
+    // helper to safely parse response body
+  const parseResponse = async (resp: Response): Promise<unknown> => {
+      if (resp.status === 204 || resp.status === 205) return null;
+      const contentType = resp.headers.get('content-type') || '';
+      // Read text first to gracefully handle empty bodies
+      const text = await resp.text();
+      if (!text) return null;
+      if (contentType.includes('application/json')) {
+        try { return JSON.parse(text); } catch { return null; }
+      }
+      return text;
+    };
+
     try {
       const response = await fetch(url, config);
       
@@ -79,9 +92,9 @@ class ApiClient {
               
               const retryResponse = await fetch(url, config);
               if (retryResponse.ok) {
-                const retryData = await retryResponse.json();
+                const retryData = await parseResponse(retryResponse);
                 return {
-                  data: retryData,
+                  data: retryData as T,
                   success: true,
                   message: 'Success'
                 };
@@ -109,11 +122,11 @@ class ApiClient {
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
       
-      const data = await response.json();
+  const data = await parseResponse(response);
       
       // Django REST Framework returns data directly, wrap it in our ApiResponse format
       return {
-        data,
+        data: (data as T),
         success: true,
         message: 'Success'
       };
