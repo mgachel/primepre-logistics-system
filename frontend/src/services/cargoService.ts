@@ -157,6 +157,66 @@ export interface BulkUploadResult {
 }
 
 export const cargoService = {
+  // ================== BACKEND-ALIGNED (DJANGO) MUTATIONS ==================
+
+  // Create a new CargoContainer (matches CargoContainerCreateSerializer)
+  async createBackendContainer(data: {
+    container_id: string;
+    cargo_type: 'sea' | 'air';
+    weight?: number | null;
+    cbm?: number | null;
+    load_date: string; // YYYY-MM-DD
+    eta: string; // YYYY-MM-DD
+    route: string; // e.g. "China to Ghana"
+    rates?: number | string | null;
+    stay_days?: number;
+    delay_days?: number;
+    status?: 'pending' | 'in_transit' | 'delivered' | 'demurrage';
+  }): Promise<ApiResponse<BackendCargoContainer>> {
+    return apiClient.post<BackendCargoContainer>('/api/cargo/containers/', data);
+  },
+
+  // Update an existing CargoContainer (primary key is container_id)
+  async updateBackendContainer(containerId: string, data: Partial<{
+    weight: number | null;
+    cbm: number | null;
+    load_date: string;
+    eta: string;
+    route: string;
+    rates: number | string | null;
+    stay_days: number;
+    delay_days: number;
+    status: 'pending' | 'in_transit' | 'delivered' | 'demurrage';
+  }>): Promise<ApiResponse<BackendCargoContainer>> {
+    return apiClient.put<BackendCargoContainer>(`/api/cargo/containers/${encodeURIComponent(containerId)}/`, data);
+  },
+
+  // Delete a CargoContainer
+  async deleteBackendContainer(containerId: string): Promise<ApiResponse<void>> {
+    return apiClient.delete<void>(`/api/cargo/containers/${encodeURIComponent(containerId)}/`);
+  },
+
+  // Update a CargoItem (backend-aligned)
+  async updateBackendCargoItem(itemId: string, data: Partial<{
+    container: string; // container_id
+    client: number;
+    tracking_id: string;
+    item_description: string;
+    quantity: number;
+    weight: number | null;
+    cbm: number;
+    unit_value: number | null;
+    total_value: number | null;
+    status: 'pending' | 'in_transit' | 'delivered' | 'delayed';
+    delivered_date: string | null; // YYYY-MM-DD
+  }>): Promise<ApiResponse<BackendCargoItem>> {
+    return apiClient.put<BackendCargoItem>(`/api/cargo/cargo-items/${encodeURIComponent(itemId)}/`, data);
+  },
+
+  // Delete a CargoItem
+  async deleteBackendCargoItem(itemId: string): Promise<ApiResponse<void>> {
+    return apiClient.delete<void>(`/api/cargo/cargo-items/${encodeURIComponent(itemId)}/`);
+  },
   // ================== BACKEND (DJANGO) CARGO ENDPOINTS ==================
 
   // List cargo containers (admin/staff)
