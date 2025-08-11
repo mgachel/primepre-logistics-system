@@ -13,7 +13,7 @@ export interface WarehouseItem {
   cbm: number;
   weight: number;
   supplier_name?: string;
-  status: 'PENDING' | 'READY_FOR_SHIPPING' | 'SHIPPED' | 'FLAGGED' | 'CANCELLED';
+  status: 'PENDING' | 'READY_FOR_SHIPPING' | 'SHIPPED' | 'READY_FOR_DELIVERY' | 'DELIVERED' | 'FLAGGED' | 'CANCELLED';
   warehouse_location?: string;
   date_received?: string;
   notes?: string;
@@ -43,7 +43,7 @@ export interface UpdateWarehouseItemRequest {
   weight?: number;
   supplier_name?: string;
   warehouse_location?: string;
-  status?: 'PENDING' | 'READY_FOR_SHIPPING' | 'SHIPPED' | 'FLAGGED' | 'CANCELLED';
+  status?: 'PENDING' | 'READY_FOR_SHIPPING' | 'SHIPPED' | 'READY_FOR_DELIVERY' | 'DELIVERED' | 'FLAGGED' | 'CANCELLED';
   supply_tracking?: string;
   item_id?: string;
   notes?: string;
@@ -207,6 +207,18 @@ export const warehouseService = {
     return apiClient.delete<void>(`/api/goods/ghana/${id}/`);
   },
 
+  // Admin list Ghana warehouse items
+  async getAdminGhanaItems(filters: Partial<{ status: string; search: string; ordering: string; page: number; date_from: string; date_to: string; location: string; supplier_name: string; }>): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([k,v])=>{ if (v!==undefined && v!==null && v!=='') params.append(k, String(v)); });
+    return apiClient.get<PaginatedResponse<WarehouseItem>>(`/api/goods/ghana/?${params.toString()}`);
+  },
+
+  // Update Ghana item status via custom action
+  async updateGhanaItemStatus(id: number, status: 'PENDING' | 'READY_FOR_DELIVERY' | 'FLAGGED' | 'DELIVERED' | 'CANCELLED', reason?: string): Promise<ApiResponse<WarehouseItem>> {
+    return apiClient.post<WarehouseItem>(`/api/goods/ghana/${id}/update_status/`, { status, reason });
+  },
+
   // Bulk status update (admin/staff only)
   async bulkUpdateChinaStatus(ids: number[], status: string): Promise<ApiResponse<void>> {
     return apiClient.post<void>('/api/goods/china/bulk_status_update/', { ids, status });
@@ -217,20 +229,16 @@ export const warehouseService = {
   },
 
   // Excel upload (admin/staff only)
-  async uploadChinaExcel(file: File): Promise<ApiResponse<any>> {
+  async uploadChinaExcel(file: File): Promise<ApiResponse<unknown>> {
     const formData = new FormData();
     formData.append('file', file);
-    return apiClient.post<any>('/api/goods/china/upload_excel/', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+  return apiClient.post<unknown>('/api/goods/china/upload_excel/', formData);
   },
 
-  async uploadGhanaExcel(file: File): Promise<ApiResponse<any>> {
+  async uploadGhanaExcel(file: File): Promise<ApiResponse<unknown>> {
     const formData = new FormData();
     formData.append('file', file);
-    return apiClient.post<any>('/api/goods/ghana/upload_excel/', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+  return apiClient.post<unknown>('/api/goods/ghana/upload_excel/', formData);
   },
 
   // Download templates (admin/staff only)
@@ -252,50 +260,4 @@ export const warehouseService = {
     return response.blob();
   }
 };
-
-  // Get Ghana warehouse items
-  async getGhanaWarehouseItems(filters: Omit<WarehouseFilters, 'warehouse'> = {}): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
-    return this.getWarehouseItems({ ...filters, warehouse: 'ghana' });
-  },
-
-  // Get warehouse statistics
-  async getWarehouseStats(warehouse?: 'china' | 'ghana'): Promise<ApiResponse<WarehouseStats>> {
-    const params = warehouse ? `?warehouse=${warehouse}` : '';
-    return apiClient.get<WarehouseStats>(`/warehouse/stats${params}`);
-  },
-
-  // Import warehouse data
-  async importWarehouseData(file: File, warehouse: 'china' | 'ghana'): Promise<ApiResponse<{ imported: number; errors: number }>> {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('warehouse', warehouse);
-    
-    return apiClient.post<{ imported: number; errors: number }>('/warehouse/import', formData);
-  },
-
-  // Export warehouse data
-  async exportWarehouseData(warehouse: 'china' | 'ghana', format: 'csv' | 'excel' = 'csv'): Promise<Blob> {
-    const response = await fetch(`${apiClient['baseURL']}/warehouse/export?warehouse=${warehouse}&format=${format}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('Export failed');
-    }
-    
-    return response.blob();
-  },
-
-  // Update stock quantity
-  async updateStockQuantity(id: string, quantity: number): Promise<ApiResponse<WarehouseItem>> {
-    return apiClient.patch<WarehouseItem>(`/warehouse/items/${id}/stock`, { quantity });
-  },
-
-  // Get low stock alerts
-  async getLowStockAlerts(warehouse?: 'china' | 'ghana'): Promise<ApiResponse<WarehouseItem[]>> {
-    const params = warehouse ? `?warehouse=${warehouse}` : '';
-    return apiClient.get<WarehouseItem[]>(`/warehouse/alerts/low-stock${params}`);
-  },
-}; 
+ 
