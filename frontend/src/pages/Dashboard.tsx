@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminService, UserStats } from "@/services/adminService";
 import { apiClient } from "@/services/api";
 import type { ApiResponse, PaginatedResponse } from "@/services/api";
@@ -13,6 +13,7 @@ import type { User } from "@/services/authService";
 import { DataTable, Column } from "@/components/data-table/DataTable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
+import { cargoService, BackendCargoContainer } from "@/services/cargoService";
 
 type GoodsStats = { total_cbm?: number };
 type CargoContainer = {
@@ -31,6 +32,7 @@ type CargoDashboard = {
 
 export default function Dashboard() {
   const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
+  const queryClient = useQueryClient();
 
   // Admin/user stats
   const { data: userStats, isLoading: loadingUsers } = useQuery({
@@ -48,14 +50,20 @@ export default function Dashboard() {
     queryFn: () => apiClient.get<GoodsStats>("/api/goods/ghana/statistics/"),
   });
 
-  // Cargo dashboard (sea and air)
-  const { data: seaCargo, isLoading: loadingSea } = useQuery({
-    queryKey: ["cargo-dashboard", "sea"],
-    queryFn: () => apiClient.get<CargoDashboard>("/api/cargo/dashboard/?cargo_type=sea"),
+  // In-transit containers (sea and air)
+  const { data: seaInTransit, isLoading: loadingSea } = useQuery({
+    queryKey: ["containers", "sea", "in_transit"],
+    queryFn: () => cargoService.getContainers({ cargo_type: "sea", status: "in_transit" }),
   });
-  const { data: airCargo, isLoading: loadingAir } = useQuery({
-    queryKey: ["cargo-dashboard", "air"],
-    queryFn: () => apiClient.get<CargoDashboard>("/api/cargo/dashboard/?cargo_type=air"),
+  const { data: airInTransit, isLoading: loadingAir } = useQuery({
+    queryKey: ["containers", "air", "in_transit"],
+    queryFn: () => cargoService.getContainers({ cargo_type: "air", status: "in_transit" }),
+  });
+
+  // Cargo items in transit count
+  const { data: itemsInTransit } = useQuery({
+    queryKey: ["cargo-items", "in_transit", "count"],
+    queryFn: () => cargoService.getCargoItems({ status: "in_transit" }),
   });
 
   // Recent users for activity (latest)
@@ -66,30 +74,25 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     const cbmInWarehouse = (chinaStats?.data?.total_cbm || 0) + (ghanaStats?.data?.total_cbm || 0);
-    const activeShipments = (seaCargo?.data?.containers_in_transit || 0) + (airCargo?.data?.containers_in_transit || 0);
-    const totalCargoItems = (seaCargo?.data?.total_cargo_items || 0) + (airCargo?.data?.total_cargo_items || 0);
+    const activeShipments = (seaInTransit?.data?.count || 0) + (airInTransit?.data?.count || 0);
+    const totalCargoItems = itemsInTransit?.data?.count || 0; // only items currently in transit
   const activeClients = (userStats as ApiResponse<UserStats> | undefined)?.data?.active_users ?? 0;
     return { cbmInWarehouse, activeShipments, totalCargoItems, activeClients };
-  }, [chinaStats, ghanaStats, seaCargo, airCargo, userStats]);
+  }, [chinaStats, ghanaStats, seaInTransit, airInTransit, itemsInTransit, userStats]);
 
   const transitingCargo = useMemo(() => {
-    const mapContainer = (type: "sea" | "air") => (c: CargoContainer) => ({
-      id: c.container_id,
+    const mapContainer = (type: "sea" | "air") => (c: BackendCargoContainer) => ({
       type,
       container: c.container_id,
-      client: c.client_summaries?.[0]?.client_name || "-",
+      client: "-", // backend may include client_summaries; kept simple here
       route: c.route || "-",
       eta: c.eta || "-",
       status: "in-transit" as const,
     });
-    const sea = (seaCargo?.data?.recent_containers || [])
-      .filter((c) => c.status === "in_transit")
-      .map(mapContainer("sea"));
-    const air = (airCargo?.data?.recent_containers || [])
-      .filter((c) => c.status === "in_transit")
-      .map(mapContainer("air"));
-    return [...sea, ...air].slice(0, 10);
-  }, [seaCargo, airCargo]);
+    const sea = (seaInTransit?.data?.results || []).map(mapContainer("sea"));
+    const air = (airInTransit?.data?.results || []).map(mapContainer("air"));
+    return [...sea, ...air];
+  }, [seaInTransit, airInTransit]);
 
   const recentClientActivity = useMemo(() => {
   const users: User[] = recentUsers?.data?.results ?? [];
@@ -105,7 +108,6 @@ export default function Dashboard() {
   const loadingTransiting = loadingSea || loadingAir;
 
   type Row = {
-    id: string;
     type: "sea" | "air";
     container: string;
     client: string;
@@ -115,7 +117,6 @@ export default function Dashboard() {
   };
 
   const rows: Row[] = transitingCargo.map(c => ({
-    id: c.id,
     type: c.type,
     container: c.container,
     client: c.client,
@@ -125,14 +126,13 @@ export default function Dashboard() {
   }));
 
   const columns: Column<Row>[] = [
-    { id: "id", header: "Tracking ID", accessor: r => <span className="font-medium">{r.id}</span>, sort: (a,b)=>a.id.localeCompare(b.id), sticky: true },
     { id: "type", header: "Type", accessor: r => (
       <div className="flex items-center gap-2">
         {r.type === "sea" ? <Ship className="h-4 w-4 text-primary" /> : <Plane className="h-4 w-4 text-primary" />}
         <span className="capitalize">{r.type}</span>
       </div>
     ) },
-    { id: "container", header: "Container/AWB", accessor: r => <code className="text-xs">{r.container}</code>, sort: (a,b)=>a.container.localeCompare(b.container) },
+    { id: "container", header: "Container/AWB", accessor: r => <code className="text-xs">{r.container}</code>, sort: (a,b)=>a.container.localeCompare(b.container), sticky: true },
     { id: "client", header: "Client", accessor: r => r.client, sort: (a,b)=>a.client.localeCompare(b.client) },
     { id: "route", header: "Route", accessor: r => r.route, sort: (a,b)=> (a.route||"").localeCompare(b.route||"") },
     { id: "eta", header: "ETA", accessor: r => {
@@ -260,7 +260,17 @@ export default function Dashboard() {
         </div>
       </div>
 
-  <NewCargoContainerDialog open={showNewCargoDialog} onOpenChange={setShowNewCargoDialog} />
+  <NewCargoContainerDialog open={showNewCargoDialog} onOpenChange={(o)=>{
+    setShowNewCargoDialog(o);
+    if (!o) {
+      // refresh after closing if created
+      queryClient.invalidateQueries({ queryKey: ["containers", "sea", "in_transit"] });
+      queryClient.invalidateQueries({ queryKey: ["containers", "air", "in_transit"] });
+      queryClient.invalidateQueries({ queryKey: ["cargo-items", "in_transit", "count"] });
+      queryClient.invalidateQueries({ queryKey: ["goods-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-stats"] });
+    }
+  }} />
     </div>
   );
 }
