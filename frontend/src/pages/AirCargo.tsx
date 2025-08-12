@@ -26,6 +26,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
 import { useNavigate } from "react-router-dom";
@@ -74,28 +81,23 @@ export default function AirCargo() {
     "all" | "in_transit" | "delivered" | "pending" | "delayed"
   >(persistGet("air:filterStatus", "all"));
 
-  // Load air cargo data (items and containers) + dashboard
+  // View dialog state
+  const [showViewDialog, setShowViewDialog] = useState(false);
+  const [viewContainer, setViewContainer] = useState<BackendCargoContainer | null>(null);
+
+  // Load air cargo data (containers) + dashboard
   useEffect(() => {
     let ignore = false;
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const [itemsRes, containersRes, dashRes] = await Promise.all([
-          cargoService.getCargoItems({ status: undefined }),
+        const [containersRes, dashRes] = await Promise.all([
           cargoService.getContainers({ cargo_type: "air" }),
           cargoService.getDashboard("air"),
         ]);
         if (!ignore) {
           const airContainers = containersRes.data?.results || [];
-          const allItems = itemsRes.data?.results || [];
-          const airContainerIds = new Set(
-            airContainers.map((c) => c.container_id)
-          );
-          const airItems = allItems.filter(
-            (i) => i.container && airContainerIds.has(i.container)
-          );
-          setItems(airItems);
           setContainers(airContainers);
           setDashboard(dashRes.data || null);
         }
@@ -113,36 +115,37 @@ export default function AirCargo() {
   }, []);
 
   const filtered = useMemo(() => {
-    let list = items;
-    if (filterStatus !== "all")
-      list = list.filter((i) => i.status === filterStatus);
+    let list = containers;
+    if (filterStatus !== "all") {
+      const statusMap = {
+        "in_transit": "in_transit",
+        "delivered": "delivered", 
+        "pending": "pending",
+        "delayed": "demurrage" // map delayed to demurrage status
+      };
+      list = list.filter((c) => c.status === statusMap[filterStatus as keyof typeof statusMap]);
+    }
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       list = list.filter(
-        (i) =>
-          (i.tracking_id || "").toLowerCase().includes(q) ||
-          (i.client_name || "").toLowerCase().includes(q)
+        (c) =>
+          c.container_id.toLowerCase().includes(q) ||
+          (c.route || "").toLowerCase().includes(q)
       );
     }
     return list;
-  }, [items, filterStatus, searchTerm]);
+  }, [containers, filterStatus, searchTerm]);
 
   const counts = useMemo(
     () => ({
-      all: items.length,
-      in_transit: items.filter((i) => i.status === "in_transit").length,
-      delivered: items.filter((i) => i.status === "delivered").length,
-      pending: items.filter((i) => i.status === "pending").length,
-      delayed: items.filter((i) => i.status === "delayed").length,
+      all: containers.length,
+      in_transit: containers.filter((c) => c.status === "in_transit").length,
+      delivered: containers.filter((c) => c.status === "delivered").length,
+      pending: containers.filter((c) => c.status === "pending").length,
+      delayed: containers.filter((c) => c.status === "demurrage").length,
     }),
-    [items]
+    [containers]
   );
-
-  const containerMap = useMemo(() => {
-    const map = new Map<string, BackendCargoContainer>();
-    for (const c of containers) map.set(c.container_id, c);
-    return map;
-  }, [containers]);
 
   type Row = {
     id: string;
@@ -156,33 +159,34 @@ export default function AirCargo() {
     arrival: string;
     eta: string | null;
     status: "in-transit" | "delivered" | "pending" | "delayed";
-    _raw: BackendCargoItem;
+    _raw: BackendCargoContainer;
   };
 
   const rows: Row[] = useMemo(
     () =>
-      filtered.map((i) => {
-        const c = containerMap.get(i.container);
+      filtered.map((container) => {
         const status: Row["status"] =
-          i.status === "in_transit"
+          container.status === "in_transit"
             ? "in-transit"
-            : (i.status as Row["status"]);
+            : container.status === "demurrage"
+            ? "delayed"
+            : (container.status as Row["status"]);
         return {
-          id: i.id,
-          tracking: i.tracking_id || i.id,
-          awb: i.tracking_id || "-",
-          client: i.client_name || String(i.client || ""),
-          route: c?.route ?? "-",
+          id: container.container_id,
+          tracking: container.container_id,
+          awb: container.container_id,
+          client: `${container.total_clients} clients`,
+          route: container.route ?? "-",
           airline: "-",
           flight: "-",
-          departure: c?.load_date ? formatDate(c.load_date) : "-",
-          arrival: c?.unloading_date ? formatDate(c.unloading_date) : "-",
-          eta: c?.eta ?? null,
+          departure: container.load_date ? formatDate(container.load_date) : "-",
+          arrival: container.unloading_date ? formatDate(container.unloading_date) : "-",
+          eta: container.eta ?? null,
           status,
-          _raw: i,
+          _raw: container,
         };
       }),
-    [filtered, containerMap]
+    [filtered]
   );
 
   const columns: Column<Row>[] = [
@@ -534,6 +538,15 @@ export default function AirCargo() {
               rowActions={(row) => (
                 <>
                   <DropdownMenuItem
+                    onClick={() => {
+                      setViewContainer(row._raw);
+                      setShowViewDialog(true);
+                    }}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Details
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     onClick={async () => {
                       // Allow user to select new status
                       const statusOptions = [
@@ -563,18 +576,18 @@ export default function AirCargo() {
                         return;
 
                       try {
-                        await cargoService.updateBackendCargoItem(row._raw.id, {
-                          status: newStatus as BackendCargoItem["status"],
+                        await cargoService.updateBackendContainer(row._raw.container_id, {
+                          status: newStatus as BackendCargoContainer["status"],
                         });
-                        setItems((prev) =>
-                          prev.map((i) =>
-                            i.id === row._raw.id
+                        setContainers((prev) =>
+                          prev.map((container) =>
+                            container.container_id === row._raw.container_id
                               ? {
-                                  ...i,
+                                  ...container,
                                   status:
-                                    newStatus as BackendCargoItem["status"],
+                                    newStatus as BackendCargoContainer["status"],
                                 }
-                              : i
+                              : container
                           )
                         );
                         toast({
@@ -600,52 +613,51 @@ export default function AirCargo() {
                   <DropdownMenuItem
                     onClick={async () => {
                       // Create a simple form for editing key fields
-                      const currentItem = row._raw;
-                      const newDescription = prompt(
-                        "Edit item description:",
-                        currentItem.item_description
+                      const currentContainer = row._raw;
+                      const newRoute = prompt(
+                        "Edit route:",
+                        currentContainer.route
                       );
-                      if (newDescription === null) return; // User cancelled
+                      if (newRoute === null) return; // User cancelled
 
-                      const newQuantity = prompt(
-                        "Edit quantity:",
-                        String(currentItem.quantity)
+                      const newWeight = prompt(
+                        "Edit weight (kg):",
+                        String(currentContainer.weight || "")
                       );
-                      if (newQuantity === null) return; // User cancelled
+                      if (newWeight === null) return; // User cancelled
 
                       const newCbm = prompt(
                         "Edit CBM:",
-                        String(currentItem.cbm)
+                        String(currentContainer.cbm || "")
                       );
                       if (newCbm === null) return; // User cancelled
 
-                      const quantity =
-                        parseInt(newQuantity) || currentItem.quantity;
-                      const cbm = parseFloat(newCbm) || currentItem.cbm;
+                      const weight = parseFloat(newWeight) || currentContainer.weight;
+                      const cbm = parseFloat(newCbm) || currentContainer.cbm;
 
                       try {
-                        await cargoService.updateBackendCargoItem(
-                          currentItem.id,
+                        await cargoService.updateBackendContainer(
+                          currentContainer.container_id,
                           {
-                            item_description: newDescription,
-                            quantity,
+                            route: newRoute,
+                            weight,
                             cbm,
                           }
                         );
-                        setItems((prev) =>
-                          prev.map((i) =>
-                            i.id === currentItem.id
+                        setContainers((prev) =>
+                          prev.map((container) =>
+                            container.container_id === currentContainer.container_id
                               ? {
-                                  ...i,
-                                  item_description: newDescription,
-                                  quantity,
+                                  ...container,
+                                  route: newRoute,
+                                  weight,
                                   cbm,
                                 }
-                              : i
+                              : container
                           )
                         );
                         toast({
-                          title: "Item updated",
+                          title: "Container updated",
                           description: `${row.tracking} details updated`,
                         });
                       } catch (e: unknown) {
@@ -664,12 +676,12 @@ export default function AirCargo() {
                   <DropdownMenuItem
                     className="text-destructive"
                     onClick={async () => {
-                      if (!confirm(`Delete cargo item ${row.tracking}?`))
+                      if (!confirm(`Delete cargo container ${row.tracking}?`))
                         return;
                       try {
-                        await cargoService.deleteBackendCargoItem(row._raw.id);
-                        setItems((prev) =>
-                          prev.filter((i) => i.id !== row._raw.id)
+                        await cargoService.deleteBackendContainer(row._raw.container_id);
+                        setContainers((prev) =>
+                          prev.filter((container) => container.container_id !== row._raw.container_id)
                         );
                         toast({
                           title: "Deleted",
@@ -714,6 +726,143 @@ export default function AirCargo() {
         onOpenChange={setShowNewCargoDialog}
         defaultType="air"
       />
+
+      {/* View Container Dialog */}
+      <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Container Details - {viewContainer?.container_id}
+            </DialogTitle>
+            <DialogDescription>
+              Detailed information about the selected air cargo container.
+            </DialogDescription>
+          </DialogHeader>
+          {viewContainer && (
+            <div className="space-y-6">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Container ID
+                  </label>
+                  <p className="text-sm font-mono">
+                    {viewContainer.container_id}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Type
+                  </label>
+                  <p className="text-sm capitalize">{viewContainer.cargo_type}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Status
+                  </label>
+                  <StatusBadge status={viewContainer.status === 'in_transit' ? 'in-transit' : viewContainer.status} />
+                </div>
+              </div>
+
+              {/* Route Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Route
+                  </label>
+                  <p className="text-sm">{viewContainer.route}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Load Date
+                  </label>
+                  <p className="text-sm">
+                    {viewContainer.load_date ? formatDate(viewContainer.load_date) : "Not set"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Capacity & Weight */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Weight (kg)
+                  </label>
+                  <p className="text-sm">
+                    {viewContainer.weight ? `${viewContainer.weight.toLocaleString()} kg` : "Not set"}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    CBM
+                  </label>
+                  <p className="text-sm">
+                    {viewContainer.cbm ? `${viewContainer.cbm} m³` : "Not set"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Timing */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    ETA
+                  </label>
+                  <p className="text-sm">
+                    {viewContainer.eta ? formatDate(viewContainer.eta) : "Not set"}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Rates
+                  </label>
+                  <p className="text-sm">
+                    {viewContainer.rates ? viewContainer.rates : "Not set"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Days tracking */}
+              {(viewContainer.stay_days > 0 || viewContainer.delay_days > 0) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Stay Days
+                    </label>
+                    <p className="text-sm">{viewContainer.stay_days}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Delay Days
+                    </label>
+                    <p className="text-sm">{viewContainer.delay_days}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Created
+                  </label>
+                  <p className="text-sm">
+                    {formatDate(viewContainer.created_at)}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Last Updated
+                  </label>
+                  <p className="text-sm">
+                    {formatDate(viewContainer.updated_at)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
