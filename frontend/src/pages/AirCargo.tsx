@@ -83,7 +83,8 @@ export default function AirCargo() {
 
   // View dialog state
   const [showViewDialog, setShowViewDialog] = useState(false);
-  const [viewContainer, setViewContainer] = useState<BackendCargoContainer | null>(null);
+  const [viewContainer, setViewContainer] =
+    useState<BackendCargoContainer | null>(null);
 
   // Load air cargo data (containers) + dashboard
   useEffect(() => {
@@ -118,12 +119,14 @@ export default function AirCargo() {
     let list = containers;
     if (filterStatus !== "all") {
       const statusMap = {
-        "in_transit": "in_transit",
-        "delivered": "delivered", 
-        "pending": "pending",
-        "delayed": "demurrage" // map delayed to demurrage status
+        in_transit: "in_transit",
+        delivered: "delivered",
+        pending: "pending",
+        delayed: "demurrage", // map delayed to demurrage status
       };
-      list = list.filter((c) => c.status === statusMap[filterStatus as keyof typeof statusMap]);
+      list = list.filter(
+        (c) => c.status === statusMap[filterStatus as keyof typeof statusMap]
+      );
     }
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
@@ -179,8 +182,12 @@ export default function AirCargo() {
           route: container.route ?? "-",
           airline: "-",
           flight: "-",
-          departure: container.load_date ? formatDate(container.load_date) : "-",
-          arrival: container.unloading_date ? formatDate(container.unloading_date) : "-",
+          departure: container.load_date
+            ? formatDate(container.load_date)
+            : "-",
+          arrival: container.unloading_date
+            ? formatDate(container.unloading_date)
+            : "-",
           eta: container.eta ?? null,
           status,
           _raw: container,
@@ -576,9 +583,13 @@ export default function AirCargo() {
                         return;
 
                       try {
-                        await cargoService.updateBackendContainer(row._raw.container_id, {
-                          status: newStatus as BackendCargoContainer["status"],
-                        });
+                        await cargoService.updateBackendContainer(
+                          row._raw.container_id,
+                          {
+                            status:
+                              newStatus as BackendCargoContainer["status"],
+                          }
+                        );
                         setContainers((prev) =>
                           prev.map((container) =>
                             container.container_id === row._raw.container_id
@@ -632,7 +643,8 @@ export default function AirCargo() {
                       );
                       if (newCbm === null) return; // User cancelled
 
-                      const weight = parseFloat(newWeight) || currentContainer.weight;
+                      const weight =
+                        parseFloat(newWeight) || currentContainer.weight;
                       const cbm = parseFloat(newCbm) || currentContainer.cbm;
 
                       try {
@@ -646,7 +658,8 @@ export default function AirCargo() {
                         );
                         setContainers((prev) =>
                           prev.map((container) =>
-                            container.container_id === currentContainer.container_id
+                            container.container_id ===
+                            currentContainer.container_id
                               ? {
                                   ...container,
                                   route: newRoute,
@@ -679,9 +692,14 @@ export default function AirCargo() {
                       if (!confirm(`Delete cargo container ${row.tracking}?`))
                         return;
                       try {
-                        await cargoService.deleteBackendContainer(row._raw.container_id);
+                        await cargoService.deleteBackendContainer(
+                          row._raw.container_id
+                        );
                         setContainers((prev) =>
-                          prev.filter((container) => container.container_id !== row._raw.container_id)
+                          prev.filter(
+                            (container) =>
+                              container.container_id !== row._raw.container_id
+                          )
                         );
                         toast({
                           title: "Deleted",
@@ -754,13 +772,21 @@ export default function AirCargo() {
                   <label className="text-sm font-medium text-muted-foreground">
                     Type
                   </label>
-                  <p className="text-sm capitalize">{viewContainer.cargo_type}</p>
+                  <p className="text-sm capitalize">
+                    {viewContainer.cargo_type}
+                  </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">
                     Status
                   </label>
-                  <StatusBadge status={viewContainer.status === 'in_transit' ? 'in-transit' : viewContainer.status} />
+                  <StatusBadge
+                    status={
+                      viewContainer.status === "in_transit"
+                        ? "in-transit"
+                        : viewContainer.status
+                    }
+                  />
                 </div>
               </div>
 
@@ -777,7 +803,9 @@ export default function AirCargo() {
                     Load Date
                   </label>
                   <p className="text-sm">
-                    {viewContainer.load_date ? formatDate(viewContainer.load_date) : "Not set"}
+                    {viewContainer.load_date
+                      ? formatDate(viewContainer.load_date)
+                      : "Not set"}
                   </p>
                 </div>
               </div>
@@ -789,7 +817,9 @@ export default function AirCargo() {
                     Weight (kg)
                   </label>
                   <p className="text-sm">
-                    {viewContainer.weight ? `${viewContainer.weight.toLocaleString()} kg` : "Not set"}
+                    {viewContainer.weight
+                      ? `${viewContainer.weight.toLocaleString()} kg`
+                      : "Not set"}
                   </p>
                 </div>
                 <div>
@@ -809,7 +839,9 @@ export default function AirCargo() {
                     ETA
                   </label>
                   <p className="text-sm">
-                    {viewContainer.eta ? formatDate(viewContainer.eta) : "Not set"}
+                    {viewContainer.eta
+                      ? formatDate(viewContainer.eta)
+                      : "Not set"}
                   </p>
                 </div>
                 <div>
@@ -823,7 +855,8 @@ export default function AirCargo() {
               </div>
 
               {/* Days tracking */}
-              {(viewContainer.stay_days > 0 || viewContainer.delay_days > 0) && (
+              {(viewContainer.stay_days > 0 ||
+                viewContainer.delay_days > 0) && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">
