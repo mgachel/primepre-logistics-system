@@ -1,4 +1,15 @@
-import { Package, Truck, Users, Ship, Plane, TrendingUp, Calendar, Plus, Upload, RefreshCcw } from "lucide-react";
+import {
+  Package,
+  Truck,
+  Users,
+  Ship,
+  Plane,
+  TrendingUp,
+  Calendar,
+  Plus,
+  Upload,
+  RefreshCcw,
+} from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +25,12 @@ import { DataTable, Column } from "@/components/data-table/DataTable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
 import { cargoService, BackendCargoContainer } from "@/services/cargoService";
+import { dashboardService } from "@/services/dashboardService";
+import type { WarehouseItem } from "@/services/warehouseService";
+import type {
+  CargoContainer as LegacyCargoContainer,
+  CargoItem as LegacyCargoItem,
+} from "@/services/cargoService";
 
 type GoodsStats = { total_cbm?: number };
 type CargoContainer = {
@@ -53,11 +70,35 @@ export default function Dashboard() {
   // In-transit containers (sea and air)
   const { data: seaInTransit, isLoading: loadingSea } = useQuery({
     queryKey: ["containers", "sea", "in_transit"],
-    queryFn: () => cargoService.getContainers({ cargo_type: "sea", status: "in_transit" }),
+    queryFn: () =>
+      cargoService.getContainers({ cargo_type: "sea", status: "in_transit" }),
   });
   const { data: airInTransit, isLoading: loadingAir } = useQuery({
     queryKey: ["containers", "air", "in_transit"],
-    queryFn: () => cargoService.getContainers({ cargo_type: "air", status: "in_transit" }),
+    queryFn: () =>
+      cargoService.getContainers({ cargo_type: "air", status: "in_transit" }),
+  });
+
+  // Fetch ALL in-transit containers across pagination for table completeness
+  type Page<T> = { count: number; next?: string | null; previous?: string | null; results: T[] };
+  const { data: allInTransit, isLoading: loadingAllTransit } = useQuery({
+    queryKey: ["containers", "in_transit", "all"],
+    queryFn: async () => {
+      const fetchAll = async (type: "sea" | "air"): Promise<BackendCargoContainer[]> => {
+        let page = 1;
+        const acc: BackendCargoContainer[] = [];
+        for (;;) {
+          const resp = await cargoService.getContainers({ cargo_type: type, status: "in_transit", page });
+          const data = resp.data as unknown as Page<BackendCargoContainer>;
+          acc.push(...(data?.results || []));
+          if (!data?.next) break;
+          page += 1;
+        }
+        return acc;
+      };
+      const [sea, air] = await Promise.all([fetchAll("sea"), fetchAll("air")]);
+      return { sea, air };
+    },
   });
 
   // Cargo items in transit count
@@ -66,46 +107,145 @@ export default function Dashboard() {
     queryFn: () => cargoService.getCargoItems({ status: "in_transit" }),
   });
 
-  // Recent users for activity (latest)
-  const { data: recentUsers, isLoading: loadingRecentUsers } = useQuery<ApiResponse<PaginatedResponse<User>>>({
-    queryKey: ["recent-users"],
-    queryFn: () => apiClient.get<PaginatedResponse<User>>("/api/auth/admin/users/?ordering=-date_joined"),
+  // Recent activity across warehouses and cargo
+  const { data: recentActivity, isLoading: loadingRecent } = useQuery({
+    queryKey: ["recent-activity"],
+    queryFn: () => dashboardService.getRecentActivity(),
   });
 
+  // Recent user registrations for admin (augment recent activity)
+  const { data: recentUsers } = useQuery<ApiResponse<PaginatedResponse<User>>>(
+    {
+      queryKey: ["recent-users", { ordering: "-date_joined", limit: 5 }],
+      queryFn: () =>
+        apiClient.get<PaginatedResponse<User>>(
+          "/api/auth/admin/users/?ordering=-date_joined&limit=5"
+        ),
+    }
+  );
+
   const stats = useMemo(() => {
-    const cbmInWarehouse = (chinaStats?.data?.total_cbm || 0) + (ghanaStats?.data?.total_cbm || 0);
-    const activeShipments = (seaInTransit?.data?.count || 0) + (airInTransit?.data?.count || 0);
+    const cbmInWarehouse =
+      (chinaStats?.data?.total_cbm || 0) + (ghanaStats?.data?.total_cbm || 0);
+    const activeShipments =
+      (seaInTransit?.data?.count || 0) + (airInTransit?.data?.count || 0);
     const totalCargoItems = itemsInTransit?.data?.count || 0; // only items currently in transit
-  const activeClients = (userStats as ApiResponse<UserStats> | undefined)?.data?.active_users ?? 0;
+    const activeClients =
+      (userStats as ApiResponse<UserStats> | undefined)?.data?.active_users ??
+      0;
     return { cbmInWarehouse, activeShipments, totalCargoItems, activeClients };
-  }, [chinaStats, ghanaStats, seaInTransit, airInTransit, itemsInTransit, userStats]);
+  }, [
+    chinaStats,
+    ghanaStats,
+    seaInTransit,
+    airInTransit,
+    itemsInTransit,
+    userStats,
+  ]);
 
   const transitingCargo = useMemo(() => {
-    const mapContainer = (type: "sea" | "air") => (c: BackendCargoContainer) => ({
-      type,
-      container: c.container_id,
-      client: "-", // backend may include client_summaries; kept simple here
-      route: c.route || "-",
-      eta: c.eta || "-",
-      status: "in-transit" as const,
-    });
-    const sea = (seaInTransit?.data?.results || []).map(mapContainer("sea"));
-    const air = (airInTransit?.data?.results || []).map(mapContainer("air"));
+    const mapContainer =
+      (type: "sea" | "air") => (c: BackendCargoContainer) => ({
+        type,
+        container: c.container_id,
+        client: "-",
+        route: c.route || "-",
+        eta: c.eta || "-",
+        status: "in-transit" as const,
+      });
+    const sea = (allInTransit?.sea || []).map(mapContainer("sea"));
+    const air = (allInTransit?.air || []).map(mapContainer("air"));
     return [...sea, ...air];
-  }, [seaInTransit, airInTransit]);
+  }, [allInTransit]);
 
-  const recentClientActivity = useMemo(() => {
-  const users: User[] = recentUsers?.data?.results ?? [];
-    return users.slice(0, 5).map((u) => ({
-      name: u.full_name || `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim(),
-      activity: "Joined Primepre",
-      time: u.date_joined ? new Date(u.date_joined).toLocaleDateString() : "",
-      status: u.is_active ? ("active" as const) : ("inactive" as const),
+  const recentEvents = useMemo(() => {
+    const items = (
+      (recentActivity?.data?.recent_items ?? []) as WarehouseItem[]
+    ).map((it) => ({
+      id: it.primepre_id || String(it.id),
+      when: it.created_at || it.updated_at,
+      title: `Warehouse item ${
+        it.primepre_id ? `#${it.primepre_id}` : ""
+      }`.trim(),
+      detail: it.warehouse_location || "Warehouse",
+      status:
+        String(it.status || "").toLowerCase() === "flagged"
+          ? ("risk" as const)
+          : String(it.status || "").toLowerCase() === "delivered"
+          ? ("delivered" as const)
+          : ("pending" as const),
     }));
-  }, [recentUsers]);
 
-  const loadingStats = loadingChina || loadingGhana || loadingSea || loadingAir || loadingUsers;
-  const loadingTransiting = loadingSea || loadingAir;
+    const cargoList = (
+      (recentActivity?.data?.recent_cargo ?? []) as Array<
+        LegacyCargoContainer | LegacyCargoItem
+      >
+    ).map((c) => {
+      const when =
+        (c as LegacyCargoContainer).created_at ??
+        (c as LegacyCargoItem).created_at;
+      const updated =
+        (c as LegacyCargoContainer).updated_at ??
+        (c as LegacyCargoItem).updated_at;
+      const whenVal = when || updated;
+      const statusRaw = String(
+        ((c as LegacyCargoContainer).status ?? (c as LegacyCargoItem).status) ||
+          ""
+      );
+      const status =
+        statusRaw.toLowerCase() === "in_transit"
+          ? ("in-transit" as const)
+          : statusRaw.toLowerCase() === "delivered"
+          ? ("delivered" as const)
+          : ("pending" as const);
+
+      if ((c as LegacyCargoContainer).container_number !== undefined) {
+        const cc = c as LegacyCargoContainer;
+        return {
+          id: cc.container_number,
+          when: whenVal,
+          title: `Container ${cc.container_number}`,
+          detail:
+            `${cc.origin_port ?? ""}${cc.origin_port ? " → " : ""}${
+              cc.destination_port ?? ""
+            }` || "Cargo",
+          status,
+        };
+      } else {
+        const ci = c as LegacyCargoItem;
+        return {
+          id: String(ci.id),
+          when: whenVal,
+          title: ci.awb_number ? `AWB ${ci.awb_number}` : `Cargo item updated`,
+          detail: ci.description || "Cargo item",
+          status,
+        };
+      }
+    });
+
+    // Users joined events
+    const userJoins = ((recentUsers?.data?.results ?? []) as User[]).map(
+      (u) => ({
+        id: String(u.id),
+        when: (u as User).date_joined as unknown as string,
+        title: u.full_name
+          ? `${u.full_name} joined`
+          : `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() + " joined",
+        detail: u.email || "New user registration",
+        status: u.is_active ? ("active" as const) : ("inactive" as const),
+      })
+    );
+
+    const combined = [...items, ...cargoList, ...userJoins].sort(
+      (a, b) =>
+        new Date(b.when || 0).getTime() - new Date(a.when || 0).getTime()
+    );
+    return combined.slice(0, 7);
+  }, [recentActivity, recentUsers]);
+
+  const loadingStats =
+    loadingChina || loadingGhana || loadingSea || loadingAir || loadingUsers;
+  const loadingTransiting = loadingAllTransit;
 
   type Row = {
     type: "sea" | "air";
@@ -116,7 +256,7 @@ export default function Dashboard() {
     status: "in-transit";
   };
 
-  const rows: Row[] = transitingCargo.map(c => ({
+  const rows: Row[] = transitingCargo.map((c) => ({
     type: c.type,
     container: c.container,
     client: c.client,
@@ -126,27 +266,72 @@ export default function Dashboard() {
   }));
 
   const columns: Column<Row>[] = [
-    { id: "type", header: "Type", accessor: r => (
-      <div className="flex items-center gap-2">
-        {r.type === "sea" ? <Ship className="h-4 w-4 text-primary" /> : <Plane className="h-4 w-4 text-primary" />}
-        <span className="capitalize">{r.type}</span>
-      </div>
-    ) },
-    { id: "container", header: "Container/AWB", accessor: r => <code className="text-xs">{r.container}</code>, sort: (a,b)=>a.container.localeCompare(b.container), sticky: true },
-    { id: "client", header: "Client", accessor: r => r.client, sort: (a,b)=>a.client.localeCompare(b.client) },
-    { id: "route", header: "Route", accessor: r => r.route, sort: (a,b)=> (a.route||"").localeCompare(b.route||"") },
-    { id: "eta", header: "ETA", accessor: r => {
-      if (!r.eta) return <span className="text-sm text-muted-foreground">-</span>;
-      const d = new Date(r.eta);
-      const overdue = isOverdue(d);
-      return (
-        <div className="text-sm">
-          <div className={overdue ? "text-destructive font-medium" : undefined}>{formatDate(d)}</div>
-          <div className={"text-xs " + (overdue ? "text-destructive" : "text-muted-foreground")}>{overdue ? `${daysLate(d)} days late` : formatRelative(d)}</div>
+    {
+      id: "type",
+      header: "Type",
+      accessor: (r) => (
+        <div className="flex items-center gap-2">
+          {r.type === "sea" ? (
+            <Ship className="h-4 w-4 text-primary" />
+          ) : (
+            <Plane className="h-4 w-4 text-primary" />
+          )}
+          <span className="capitalize">{r.type}</span>
         </div>
-      );
-    }, sort: (a,b)=> (a.eta||"").localeCompare(b.eta||"") },
-    { id: "status", header: "Status", accessor: r => <StatusBadge status={r.status} /> },
+      ),
+    },
+    {
+      id: "container",
+      header: "Container/AWB",
+      accessor: (r) => <code className="text-xs">{r.container}</code>,
+      sort: (a, b) => a.container.localeCompare(b.container),
+      sticky: true,
+    },
+    {
+      id: "client",
+      header: "Client",
+      accessor: (r) => r.client,
+      sort: (a, b) => a.client.localeCompare(b.client),
+    },
+    {
+      id: "route",
+      header: "Route",
+      accessor: (r) => r.route,
+      sort: (a, b) => (a.route || "").localeCompare(b.route || ""),
+    },
+    {
+      id: "eta",
+      header: "ETA",
+      accessor: (r) => {
+        if (!r.eta)
+          return <span className="text-sm text-muted-foreground">-</span>;
+        const d = new Date(r.eta);
+        const overdue = isOverdue(d);
+        return (
+          <div className="text-sm">
+            <div
+              className={overdue ? "text-destructive font-medium" : undefined}
+            >
+              {formatDate(d)}
+            </div>
+            <div
+              className={
+                "text-xs " +
+                (overdue ? "text-destructive" : "text-muted-foreground")
+              }
+            >
+              {overdue ? `${daysLate(d)} days late` : formatRelative(d)}
+            </div>
+          </div>
+        );
+      },
+      sort: (a, b) => (a.eta || "").localeCompare(b.eta || ""),
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessor: (r) => <StatusBadge status={r.status} />,
+    },
   ];
 
   return (
@@ -155,7 +340,10 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Monitor your logistics operations and key metrics • All times shown in your local time zone</p>
+          <p className="text-muted-foreground mt-1">
+            Monitor your logistics operations and key metrics • All times shown
+            in your local time zone
+          </p>
         </div>
         <div className="flex items-center space-x-3 mt-4 sm:mt-0">
           <Button variant="outline" size="sm">
@@ -180,10 +368,30 @@ export default function Dashboard() {
           ))
         ) : (
           <>
-            <MetricCard title="CBM in Warehouse" value={stats.cbmInWarehouse.toString()} icon={Package} change={{ value: "+2.1%", type: "increase" }} />
-            <MetricCard title="Active Shipments" value={stats.activeShipments.toString()} icon={Truck} change={{ value: "-1.3%", type: "decrease" }} />
-            <MetricCard title="Total Cargo Items" value={stats.totalCargoItems.toString()} icon={TrendingUp} change={{ value: "+0.4%", type: "increase" }} />
-            <MetricCard title="Active Clients" value={stats.activeClients.toString()} icon={Users} change={{ value: "0%", type: "neutral" }} />
+            <MetricCard
+              title="CBM in Warehouse"
+              value={stats.cbmInWarehouse.toString()}
+              icon={Package}
+              change={{ value: "+2.1%", type: "increase" }}
+            />
+            <MetricCard
+              title="Active Shipments"
+              value={stats.activeShipments.toString()}
+              icon={Truck}
+              change={{ value: "-1.3%", type: "decrease" }}
+            />
+            <MetricCard
+              title="Total Cargo Items"
+              value={stats.totalCargoItems.toString()}
+              icon={TrendingUp}
+              change={{ value: "+0.4%", type: "increase" }}
+            />
+            <MetricCard
+              title="Active Clients"
+              value={stats.activeClients.toString()}
+              icon={Users}
+              change={{ value: "0%", type: "neutral" }}
+            />
           </>
         )}
       </div>
@@ -196,7 +404,9 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Cargo in Transit</h3>
               <Link to="/cargos/sea">
-                <Button variant="ghost" size="sm">View All</Button>
+                <Button variant="ghost" size="sm">
+                  View All
+                </Button>
               </Link>
             </div>
           </div>
@@ -208,25 +418,52 @@ export default function Dashboard() {
               loading={loadingTransiting}
               empty={
                 <div className="text-center space-y-2">
-                  <div className="text-muted-foreground">No cargo currently in transit.</div>
+                  <div className="text-muted-foreground">
+                    No cargo currently in transit.
+                  </div>
                   <div className="flex items-center justify-center gap-2">
-                    <Button size="sm" onClick={() => setShowNewCargoDialog(true)}>
-                      <Plus className="h-4 w-4 mr-1"/> Add Cargo
+                    <Button
+                      size="sm"
+                      onClick={() => setShowNewCargoDialog(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Add Cargo
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = '.xlsx,.xls,.csv';
-                      input.onchange = (e) => {
-                        const file = (e.target as HTMLInputElement).files?.[0];
-                        if (file) console.log('Uploading file:', file.name);
-                      };
-                      input.click();
-                    }}>
-                      <Upload className="h-4 w-4 mr-1"/> Import Excel
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = ".xlsx,.xls,.csv";
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement)
+                            .files?.[0];
+                          if (file) console.log("Uploading file:", file.name);
+                        };
+                        input.click();
+                      }}
+                    >
+                      <Upload className="h-4 w-4 mr-1" /> Import Excel
                     </Button>
                   </div>
-                  <a className="text-primary underline text-sm" href="#" onClick={(e)=>{e.preventDefault(); const csv = "Tracking ID,Type,Container/AWB,Client,Route,ETA\nAA-0001,Air,000-12345678,Sample Client,PVG-ACC,2025-08-15"; const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='transit-template.csv'; a.click(); URL.revokeObjectURL(url);}}>Download sample CSV</a>
+                  <a
+                    className="text-primary underline text-sm"
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const csv =
+                        "Type,Container/AWB,Client,Route,ETA\nAir,000-12345678,Sample Client,PVG-ACC,2025-08-15";
+                      const blob = new Blob([csv], { type: "text/csv" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "transit-template.csv";
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    Download sample CSV
+                  </a>
                 </div>
               }
             />
@@ -240,37 +477,72 @@ export default function Dashboard() {
               <h3 className="text-lg font-semibold">Recent Activity</h3>
             </div>
             <div className="p-6">
-              <div className="space-y-4">
-                {recentClientActivity.map((activity, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">{activity.name}</p>
-                      <p className="text-sm text-muted-foreground">{activity.activity}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-muted-foreground">{activity.time}</span>
-                        <StatusBadge status={activity.status} />
+              {loadingRecent ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <Skeleton className="w-2 h-2 rounded-full mt-2" />
+                      <div className="flex-1">
+                        <Skeleton className="h-4 w-40 mb-2" />
+                        <Skeleton className="h-3 w-24" />
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {recentEvents.map((e, index) => (
+                    <div key={index} className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{e.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {e.detail}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-muted-foreground">
+                            {e.when
+                              ? new Date(e.when).toLocaleDateString()
+                              : ""}
+                          </span>
+                          <StatusBadge status={e.status} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-  <NewCargoContainerDialog open={showNewCargoDialog} onOpenChange={(o)=>{
-    setShowNewCargoDialog(o);
-    if (!o) {
-      // refresh after closing if created
-      queryClient.invalidateQueries({ queryKey: ["containers", "sea", "in_transit"] });
-      queryClient.invalidateQueries({ queryKey: ["containers", "air", "in_transit"] });
-      queryClient.invalidateQueries({ queryKey: ["cargo-items", "in_transit", "count"] });
-      queryClient.invalidateQueries({ queryKey: ["goods-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-user-stats"] });
-    }
-  }} />
+      <NewCargoContainerDialog
+        open={showNewCargoDialog}
+        onOpenChange={(o) => {
+          setShowNewCargoDialog(o);
+          if (!o) {
+            // refresh after closing if created
+            queryClient.invalidateQueries({
+              queryKey: ["containers", "sea", "in_transit"],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ["containers", "air", "in_transit"],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ["cargo-items", "in_transit", "count"],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ["goods-stats", "china"],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ["goods-stats", "ghana"],
+            });
+            queryClient.invalidateQueries({ queryKey: ["admin-user-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
+          }
+        }}
+      />
     </div>
   );
 }
