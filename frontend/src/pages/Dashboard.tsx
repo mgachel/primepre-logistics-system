@@ -80,15 +80,26 @@ export default function Dashboard() {
   });
 
   // Fetch ALL in-transit containers across pagination for table completeness
-  type Page<T> = { count: number; next?: string | null; previous?: string | null; results: T[] };
+  type Page<T> = {
+    count: number;
+    next?: string | null;
+    previous?: string | null;
+    results: T[];
+  };
   const { data: allInTransit, isLoading: loadingAllTransit } = useQuery({
     queryKey: ["containers", "in_transit", "all"],
     queryFn: async () => {
-      const fetchAll = async (type: "sea" | "air"): Promise<BackendCargoContainer[]> => {
+      const fetchAll = async (
+        type: "sea" | "air"
+      ): Promise<BackendCargoContainer[]> => {
         let page = 1;
         const acc: BackendCargoContainer[] = [];
         for (;;) {
-          const resp = await cargoService.getContainers({ cargo_type: type, status: "in_transit", page });
+          const resp = await cargoService.getContainers({
+            cargo_type: type,
+            status: "in_transit",
+            page,
+          });
           const data = resp.data as unknown as Page<BackendCargoContainer>;
           acc.push(...(data?.results || []));
           if (!data?.next) break;
@@ -114,15 +125,13 @@ export default function Dashboard() {
   });
 
   // Recent user registrations for admin (augment recent activity)
-  const { data: recentUsers } = useQuery<ApiResponse<PaginatedResponse<User>>>(
-    {
-      queryKey: ["recent-users", { ordering: "-date_joined", limit: 5 }],
-      queryFn: () =>
-        apiClient.get<PaginatedResponse<User>>(
-          "/api/auth/admin/users/?ordering=-date_joined&limit=5"
-        ),
-    }
-  );
+  const { data: recentUsers } = useQuery<ApiResponse<PaginatedResponse<User>>>({
+    queryKey: ["recent-users", { ordering: "-date_joined", limit: 5 }],
+    queryFn: () =>
+      apiClient.get<PaginatedResponse<User>>(
+        "/api/auth/admin/users/?ordering=-date_joined&limit=5"
+      ),
+  });
 
   const stats = useMemo(() => {
     const cbmInWarehouse =
