@@ -1,18 +1,43 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, Ship, MapPin, Calendar, Package, RefreshCcw } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Ship,
+  MapPin,
+  Calendar,
+  Package,
+  RefreshCcw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
 import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
-import { cargoService, BackendCargoContainer, CargoDashboardStats } from "@/services/cargoService";
+import {
+  cargoService,
+  BackendCargoContainer,
+  CargoDashboardStats,
+} from "@/services/cargoService";
 import { DataTable, Column } from "@/components/data-table/DataTable";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Edit, Settings, Trash2, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 interface SeaCargoItem {
   id: string;
@@ -63,7 +88,8 @@ export default function SeaCargo() {
   const [containers, setContainers] = useState<BackendCargoContainer[]>([]);
   const [dashboard, setDashboard] = useState<CargoDashboardStats | null>(null);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
-  const [selectedStatusContainer, setSelectedStatusContainer] = useState<BackendCargoContainer | null>(null);
+  const [selectedStatusContainer, setSelectedStatusContainer] =
+    useState<BackendCargoContainer | null>(null);
   const [newStatus, setNewStatus] = useState<string>("");
 
   // Load containers and dashboard
@@ -131,14 +157,23 @@ export default function SeaCargo() {
 
   const handleStatusUpdate = async () => {
     if (!selectedStatusContainer || !newStatus) return;
-    
+
     try {
-      await cargoService.updateBackendContainer(selectedStatusContainer.container_id, { 
-        status: newStatus as 'pending' | 'in_transit' | 'delivered' | 'demurrage' 
-      });
+      await cargoService.updateBackendContainer(
+        selectedStatusContainer.container_id,
+        {
+          status: newStatus as
+            | "pending"
+            | "in_transit"
+            | "delivered"
+            | "demurrage",
+        }
+      );
       toast({
         title: "Status updated",
-        description: `${selectedStatusContainer.container_id} → ${newStatus.replace("_", " ")}`,
+        description: `${
+          selectedStatusContainer.container_id
+        } → ${newStatus.replace("_", " ")}`,
       });
       setShowStatusDialog(false);
       setSelectedStatusContainer(null);
@@ -378,25 +413,27 @@ export default function SeaCargo() {
           }
           rowActions={(row) => (
             <>
-              <DropdownMenuItem onClick={() => {
-                setSelectedContainer({
-                  id: row.container_id,
-                  containerNo: row.container_id,
-                  client: `${row.total_clients} clients`,
-                  origin: row.route?.split(" to ")[0] || "-",
-                  destination: row.route?.split(" to ")[1] || "-",
-                  loadingDate: row.load_date,
-                  eta: row.eta,
-                  cbm: String(row.cbm ?? 0),
-                  weight: row.weight ? `${row.weight} kg` : "-",
-                  status: "in-transit",
-                  vessel: "-",
-                  voyage: "-",
-                  goods: "-",
-                  notes: "",
-                });
-                setShowContainerDetails(true);
-              }}>
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedContainer({
+                    id: row.container_id,
+                    containerNo: row.container_id,
+                    client: `${row.total_clients} clients`,
+                    origin: row.route?.split(" to ")[0] || "-",
+                    destination: row.route?.split(" to ")[1] || "-",
+                    loadingDate: row.load_date,
+                    eta: row.eta,
+                    cbm: String(row.cbm ?? 0),
+                    weight: row.weight ? `${row.weight} kg` : "-",
+                    status: "in-transit",
+                    vessel: "-",
+                    voyage: "-",
+                    goods: "-",
+                    notes: "",
+                  });
+                  setShowContainerDetails(true);
+                }}
+              >
                 <Eye className="h-4 w-4 mr-2" /> View Details
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -486,16 +523,23 @@ export default function SeaCargo() {
           <DialogHeader>
             <DialogTitle>Update Container Status</DialogTitle>
             <DialogDescription>
-              Change the status of the selected container to reflect its current state.
+              Change the status of the selected container to reflect its current
+              state.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground">
-                Container: <span className="font-medium">{selectedStatusContainer?.container_id}</span>
+                Container:{" "}
+                <span className="font-medium">
+                  {selectedStatusContainer?.container_id}
+                </span>
               </p>
               <p className="text-sm text-muted-foreground">
-                Current Status: <span className="font-medium">{selectedStatusContainer?.status?.replace("_", " ")}</span>
+                Current Status:{" "}
+                <span className="font-medium">
+                  {selectedStatusContainer?.status?.replace("_", " ")}
+                </span>
               </p>
             </div>
             <div>
@@ -514,10 +558,18 @@ export default function SeaCargo() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowStatusDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowStatusDialog(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={handleStatusUpdate} disabled={!newStatus || newStatus === selectedStatusContainer?.status}>
+            <Button
+              onClick={handleStatusUpdate}
+              disabled={
+                !newStatus || newStatus === selectedStatusContainer?.status
+              }
+            >
               Update Status
             </Button>
           </DialogFooter>
