@@ -1,11 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, Ship, MapPin, Calendar, Package, RefreshCcw } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Ship,
+  MapPin,
+  Calendar,
+  Package,
+  RefreshCcw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
 import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
-import { cargoService, BackendCargoContainer, CargoDashboardStats } from "@/services/cargoService";
+import {
+  cargoService,
+  BackendCargoContainer,
+  CargoDashboardStats,
+} from "@/services/cargoService";
 import { DataTable, Column } from "@/components/data-table/DataTable";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Edit, Settings, Trash2 } from "lucide-react";
@@ -29,7 +41,9 @@ interface SeaCargoItem {
   notes: string;
 }
 
-function mapStatus(status: BackendCargoContainer["status"]): "in-transit" | "delivered" | "pending" | "delayed" {
+function mapStatus(
+  status: BackendCargoContainer["status"]
+): "in-transit" | "delivered" | "pending" | "delayed" {
   switch (status) {
     case "in_transit":
       return "in-transit";
@@ -48,9 +62,12 @@ export default function SeaCargo() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
-  const [selectedContainer, setSelectedContainer] = useState<SeaCargoItem | null>(null);
+  const [selectedContainer, setSelectedContainer] =
+    useState<SeaCargoItem | null>(null);
   const [showContainerDetails, setShowContainerDetails] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"all" | "in-transit" | "pending" | "delivered">("all");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "in-transit" | "pending" | "delivered"
+  >("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [containers, setContainers] = useState<BackendCargoContainer[]>([]);
@@ -63,9 +80,18 @@ export default function SeaCargo() {
       setLoading(true);
       setError(null);
       try {
-        const statusParam = statusFilter === "all" ? undefined : (statusFilter === "in-transit" ? "in_transit" : statusFilter);
+        const statusParam =
+          statusFilter === "all"
+            ? undefined
+            : statusFilter === "in-transit"
+            ? "in_transit"
+            : statusFilter;
         const [listRes, dashRes] = await Promise.all([
-          cargoService.getContainers({ cargo_type: "sea", search: searchTerm || undefined, status: statusParam }),
+          cargoService.getContainers({
+            cargo_type: "sea",
+            search: searchTerm || undefined,
+            status: statusParam,
+          }),
           cargoService.getDashboard("sea"),
         ]);
         if (!ignore) {
@@ -73,14 +99,16 @@ export default function SeaCargo() {
           setDashboard(dashRes.data || null);
         }
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Failed to load sea cargo';
+        const msg = e instanceof Error ? e.message : "Failed to load sea cargo";
         if (!ignore) setError(msg);
       } finally {
         if (!ignore) setLoading(false);
       }
     };
     load();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [searchTerm, statusFilter]);
 
   const filteredCargo = useMemo(() => containers, [containers]);
@@ -88,32 +116,86 @@ export default function SeaCargo() {
   const cols: Column<BackendCargoContainer>[] = [
     {
       id: "select",
-      header: <input aria-label="Select all" type="checkbox" className="rounded" />,
-      accessor: (c) => <input aria-label={`Select ${c.container_id}`} type="checkbox" className="rounded" />,
+      header: (
+        <input aria-label="Select all" type="checkbox" className="rounded" />
+      ),
+      accessor: (c) => (
+        <input
+          aria-label={`Select ${c.container_id}`}
+          type="checkbox"
+          className="rounded"
+        />
+      ),
       width: "48px",
       sticky: true,
     },
     {
       id: "tracking",
-      header: "Tracking ID",
+      header: "Container/AWB",
       accessor: (c) => <span className="font-medium">{c.container_id}</span>,
       sort: (a, b) => a.container_id.localeCompare(b.container_id),
       sticky: true,
       clickable: true,
     },
-    { id: "container", header: "Container No.", accessor: (c) => <code className="text-xs">{c.container_id}</code>, sort: (a,b)=>a.container_id.localeCompare(b.container_id) },
-    { id: "clients", header: "Clients", accessor: (c) => `${c.total_clients}`, sort: (a,b)=>(a.total_clients)-(b.total_clients), align: "right", width: "110px" },
-    { id: "route", header: "Route", accessor: (c) => (
-      <div className="flex items-center text-sm"><MapPin className="h-3 w-3 mr-1 text-muted-foreground" />{(c.route?.split(' to ')[0] || '-') + ' → ' + (c.route?.split(' to ')[1] || '-')}</div>
-    ), sort: (a,b)=> (a.route||'').localeCompare(b.route||'') },
-    { id: "load", header: "Loading Date", accessor: (c) => formatDate(c.load_date), sort: (a,b)=> (a.load_date||'').localeCompare(b.load_date||'') },
-    { id: "eta", header: "ETA", accessor: (c) => (
-      <div>
-        <div className={isOverdue(c.eta) ? "text-red-600 font-medium" : undefined}>{formatDate(c.eta)}</div>
-        <div className="text-xs text-muted-foreground">{isOverdue(c.eta) ? `${daysLate(c.eta)} days late` : (formatRelative(c.eta) || "")}</div>
-      </div>
-    ), sort: (a,b)=> (a.eta||'').localeCompare(b.eta||'') },
-    { id: "status", header: "Status", accessor: (c) => <StatusBadge status={mapStatus(c.status)} /> },
+    {
+      id: "container",
+      header: "Container No.",
+      accessor: (c) => <code className="text-xs">{c.container_id}</code>,
+      sort: (a, b) => a.container_id.localeCompare(b.container_id),
+    },
+    {
+      id: "clients",
+      header: "Clients",
+      accessor: (c) => `${c.total_clients}`,
+      sort: (a, b) => a.total_clients - b.total_clients,
+      align: "right",
+      width: "110px",
+    },
+    {
+      id: "route",
+      header: "Route",
+      accessor: (c) => (
+        <div className="flex items-center text-sm">
+          <MapPin className="h-3 w-3 mr-1 text-muted-foreground" />
+          {(c.route?.split(" to ")[0] || "-") +
+            " → " +
+            (c.route?.split(" to ")[1] || "-")}
+        </div>
+      ),
+      sort: (a, b) => (a.route || "").localeCompare(b.route || ""),
+    },
+    {
+      id: "load",
+      header: "Loading Date",
+      accessor: (c) => formatDate(c.load_date),
+      sort: (a, b) => (a.load_date || "").localeCompare(b.load_date || ""),
+    },
+    {
+      id: "eta",
+      header: "ETA",
+      accessor: (c) => (
+        <div>
+          <div
+            className={
+              isOverdue(c.eta) ? "text-red-600 font-medium" : undefined
+            }
+          >
+            {formatDate(c.eta)}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {isOverdue(c.eta)
+              ? `${daysLate(c.eta)} days late`
+              : formatRelative(c.eta) || ""}
+          </div>
+        </div>
+      ),
+      sort: (a, b) => (a.eta || "").localeCompare(b.eta || ""),
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessor: (c) => <StatusBadge status={mapStatus(c.status)} />,
+    },
   ];
 
   return (
@@ -125,21 +207,28 @@ export default function SeaCargo() {
             <Ship className="h-6 w-6 mr-3 text-primary" />
             Sea Cargo
           </h1>
-          <p className="text-muted-foreground mt-1">Track and manage all sea freight shipments • All times shown in your local time zone</p>
+          <p className="text-muted-foreground mt-1">
+            Track and manage all sea freight shipments • All times shown in your
+            local time zone
+          </p>
         </div>
-  <Button onClick={() => setShowNewCargoDialog(true)}>
+        <Button onClick={() => setShowNewCargoDialog(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Cargo
         </Button>
       </div>
 
-  {/* Summary Cards */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="logistics-card p-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm text-muted-foreground">Total Containers</div>
-      <div className="text-2xl font-semibold mt-1">{dashboard?.total_containers ?? 0}</div>
+              <div className="text-sm text-muted-foreground">
+                Total Containers
+              </div>
+              <div className="text-2xl font-semibold mt-1">
+                {dashboard?.total_containers ?? 0}
+              </div>
             </div>
             <Package className="h-8 w-8 text-primary/60" />
           </div>
@@ -148,7 +237,9 @@ export default function SeaCargo() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm text-muted-foreground">In Transit</div>
-      <div className="text-2xl font-semibold mt-1">{dashboard?.containers_in_transit ?? 0}</div>
+              <div className="text-2xl font-semibold mt-1">
+                {dashboard?.containers_in_transit ?? 0}
+              </div>
             </div>
             <Ship className="h-8 w-8 text-secondary/60" />
           </div>
@@ -157,7 +248,11 @@ export default function SeaCargo() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm text-muted-foreground">Total CBM</div>
-      <div className="text-2xl font-semibold mt-1">{filteredCargo.reduce((sum, c) => sum + (c.cbm || 0), 0).toFixed(1)}</div>
+              <div className="text-2xl font-semibold mt-1">
+                {filteredCargo
+                  .reduce((sum, c) => sum + (c.cbm || 0), 0)
+                  .toFixed(1)}
+              </div>
             </div>
             <Package className="h-8 w-8 text-accent/60" />
           </div>
@@ -213,7 +308,14 @@ export default function SeaCargo() {
           >
             Delivered
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchTerm("");
+              setStatusFilter("all");
+            }}
+          >
             <RefreshCcw className="h-4 w-4 mr-1" /> Reset filters
           </Button>
         </div>
@@ -226,63 +328,155 @@ export default function SeaCargo() {
           rows={filteredCargo}
           columns={cols}
           loading={loading}
-          empty={<div className="text-muted-foreground">No sea cargo yet. Add Cargo or Import from Excel.</div>}
+          empty={
+            <div className="text-muted-foreground">
+              No sea cargo yet. Add Cargo or Import from Excel.
+            </div>
+          }
           rowActions={(row) => (
             <>
-              <DropdownMenuItem onClick={async () => {
-                const next = row.status === 'pending' ? 'in_transit' : (row.status === 'in_transit' ? 'delivered' : 'pending');
-                try {
-                  await cargoService.updateBackendContainer(row.container_id, { status: next });
-                  toast({ title: 'Status updated', description: `${row.container_id} → ${next.replace('_',' ')}` });
-                  // refresh
-                  setContainers((prev)=> prev.map(c=> c.container_id===row.container_id ? { ...c, status: next as 'pending' | 'in_transit' | 'delivered' | 'demurrage' } : c));
-                } catch (e: unknown) {
-                  toast({ title: 'Update failed', description: e instanceof Error ? e.message : 'Unable to update', variant: 'destructive' });
-                }
-              }}>
-                <Settings className="h-4 w-4 mr-2"/> Update Status
+              <DropdownMenuItem
+                onClick={async () => {
+                  // Allow user to select new status
+                  const statusOptions = [
+                    "pending",
+                    "in_transit",
+                    "delivered",
+                    "demurrage",
+                  ];
+                  const currentStatus = row.status;
+                  const availableStatuses = statusOptions.filter(
+                    (s) => s !== currentStatus
+                  );
+
+                  const newStatus = prompt(
+                    `Update status for ${
+                      row.container_id
+                    }\nCurrent: ${currentStatus.replace(
+                      "_",
+                      " "
+                    )}\n\nEnter new status:\n${availableStatuses
+                      .map((s, i) => `${i + 1}. ${s.replace("_", " ")}`)
+                      .join("\n")}`,
+                    availableStatuses[0]
+                  );
+
+                  if (!newStatus || !statusOptions.includes(newStatus)) return;
+
+                  try {
+                    await cargoService.updateBackendContainer(
+                      row.container_id,
+                      {
+                        status: newStatus as
+                          | "pending"
+                          | "in_transit"
+                          | "delivered"
+                          | "demurrage",
+                      }
+                    );
+                    toast({
+                      title: "Status updated",
+                      description: `${row.container_id} → ${newStatus.replace(
+                        "_",
+                        " "
+                      )}`,
+                    });
+                    // refresh
+                    setContainers((prev) =>
+                      prev.map((c) =>
+                        c.container_id === row.container_id
+                          ? {
+                              ...c,
+                              status: newStatus as
+                                | "pending"
+                                | "in_transit"
+                                | "delivered"
+                                | "demurrage",
+                            }
+                          : c
+                      )
+                    );
+                  } catch (e: unknown) {
+                    toast({
+                      title: "Update failed",
+                      description:
+                        e instanceof Error ? e.message : "Unable to update",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <Settings className="h-4 w-4 mr-2" /> Update Status
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => {
-                setSelectedContainer({
-                  id: row.container_id,
-                  containerNo: row.container_id,
-                  client: `${row.total_clients} clients`,
-                  origin: row.route?.split(' to ')[0] || '-',
-                  destination: row.route?.split(' to ')[1] || '-',
-                  loadingDate: row.load_date,
-                  eta: row.eta,
-                  cbm: String(row.cbm ?? 0),
-                  weight: row.weight ? `${row.weight} kg` : '-',
-                  status: 'in-transit',
-                  vessel: '-',
-                  voyage: '-',
-                  goods: '-',
-                  notes: '',
-                });
-                setShowContainerDetails(true);
-              }}>
-                <Edit className="h-4 w-4 mr-2"/> Edit
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedContainer({
+                    id: row.container_id,
+                    containerNo: row.container_id,
+                    client: `${row.total_clients} clients`,
+                    origin: row.route?.split(" to ")[0] || "-",
+                    destination: row.route?.split(" to ")[1] || "-",
+                    loadingDate: row.load_date,
+                    eta: row.eta,
+                    cbm: String(row.cbm ?? 0),
+                    weight: row.weight ? `${row.weight} kg` : "-",
+                    status: "in-transit",
+                    vessel: "-",
+                    voyage: "-",
+                    goods: "-",
+                    notes: "",
+                  });
+                  setShowContainerDetails(true);
+                }}
+              >
+                <Edit className="h-4 w-4 mr-2" /> Edit
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive" onClick={async ()=>{
-                if (!confirm(`Delete container ${row.container_id}? This cannot be undone.`)) return;
-                try {
-                  await cargoService.deleteBackendContainer(row.container_id);
-                  setContainers((prev)=> prev.filter(c=> c.container_id !== row.container_id));
-                  toast({ title: 'Deleted', description: `${row.container_id} removed.` });
-                } catch (e: unknown) {
-                  toast({ title: 'Delete failed', description: e instanceof Error ? e.message : 'Unable to delete', variant: 'destructive' });
-                }
-              }}>
-                <Trash2 className="h-4 w-4 mr-2"/> Delete
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={async () => {
+                  if (
+                    !confirm(
+                      `Delete container ${row.container_id}? This cannot be undone.`
+                    )
+                  )
+                    return;
+                  try {
+                    await cargoService.deleteBackendContainer(row.container_id);
+                    setContainers((prev) =>
+                      prev.filter((c) => c.container_id !== row.container_id)
+                    );
+                    toast({
+                      title: "Deleted",
+                      description: `${row.container_id} removed.`,
+                    });
+                  } catch (e: unknown) {
+                    toast({
+                      title: "Delete failed",
+                      description:
+                        e instanceof Error ? e.message : "Unable to delete",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" /> Delete
               </DropdownMenuItem>
             </>
           )}
           renderBulkBar={(rows) => (
             <div className="flex gap-2">
-              <Button size="sm" variant="outline">Update Status</Button>
-              <Button size="sm" variant="outline">Export</Button>
-              <Button size="sm" variant="outline">Assign</Button>
-              <Button size="sm" variant="destructive">Delete</Button>
+              <Button size="sm" variant="outline">
+                Update Status
+              </Button>
+              <Button size="sm" variant="outline">
+                Export
+              </Button>
+              <Button size="sm" variant="outline">
+                Assign
+              </Button>
+              <Button size="sm" variant="destructive">
+                Delete
+              </Button>
             </div>
           )}
           onRowClick={(cargo) => {
@@ -308,10 +502,14 @@ export default function SeaCargo() {
         />
       </div>
 
-  <NewCargoContainerDialog open={showNewCargoDialog} onOpenChange={setShowNewCargoDialog} defaultType="sea" />
+      <NewCargoContainerDialog
+        open={showNewCargoDialog}
+        onOpenChange={setShowNewCargoDialog}
+        defaultType="sea"
+      />
 
-      <ContainerDetailsDialog 
-        open={showContainerDetails} 
+      <ContainerDetailsDialog
+        open={showContainerDetails}
         onOpenChange={setShowContainerDetails}
         container={selectedContainer}
       />
