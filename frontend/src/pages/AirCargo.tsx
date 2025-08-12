@@ -32,9 +32,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
+import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
 import { useNavigate } from "react-router-dom";
 import {
   cargoService,
@@ -86,6 +88,17 @@ export default function AirCargo() {
   const [viewContainer, setViewContainer] =
     useState<BackendCargoContainer | null>(null);
 
+  // Status dialog state
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [selectedStatusContainer, setSelectedStatusContainer] =
+    useState<BackendCargoContainer | null>(null);
+  const [newStatus, setNewStatus] = useState<string>("");
+
+  // Container details state
+  const [showContainerDetails, setShowContainerDetails] = useState(false);
+  const [selectedContainer, setSelectedContainer] =
+    useState<AirCargoItem | null>(null);
+
   // Load air cargo data (containers) + dashboard
   useEffect(() => {
     let ignore = false;
@@ -114,6 +127,55 @@ export default function AirCargo() {
       ignore = true;
     };
   }, []);
+
+  // Reload data function
+  const reloadData = async () => {
+    try {
+      const [containersRes, dashRes] = await Promise.all([
+        cargoService.getContainers({ cargo_type: "air" }),
+        cargoService.getDashboard("air"),
+      ]);
+      setContainers(containersRes.data?.results || []);
+      setDashboard(dashRes.data || null);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to reload air cargo";
+      setError(msg);
+    }
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!selectedStatusContainer || !newStatus) return;
+
+    try {
+      await cargoService.updateBackendContainer(
+        selectedStatusContainer.container_id,
+        {
+          status: newStatus as
+            | "pending"
+            | "in_transit"
+            | "delivered"
+            | "demurrage",
+        }
+      );
+      toast({
+        title: "Status updated",
+        description: `${
+          selectedStatusContainer.container_id
+        } → ${newStatus.replace("_", " ")}`,
+      });
+      setShowStatusDialog(false);
+      setSelectedStatusContainer(null);
+      setNewStatus("");
+      // Reload data to get fresh state
+      await reloadData();
+    } catch (e: unknown) {
+      toast({
+        title: "Update failed",
+        description: e instanceof Error ? e.message : "Unable to update",
+        variant: "destructive",
+      });
+    }
+  };
 
   const filtered = useMemo(() => {
     let list = containers;
@@ -554,133 +616,34 @@ export default function AirCargo() {
                     View Details
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={async () => {
-                      // Allow user to select new status
-                      const statusOptions = [
-                        "pending",
-                        "in_transit",
-                        "delivered",
-                        "delayed",
-                      ];
-                      const currentStatus = row._raw.status;
-                      const availableStatuses = statusOptions.filter(
-                        (s) => s !== currentStatus
-                      );
-
-                      const newStatus = prompt(
-                        `Update status for ${
-                          row.tracking
-                        }\nCurrent: ${currentStatus.replace(
-                          "_",
-                          " "
-                        )}\n\nEnter new status:\n${availableStatuses
-                          .map((s, i) => `${i + 1}. ${s.replace("_", " ")}`)
-                          .join("\n")}`,
-                        availableStatuses[0]
-                      );
-
-                      if (!newStatus || !statusOptions.includes(newStatus))
-                        return;
-
-                      try {
-                        await cargoService.updateBackendContainer(
-                          row._raw.container_id,
-                          {
-                            status:
-                              newStatus as BackendCargoContainer["status"],
-                          }
-                        );
-                        setContainers((prev) =>
-                          prev.map((container) =>
-                            container.container_id === row._raw.container_id
-                              ? {
-                                  ...container,
-                                  status:
-                                    newStatus as BackendCargoContainer["status"],
-                                }
-                              : container
-                          )
-                        );
-                        toast({
-                          title: "Status updated",
-                          description: `${row.tracking} → ${newStatus.replace(
-                            "_",
-                            " "
-                          )}`,
-                        });
-                      } catch (e: unknown) {
-                        toast({
-                          title: "Update failed",
-                          description:
-                            e instanceof Error ? e.message : "Unable to update",
-                          variant: "destructive",
-                        });
-                      }
+                    onClick={() => {
+                      setSelectedStatusContainer(row._raw);
+                      setNewStatus(row._raw.status);
+                      setShowStatusDialog(true);
                     }}
                   >
                     <Settings className="h-4 w-4 mr-2" />
                     Update Status
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={async () => {
-                      // Create a simple form for editing key fields
-                      const currentContainer = row._raw;
-                      const newRoute = prompt(
-                        "Edit route:",
-                        currentContainer.route
-                      );
-                      if (newRoute === null) return; // User cancelled
-
-                      const newWeight = prompt(
-                        "Edit weight (kg):",
-                        String(currentContainer.weight || "")
-                      );
-                      if (newWeight === null) return; // User cancelled
-
-                      const newCbm = prompt(
-                        "Edit CBM:",
-                        String(currentContainer.cbm || "")
-                      );
-                      if (newCbm === null) return; // User cancelled
-
-                      const weight =
-                        parseFloat(newWeight) || currentContainer.weight;
-                      const cbm = parseFloat(newCbm) || currentContainer.cbm;
-
-                      try {
-                        await cargoService.updateBackendContainer(
-                          currentContainer.container_id,
-                          {
-                            route: newRoute,
-                            weight,
-                            cbm,
-                          }
-                        );
-                        setContainers((prev) =>
-                          prev.map((container) =>
-                            container.container_id ===
-                            currentContainer.container_id
-                              ? {
-                                  ...container,
-                                  route: newRoute,
-                                  weight,
-                                  cbm,
-                                }
-                              : container
-                          )
-                        );
-                        toast({
-                          title: "Container updated",
-                          description: `${row.tracking} details updated`,
-                        });
-                      } catch (e: unknown) {
-                        toast({
-                          title: "Edit failed",
-                          description:
-                            e instanceof Error ? e.message : "Unable to update",
-                          variant: "destructive",
-                        });
-                      }
+                    onClick={() => {
+                      setSelectedContainer({
+                        id: row._raw.container_id,
+                        awbNumber: row._raw.container_id,
+                        client: `${row._raw.total_clients} clients`,
+                        origin: row._raw.route?.split(" to ")[0] || "-",
+                        destination: row._raw.route?.split(" to ")[1] || "-",
+                        airline: "-",
+                        flightNumber: "-",
+                        departureDate: row._raw.load_date,
+                        arrivalDate: row._raw.eta,
+                        weight: row._raw.weight ? `${row._raw.weight} kg` : "-",
+                        volume: row._raw.cbm ? `${row._raw.cbm} m³` : "-",
+                        goods: "-",
+                        status: "in-transit",
+                        notes: "",
+                      });
+                      setShowContainerDetails(true);
                     }}
                   >
                     <Edit className="h-4 w-4 mr-2" />
@@ -695,12 +658,7 @@ export default function AirCargo() {
                         await cargoService.deleteBackendContainer(
                           row._raw.container_id
                         );
-                        setContainers((prev) =>
-                          prev.filter(
-                            (container) =>
-                              container.container_id !== row._raw.container_id
-                          )
-                        );
+                        await reloadData(); // Reload data instead of local state update
                         toast({
                           title: "Deleted",
                           description: `${row.tracking} removed.`,
@@ -744,6 +702,65 @@ export default function AirCargo() {
         onOpenChange={setShowNewCargoDialog}
         defaultType="air"
       />
+
+      {/* Status Update Dialog */}
+      <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Container Status</DialogTitle>
+            <DialogDescription>
+              Change the status of the selected container to reflect its current
+              state.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Container:{" "}
+                <span className="font-medium">
+                  {selectedStatusContainer?.container_id}
+                </span>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Current Status:{" "}
+                <span className="font-medium">
+                  {selectedStatusContainer?.status?.replace("_", " ")}
+                </span>
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium">New Status</label>
+              <Select value={newStatus} onValueChange={setNewStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select new status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_transit">In Transit</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="demurrage">Demurrage</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowStatusDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleStatusUpdate}
+              disabled={
+                !newStatus || newStatus === selectedStatusContainer?.status
+              }
+            >
+              Update Status
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* View Container Dialog */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
@@ -896,6 +913,12 @@ export default function AirCargo() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ContainerDetailsDialog
+        open={showContainerDetails}
+        onOpenChange={setShowContainerDetails}
+        container={selectedContainer}
+      />
     </div>
   );
 }
