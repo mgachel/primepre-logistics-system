@@ -1,28 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Search,
-  Plus,
-  Ship,
-  MapPin,
-  Calendar,
-  Package,
-  RefreshCcw,
-} from "lucide-react";
+import { Search, Plus, Ship, MapPin, Calendar, Package, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
 import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
-import {
-  cargoService,
-  BackendCargoContainer,
-  CargoDashboardStats,
-} from "@/services/cargoService";
+import { cargoService, BackendCargoContainer, CargoDashboardStats } from "@/services/cargoService";
 import { DataTable, Column } from "@/components/data-table/DataTable";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Edit, Settings, Trash2 } from "lucide-react";
+import { Edit, Settings, Trash2, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 
 interface SeaCargoItem {
   id: string;
@@ -72,6 +62,9 @@ export default function SeaCargo() {
   const [error, setError] = useState<string | null>(null);
   const [containers, setContainers] = useState<BackendCargoContainer[]>([]);
   const [dashboard, setDashboard] = useState<CargoDashboardStats | null>(null);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [selectedStatusContainer, setSelectedStatusContainer] = useState<BackendCargoContainer | null>(null);
+  const [newStatus, setNewStatus] = useState<string>("");
 
   // Load containers and dashboard
   useEffect(() => {
@@ -110,6 +103,56 @@ export default function SeaCargo() {
       ignore = true;
     };
   }, [searchTerm, statusFilter]);
+
+  // Reload data function
+  const reloadData = async () => {
+    try {
+      const statusParam =
+        statusFilter === "all"
+          ? undefined
+          : statusFilter === "in-transit"
+          ? "in_transit"
+          : statusFilter;
+      const [listRes, dashRes] = await Promise.all([
+        cargoService.getContainers({
+          cargo_type: "sea",
+          search: searchTerm || undefined,
+          status: statusParam,
+        }),
+        cargoService.getDashboard("sea"),
+      ]);
+      setContainers(listRes.data?.results || []);
+      setDashboard(dashRes.data || null);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to reload sea cargo";
+      setError(msg);
+    }
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!selectedStatusContainer || !newStatus) return;
+    
+    try {
+      await cargoService.updateBackendContainer(selectedStatusContainer.container_id, { 
+        status: newStatus as 'pending' | 'in_transit' | 'delivered' | 'demurrage' 
+      });
+      toast({
+        title: "Status updated",
+        description: `${selectedStatusContainer.container_id} → ${newStatus.replace("_", " ")}`,
+      });
+      setShowStatusDialog(false);
+      setSelectedStatusContainer(null);
+      setNewStatus("");
+      // Reload data to get fresh state
+      await reloadData();
+    } catch (e: unknown) {
+      toast({
+        title: "Update failed",
+        description: e instanceof Error ? e.message : "Unable to update",
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredCargo = useMemo(() => containers, [containers]);
 
@@ -335,75 +378,32 @@ export default function SeaCargo() {
           }
           rowActions={(row) => (
             <>
+              <DropdownMenuItem onClick={() => {
+                setSelectedContainer({
+                  id: row.container_id,
+                  containerNo: row.container_id,
+                  client: `${row.total_clients} clients`,
+                  origin: row.route?.split(" to ")[0] || "-",
+                  destination: row.route?.split(" to ")[1] || "-",
+                  loadingDate: row.load_date,
+                  eta: row.eta,
+                  cbm: String(row.cbm ?? 0),
+                  weight: row.weight ? `${row.weight} kg` : "-",
+                  status: "in-transit",
+                  vessel: "-",
+                  voyage: "-",
+                  goods: "-",
+                  notes: "",
+                });
+                setShowContainerDetails(true);
+              }}>
+                <Eye className="h-4 w-4 mr-2" /> View Details
+              </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={async () => {
-                  // Allow user to select new status
-                  const statusOptions = [
-                    "pending",
-                    "in_transit",
-                    "delivered",
-                    "demurrage",
-                  ];
-                  const currentStatus = row.status;
-                  const availableStatuses = statusOptions.filter(
-                    (s) => s !== currentStatus
-                  );
-
-                  const newStatus = prompt(
-                    `Update status for ${
-                      row.container_id
-                    }\nCurrent: ${currentStatus.replace(
-                      "_",
-                      " "
-                    )}\n\nEnter new status:\n${availableStatuses
-                      .map((s, i) => `${i + 1}. ${s.replace("_", " ")}`)
-                      .join("\n")}`,
-                    availableStatuses[0]
-                  );
-
-                  if (!newStatus || !statusOptions.includes(newStatus)) return;
-
-                  try {
-                    await cargoService.updateBackendContainer(
-                      row.container_id,
-                      {
-                        status: newStatus as
-                          | "pending"
-                          | "in_transit"
-                          | "delivered"
-                          | "demurrage",
-                      }
-                    );
-                    toast({
-                      title: "Status updated",
-                      description: `${row.container_id} → ${newStatus.replace(
-                        "_",
-                        " "
-                      )}`,
-                    });
-                    // refresh
-                    setContainers((prev) =>
-                      prev.map((c) =>
-                        c.container_id === row.container_id
-                          ? {
-                              ...c,
-                              status: newStatus as
-                                | "pending"
-                                | "in_transit"
-                                | "delivered"
-                                | "demurrage",
-                            }
-                          : c
-                      )
-                    );
-                  } catch (e: unknown) {
-                    toast({
-                      title: "Update failed",
-                      description:
-                        e instanceof Error ? e.message : "Unable to update",
-                      variant: "destructive",
-                    });
-                  }
+                onClick={() => {
+                  setSelectedStatusContainer(row);
+                  setNewStatus(row.status);
+                  setShowStatusDialog(true);
                 }}
               >
                 <Settings className="h-4 w-4 mr-2" /> Update Status
@@ -442,9 +442,7 @@ export default function SeaCargo() {
                     return;
                   try {
                     await cargoService.deleteBackendContainer(row.container_id);
-                    setContainers((prev) =>
-                      prev.filter((c) => c.container_id !== row.container_id)
-                    );
+                    await reloadData(); // Reload data instead of local state update
                     toast({
                       title: "Deleted",
                       description: `${row.container_id} removed.`,
@@ -479,28 +477,52 @@ export default function SeaCargo() {
               </Button>
             </div>
           )}
-          onRowClick={(cargo) => {
-            const mapped: SeaCargoItem = {
-              id: cargo.container_id,
-              containerNo: cargo.container_id,
-              client: `${cargo.total_clients} clients`,
-              origin: cargo.route?.split(" to ")[0] || "-",
-              destination: cargo.route?.split(" to ")[1] || "-",
-              loadingDate: cargo.load_date,
-              eta: cargo.eta,
-              cbm: String(cargo.cbm ?? 0),
-              weight: cargo.weight ? `${cargo.weight} kg` : "-",
-              status: mapStatus(cargo.status),
-              vessel: "-",
-              voyage: "-",
-              goods: "-",
-              notes: "",
-            };
-            setSelectedContainer(mapped);
-            setShowContainerDetails(true);
-          }}
         />
       </div>
+
+      {/* Status Update Dialog */}
+      <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Container Status</DialogTitle>
+            <DialogDescription>
+              Change the status of the selected container to reflect its current state.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Container: <span className="font-medium">{selectedStatusContainer?.container_id}</span>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Current Status: <span className="font-medium">{selectedStatusContainer?.status?.replace("_", " ")}</span>
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium">New Status</label>
+              <Select value={newStatus} onValueChange={setNewStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select new status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_transit">In Transit</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="demurrage">Demurrage</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowStatusDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleStatusUpdate} disabled={!newStatus || newStatus === selectedStatusContainer?.status}>
+              Update Status
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <NewCargoContainerDialog
         open={showNewCargoDialog}
