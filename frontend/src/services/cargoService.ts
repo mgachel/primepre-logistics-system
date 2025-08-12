@@ -188,7 +188,7 @@ export const cargoService = {
     delay_days: number;
     status: 'pending' | 'in_transit' | 'delivered' | 'demurrage';
   }>): Promise<ApiResponse<BackendCargoContainer>> {
-    return apiClient.put<BackendCargoContainer>(`/api/cargo/containers/${encodeURIComponent(containerId)}/`, data);
+    return apiClient.patch<BackendCargoContainer>(`/api/cargo/containers/${encodeURIComponent(containerId)}/`, data);
   },
 
   // Delete a CargoContainer
