@@ -21,7 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { NewGoodsDialog } from "@/components/dialogs/NewGoodsDialog";
-import { warehouseService, WarehouseItem, AdminWarehouseStatistics } from "@/services/warehouseService";
+import {
+  warehouseService,
+  WarehouseItem,
+  AdminWarehouseStatistics,
+} from "@/services/warehouseService";
 import { DataTable, Column } from "@/components/data-table/DataTable";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -47,6 +51,7 @@ export default function GhanaWarehouse() {
   const [stats, setStats] = useState<AdminWarehouseStatistics | null>(null);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrev, setHasPrev] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // helpers to coerce/format numeric fields safely
   const toNum = (v: unknown) => {
@@ -212,13 +217,81 @@ export default function GhanaWarehouse() {
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      const res = await warehouseService.uploadGhanaExcel(file);
-      toast({
-        title: res.success ? "Upload complete" : "Upload failed",
-        description: res.message,
-      });
-      // refresh
-      setSearch((s) => s);
+      const isExcel =
+        file.type.includes("sheet") ||
+        file.name.toLowerCase().endsWith(".xlsx") ||
+        file.name.toLowerCase().endsWith(".xls");
+      if (!isExcel) {
+        toast({
+          title: "Unsupported file",
+          description: "Please upload an .xlsx or .xls Excel file.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setUploading(true);
+      try {
+        const res = await warehouseService.uploadGhanaExcel(file);
+        const created = res.data?.created_count ?? 0;
+        const rawErrors = (res.data?.errors || []) as Array<
+          string | { row?: number; error: string }
+        >;
+        const errors = rawErrors
+          .map((er) =>
+            typeof er === "string"
+              ? er
+              : er?.row
+              ? `Row ${er.row}: ${er.error}`
+              : er?.error
+          )
+          .filter(Boolean) as string[];
+        const hadErrors = errors.length > 0;
+
+        if (!res.success || created === 0) {
+          const sample = errors.slice(0, 3).join(" | ");
+          const raw = res.message || "";
+          const missing = raw.match(/Missing required columns:\s*([^'"\]}]*)/i);
+          const cleaned = raw
+            .replace(/ErrorDetail\(string=/g, "")
+            .replace(/,\s*code='[^']*'\)/g, ")")
+            .replace(/[[{}]]/g, "")
+            .replace(/^["']|["']$/g, "");
+          const friendly = missing
+            ? `Missing required columns: ${missing[1].trim()}. Please download and use the template.`
+            : sample ||
+              cleaned ||
+              "No items were created from this file. Please check that the columns match the template and required fields are filled.";
+          toast({
+            title: "Upload failed",
+            description: friendly,
+            variant: "destructive",
+          });
+        } else {
+          const detail = hadErrors
+            ? `Created ${created} item(s), but ${errors.length} row(s) failed.`
+            : `Created ${created} item(s).`;
+          const more = hadErrors ? ` Example: ${errors[0]}` : "";
+          toast({
+            title: "Upload complete",
+            description: `${detail}${more}`,
+          });
+        }
+
+        // refresh list and stats regardless of outcome
+        setPage(1);
+        setSearch((s) => s);
+        const statsRes = await warehouseService.getAdminGhanaStatistics();
+        if (statsRes.success) setStats(statsRes.data);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Upload failed";
+        toast({
+          title: "Upload failed",
+          description: msg,
+          variant: "destructive",
+        });
+      } finally {
+        setUploading(false);
+      }
     };
     input.click();
   };
@@ -254,9 +327,14 @@ export default function GhanaWarehouse() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onUpload}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onUpload}
+            disabled={uploading}
+          >
             <Upload className="h-4 w-4" />
-            Import Excel
+            {uploading ? "Uploading..." : "Import Excel"}
           </Button>
           <Button variant="outline" size="sm" onClick={onExportTemplate}>
             <Download className="h-4 w-4" />
@@ -456,7 +534,8 @@ export default function GhanaWarehouse() {
           />
           <div className="flex items-center justify-between pt-4">
             <div className="text-sm text-muted-foreground">
-              Page {page} of {Math.max(1, Math.ceil(count / PAGE_SIZE))} • {count} total
+              Page {page} of {Math.max(1, Math.ceil(count / PAGE_SIZE))} •{" "}
+              {count} total
             </div>
             <div className="flex gap-2">
               <Button
