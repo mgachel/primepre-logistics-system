@@ -16,6 +16,7 @@ import {
   FileDown,
   Settings,
 } from "lucide-react";
+import { EditCargoContainerDialog } from "@/components/dialogs/EditCargoContainerDialog";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,6 +94,9 @@ export default function AirCargo() {
   const [selectedStatusContainer, setSelectedStatusContainer] =
     useState<BackendCargoContainer | null>(null);
   const [newStatus, setNewStatus] = useState<string>("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editContainer, setEditContainer] =
+    useState<BackendCargoContainer | null>(null);
 
   // Container details state
   const [showContainerDetails, setShowContainerDetails] = useState(false);
@@ -626,23 +630,8 @@ export default function AirCargo() {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => {
-                      setSelectedContainer({
-                        id: row._raw.container_id,
-                        awbNumber: row._raw.container_id,
-                        client: `${row._raw.total_clients} clients`,
-                        origin: row._raw.route?.split(" to ")[0] || "-",
-                        destination: row._raw.route?.split(" to ")[1] || "-",
-                        airline: "-",
-                        flightNumber: "-",
-                        departureDate: row._raw.load_date,
-                        arrivalDate: row._raw.eta,
-                        weight: row._raw.weight ? `${row._raw.weight} kg` : "-",
-                        volume: row._raw.cbm ? `${row._raw.cbm} m³` : "-",
-                        goods: "-",
-                        status: "in-transit",
-                        notes: "",
-                      });
-                      setShowContainerDetails(true);
+                      setEditContainer(row._raw);
+                      setEditOpen(true);
                     }}
                   >
                     <Edit className="h-4 w-4 mr-2" />
@@ -917,6 +906,15 @@ export default function AirCargo() {
         open={showContainerDetails}
         onOpenChange={setShowContainerDetails}
         container={selectedContainer}
+      />
+
+      <EditCargoContainerDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        container={editContainer}
+        onSaved={async () => {
+          await reloadData();
+        }}
       />
     </div>
   );
