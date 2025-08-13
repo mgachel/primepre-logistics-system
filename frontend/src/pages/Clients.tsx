@@ -9,6 +9,8 @@ import {
   Briefcase,
   RefreshCcw,
   ShieldX,
+  ShieldCheck,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NewClientDialog } from "@/components/dialogs/NewClientDialog";
+import { SendMessageDialog } from "@/components/dialogs/SendMessageDialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { adminService } from "@/services/adminService";
 import type { User } from "@/services/authService";
@@ -43,6 +46,9 @@ export default function Clients() {
     "all" | "active" | "inactive"
   >(persistGet("clients:filterStatus", "all"));
   const [showNewClientDialog, setShowNewClientDialog] = useState(false);
+  const [showSendMessageDialog, setShowSendMessageDialog] = useState(false);
+  const [selectedUserForMessage, setSelectedUserForMessage] =
+    useState<User | null>(null);
   const [detailsUser, setDetailsUser] = useState<User | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [historyItems, setHistoryItems] = useState<BackendCargoItem[]>([]);
@@ -398,46 +404,57 @@ export default function Clients() {
                 }}
               >
                 <Eye className="h-4 w-4 mr-2" />
-                View
+                View Details
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
-                  setDetailsUser(row._raw);
-                  setDetailsOpen(true); /* history auto-load in effect */
+                  setSelectedUserForMessage(row._raw);
+                  setShowSendMessageDialog(true);
                 }}
               >
-                <History className="h-4 w-4 mr-2" />
-                View History
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Send Message
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="text-destructive"
+                className={
+                  row._raw.is_active ? "text-destructive" : "text-green-600"
+                }
                 onClick={async () => {
-                  if (!row._raw.is_active) {
-                    toast({ title: "Client already inactive" });
-                    return;
-                  }
+                  const action = row._raw.is_active ? "block" : "unblock";
+                  const actionText = row._raw.is_active ? "Block" : "Unblock";
+
                   if (
                     !confirm(
-                      `Block client ${
+                      `${actionText} client ${
                         row._raw.full_name || row._raw.email || row._raw.id
-                      }? They will become inactive.`
+                      }? They will become ${
+                        row._raw.is_active ? "inactive" : "active"
+                      }.`
                     )
                   )
                     return;
+
                   try {
-                    await adminService.updateClientStatus(row._raw.id, false);
+                    const response = await adminService.toggleUserStatus(
+                      row._raw.id
+                    );
                     toast({
-                      title: "Client blocked",
+                      title: `Client ${action}ed`,
                       description: `${
                         row._raw.full_name || row._raw.email
-                      } is now inactive.`,
+                      } is now ${
+                        response.data.user.is_active ? "active" : "inactive"
+                      }.`,
                     });
+
                     // Refresh list by re-fetching all clients
                     const params: {
+                      user_role: string;
                       ordering: string;
                       search?: string;
                       is_active?: boolean;
                     } = {
+                      user_role: "CUSTOMER",
                       ordering: "-date_joined",
                     };
                     if (searchTerm) params.search = searchTerm;
@@ -446,18 +463,28 @@ export default function Clients() {
                     fetchAllClients(params);
                   } catch (e: unknown) {
                     toast({
-                      title: "Failed to block",
+                      title: `Failed to ${action}`,
                       description:
-                        e instanceof Error ? e.message : "Unable to update",
+                        e instanceof Error
+                          ? e.message
+                          : "Unable to update user status",
                       variant: "destructive",
                     });
                   }
                 }}
               >
-                <ShieldX className="h-4 w-4 mr-2" />
-                Block Client
+                {row._raw.is_active ? (
+                  <>
+                    <ShieldX className="h-4 w-4 mr-2" />
+                    Block Client
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="h-4 w-4 mr-2" />
+                    Unblock Client
+                  </>
+                )}
               </DropdownMenuItem>
-              <DropdownMenuItem>Print / Export</DropdownMenuItem>
             </>
           )}
           onRowClick={(row) => {
@@ -604,6 +631,12 @@ export default function Clients() {
           </div>
         </DrawerContent>
       </Drawer>
+
+      <SendMessageDialog
+        open={showSendMessageDialog}
+        onOpenChange={setShowSendMessageDialog}
+        user={selectedUserForMessage}
+      />
 
       <NewClientDialog
         open={showNewClientDialog}
