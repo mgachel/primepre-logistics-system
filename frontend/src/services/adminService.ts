@@ -179,58 +179,27 @@ export const adminService = {
     }));
   },
 
-  // Toggle user active status (admin only)
+  // Toggle user active status using the proper backend endpoint
   async toggleUserStatus(
-    id: number,
-    isActive: boolean
-  ): Promise<ApiResponse<AdminUser>> {
-    return this.updateAdminUser(id, { is_active: isActive });
+    id: number
+  ): Promise<ApiResponse<{ message: string; user: User }>> {
+    return apiClient.post(`/api/auth/admin/users/${id}/toggle_active/`);
   },
 
-  // Get user permissions summary
-  async getUserPermissions(id: number): Promise<
-    ApiResponse<{
-      permissions: string[];
-      accessible_warehouses: string[];
-      admin_capabilities: string[];
-    }>
-  > {
-    const user = await this.getAdminUserById(id);
-    if (!user.data) throw new Error("User not found");
+  // Send message/email to user
+  async sendMessageToUser(
+    id: number,
+    data: { subject: string; message: string }
+  ): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.post(`/api/auth/admin/users/${id}/send_message/`, data);
+  },
 
-    const permissions: string[] = [];
-    const adminCapabilities: string[] = [];
-
-    if (user.data.can_create_users) {
-      permissions.push("CREATE_USERS");
-      adminCapabilities.push("User Management");
-    }
-    if (user.data.can_manage_inventory) {
-      permissions.push("MANAGE_INVENTORY");
-      adminCapabilities.push("Inventory Management");
-    }
-    if (user.data.can_view_analytics) {
-      permissions.push("VIEW_ANALYTICS");
-      adminCapabilities.push("Analytics Access");
-    }
-    if (user.data.can_manage_admins) {
-      permissions.push("MANAGE_ADMINS");
-      adminCapabilities.push("Admin Management");
-    }
-    if (user.data.can_access_admin_panel) {
-      permissions.push("ADMIN_PANEL_ACCESS");
-      adminCapabilities.push("Admin Panel Access");
-    }
-
-    return {
-      data: {
-        permissions,
-        accessible_warehouses: user.data.accessible_warehouses,
-        admin_capabilities: adminCapabilities,
-      },
-      success: true,
-      message: "User permissions retrieved successfully",
-    };
+  // Reset user password (admin action)
+  async resetUserPassword(
+    id: number,
+    data: { new_password: string }
+  ): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.post(`/api/auth/admin/users/${id}/reset_password/`, data);
   },
 
   // Update client/user status (for regular users, not admin users)
@@ -238,7 +207,7 @@ export const adminService = {
     id: number,
     isActive: boolean
   ): Promise<ApiResponse<User>> {
-    return apiClient.patch(`/api/v1/auth/users/${id}/`, {
+    return apiClient.patch(`/api/auth/admin/users/${id}/`, {
       is_active: isActive,
     });
   },
@@ -248,6 +217,6 @@ export const adminService = {
     id: number,
     data: Partial<User>
   ): Promise<ApiResponse<User>> {
-    return apiClient.patch(`/api/v1/auth/users/${id}/`, data);
+    return apiClient.patch(`/api/auth/admin/users/${id}/`, data);
   },
 };
