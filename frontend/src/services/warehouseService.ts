@@ -103,6 +103,25 @@ export interface WarehouseStats {
   total_weight: number;
 }
 
+// Admin statistics as returned by /api/goods/{china|ghana}/statistics/
+export interface AdminWarehouseStatistics {
+  total_count: number;
+  pending_count: number;
+  flagged_count: number;
+  cancelled_count: number;
+  total_cbm: number;
+  total_weight: number;
+  total_estimated_value: number;
+  average_days_in_warehouse: number;
+  processing_rate: number;
+  // China-only
+  ready_for_shipping_count?: number;
+  shipped_count?: number;
+  // Ghana-only
+  ready_for_delivery_count?: number;
+  delivered_count?: number;
+}
+
 export const warehouseService = {
   // Get China warehouse items (customer view)
   async getChinaWarehouseItems(
@@ -309,6 +328,18 @@ export const warehouseService = {
     });
     return apiClient.get<PaginatedResponse<WarehouseItem>>(
       `/api/goods/ghana/?${params.toString()}`
+    );
+  },
+
+  // Admin statistics
+  async getAdminChinaStatistics(): Promise<ApiResponse<AdminWarehouseStatistics>> {
+    return apiClient.get<AdminWarehouseStatistics>(
+      `/api/goods/china/statistics/`
+    );
+  },
+  async getAdminGhanaStatistics(): Promise<ApiResponse<AdminWarehouseStatistics>> {
+    return apiClient.get<AdminWarehouseStatistics>(
+      `/api/goods/ghana/statistics/`
     );
   },
 
