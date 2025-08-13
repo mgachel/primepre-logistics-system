@@ -208,18 +208,12 @@ export default function SeaCargo() {
       sticky: true,
     },
     {
-      id: "tracking",
-      header: "Container/AWB",
+      id: "container",
+      header: "Container No.",
       accessor: (c) => <span className="font-medium">{c.container_id}</span>,
       sort: (a, b) => a.container_id.localeCompare(b.container_id),
       sticky: true,
       clickable: true,
-    },
-    {
-      id: "container",
-      header: "Container No.",
-      accessor: (c) => <code className="text-xs">{c.container_id}</code>,
-      sort: (a, b) => a.container_id.localeCompare(b.container_id),
     },
     {
       id: "clients",
