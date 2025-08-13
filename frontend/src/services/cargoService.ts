@@ -189,6 +189,7 @@ export const cargoService = {
       cbm: number | null;
       load_date: string;
       eta: string;
+      unloading_date: string;
       route: string;
       rates: number | string | null;
       stay_days: number;
