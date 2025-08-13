@@ -608,8 +608,7 @@ export default function AirCargo() {
                 <>
                   <DropdownMenuItem
                     onClick={() => {
-                      setViewContainer(row._raw);
-                      setShowViewDialog(true);
+                      navigate(`/containers/${row._raw.container_id}`);
                     }}
                   >
                     <Eye className="h-4 w-4 mr-2" />
