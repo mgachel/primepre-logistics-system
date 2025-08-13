@@ -27,7 +27,7 @@ import ShippingRates from "./pages/ShippingRates";
 import ProfileSettings from "./pages/ProfileSettings";
 import Notifications from "./pages/Notifications";
 import Support from "./pages/Support";
-import ContainerDetails from "./pages/ContainerDetails";
+import ContainerDetailsPage from "./pages/ContainerDetailsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -55,8 +55,16 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <RoleBasedRoute
-                    adminComponent={<AppLayout><Dashboard /></AppLayout>}
-                    customerComponent={<AppLayout><CustomerDashboard /></AppLayout>}
+                    adminComponent={
+                      <AppLayout>
+                        <Dashboard />
+                      </AppLayout>
+                    }
+                    customerComponent={
+                      <AppLayout>
+                        <CustomerDashboard />
+                      </AppLayout>
+                    }
                   />
                 </ProtectedRoute>
               }
@@ -68,7 +76,11 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <RoleBasedRoute
-                    adminComponent={<AppLayout><Clients /></AppLayout>}
+                    adminComponent={
+                      <AppLayout>
+                        <Clients />
+                      </AppLayout>
+                    }
                     customerComponent={<Navigate to="/" replace />}
                   />
                 </ProtectedRoute>
@@ -79,7 +91,11 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <RoleBasedRoute
-                    adminComponent={<AppLayout><SeaCargo /></AppLayout>}
+                    adminComponent={
+                      <AppLayout>
+                        <SeaCargo />
+                      </AppLayout>
+                    }
                     customerComponent={<Navigate to="/" replace />}
                   />
                 </ProtectedRoute>
@@ -90,7 +106,11 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <RoleBasedRoute
-                    adminComponent={<AppLayout><AirCargo /></AppLayout>}
+                    adminComponent={
+                      <AppLayout>
+                        <AirCargo />
+                      </AppLayout>
+                    }
                     customerComponent={<Navigate to="/" replace />}
                   />
                 </ProtectedRoute>
@@ -101,7 +121,11 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <RoleBasedRoute
-                    adminComponent={<AppLayout><ChinaWarehouse /></AppLayout>}
+                    adminComponent={
+                      <AppLayout>
+                        <ChinaWarehouse />
+                      </AppLayout>
+                    }
                     customerComponent={<Navigate to="/" replace />}
                   />
                 </ProtectedRoute>
@@ -112,7 +136,11 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <RoleBasedRoute
-                    adminComponent={<AppLayout><GhanaWarehouse /></AppLayout>}
+                    adminComponent={
+                      <AppLayout>
+                        <GhanaWarehouse />
+                      </AppLayout>
+                    }
                     customerComponent={<Navigate to="/" replace />}
                   />
                 </ProtectedRoute>
@@ -123,7 +151,11 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <RoleBasedRoute
-                    adminComponent={<AppLayout><Claims /></AppLayout>}
+                    adminComponent={
+                      <AppLayout>
+                        <Claims />
+                      </AppLayout>
+                    }
                     customerComponent={<Navigate to="/" replace />}
                   />
                 </ProtectedRoute>
@@ -134,7 +166,11 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <RoleBasedRoute
-                    adminComponent={<AppLayout><ShippingRates /></AppLayout>}
+                    adminComponent={
+                      <AppLayout>
+                        <ShippingRates />
+                      </AppLayout>
+                    }
                     customerComponent={<Navigate to="/" replace />}
                   />
                 </ProtectedRoute>
@@ -145,7 +181,11 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <RoleBasedRoute
-                    adminComponent={<AppLayout><Admins /></AppLayout>}
+                    adminComponent={
+                      <AppLayout>
+                        <Admins />
+                      </AppLayout>
+                    }
                     customerComponent={<Navigate to="/" replace />}
                   />
                 </ProtectedRoute>
@@ -159,7 +199,11 @@ const App = () => (
                 <ProtectedRoute>
                   <RoleBasedRoute
                     adminComponent={<Navigate to="/" replace />}
-                    customerComponent={<AppLayout><CustomerShipments /></AppLayout>}
+                    customerComponent={
+                      <AppLayout>
+                        <CustomerShipments />
+                      </AppLayout>
+                    }
                   />
                 </ProtectedRoute>
               }
@@ -170,7 +214,11 @@ const App = () => (
                 <ProtectedRoute>
                   <RoleBasedRoute
                     adminComponent={<Navigate to="/" replace />}
-                    customerComponent={<AppLayout><CustomerClaims /></AppLayout>}
+                    customerComponent={
+                      <AppLayout>
+                        <CustomerClaims />
+                      </AppLayout>
+                    }
                   />
                 </ProtectedRoute>
               }
@@ -181,7 +229,9 @@ const App = () => (
               path="/settings"
               element={
                 <ProtectedRoute>
-                  <AppLayout><Settings /></AppLayout>
+                  <AppLayout>
+                    <Settings />
+                  </AppLayout>
                 </ProtectedRoute>
               }
             />
@@ -189,7 +239,9 @@ const App = () => (
               path="/profile"
               element={
                 <ProtectedRoute>
-                  <AppLayout><ProfileSettings /></AppLayout>
+                  <AppLayout>
+                    <ProfileSettings />
+                  </AppLayout>
                 </ProtectedRoute>
               }
             />
@@ -197,7 +249,9 @@ const App = () => (
               path="/notifications"
               element={
                 <ProtectedRoute>
-                  <AppLayout><Notifications /></AppLayout>
+                  <AppLayout>
+                    <Notifications />
+                  </AppLayout>
                 </ProtectedRoute>
               }
             />
@@ -205,15 +259,24 @@ const App = () => (
               path="/support"
               element={
                 <ProtectedRoute>
-                  <AppLayout><Support /></AppLayout>
+                  <AppLayout>
+                    <Support />
+                  </AppLayout>
                 </ProtectedRoute>
               }
             />
             <Route
-              path="/container/:id"
+              path="/containers/:containerId"
               element={
                 <ProtectedRoute>
-                  <AppLayout><ContainerDetails /></AppLayout>
+                  <RoleBasedRoute
+                    adminComponent={
+                      <AppLayout>
+                        <ContainerDetailsPage />
+                      </AppLayout>
+                    }
+                    customerComponent={<Navigate to="/" replace />}
+                  />
                 </ProtectedRoute>
               }
             />
