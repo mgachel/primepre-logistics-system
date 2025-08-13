@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
+import { EditCargoContainerDialog } from "@/components/dialogs/EditCargoContainerDialog";
 import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
 import {
   cargoService,
@@ -93,6 +94,9 @@ export default function SeaCargo() {
   const [selectedStatusContainer, setSelectedStatusContainer] =
     useState<BackendCargoContainer | null>(null);
   const [newStatus, setNewStatus] = useState<string>("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editContainer, setEditContainer] =
+    useState<BackendCargoContainer | null>(null);
 
   // Load containers and dashboard
   useEffect(() => {
@@ -427,23 +431,8 @@ export default function SeaCargo() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
-                  setSelectedContainer({
-                    id: row.container_id,
-                    containerNo: row.container_id,
-                    client: `${row.total_clients} clients`,
-                    origin: row.route?.split(" to ")[0] || "-",
-                    destination: row.route?.split(" to ")[1] || "-",
-                    loadingDate: row.load_date,
-                    eta: row.eta,
-                    cbm: String(row.cbm ?? 0),
-                    weight: row.weight ? `${row.weight} kg` : "-",
-                    status: "in-transit",
-                    vessel: "-",
-                    voyage: "-",
-                    goods: "-",
-                    notes: "",
-                  });
-                  setShowContainerDetails(true);
+                  setEditContainer(row);
+                  setEditOpen(true);
                 }}
               >
                 <Edit className="h-4 w-4 mr-2" /> Edit
@@ -560,6 +549,15 @@ export default function SeaCargo() {
         open={showNewCargoDialog}
         onOpenChange={setShowNewCargoDialog}
         defaultType="sea"
+      />
+
+      <EditCargoContainerDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        container={editContainer}
+        onSaved={async () => {
+          await reloadData();
+        }}
       />
 
       <ContainerDetailsDialog
