@@ -25,11 +25,12 @@ import { NewGoodsDialog } from "@/components/dialogs/NewGoodsDialog";
 import { DataTable, Column } from "@/components/data-table/DataTable";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { warehouseService, WarehouseItem } from "@/services/warehouseService";
+import { warehouseService, WarehouseItem, AdminWarehouseStatistics } from "@/services/warehouseService";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ChinaWarehouse() {
   const { toast } = useToast();
+  const PAGE_SIZE = 20;
   const [showNewGoodsDialog, setShowNewGoodsDialog] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<
@@ -42,6 +43,11 @@ export default function ChinaWarehouse() {
   >("all");
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<WarehouseItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [count, setCount] = useState(0);
+  const [stats, setStats] = useState<AdminWarehouseStatistics | null>(null);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
 
   // helpers
   const toNum = (v: unknown) => {
@@ -62,8 +68,14 @@ export default function ChinaWarehouse() {
           search: search || undefined,
           status: status === "all" ? undefined : status,
           ordering: "-updated_at",
+          page,
         });
-        if (!ignore) setItems(res.data?.results || []);
+        if (!ignore) {
+          setItems(res.data?.results || []);
+          setCount(res.data?.count || 0);
+          setHasNext(!!res.data?.next);
+          setHasPrev(!!res.data?.previous);
+        }
       } catch (e: unknown) {
         const msg =
           e instanceof Error ? e.message : "Failed to load China items";
@@ -81,7 +93,24 @@ export default function ChinaWarehouse() {
     return () => {
       ignore = true;
     };
-  }, [search, status, toast]);
+  }, [search, status, page, toast]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, status]);
+
+  useEffect(() => {
+    let ignore = false;
+    const loadStats = async () => {
+      const res = await warehouseService.getAdminChinaStatistics();
+      if (!ignore && res.success) setStats(res.data);
+    };
+    loadStats();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const chStatusToBadge = (
     s: WarehouseItem["status"]
@@ -243,23 +272,23 @@ export default function ChinaWarehouse() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <MetricCard
           title="Total Items"
-          value="0"
+          value={(stats?.total_count ?? 0).toString()}
           icon={Package}
           className="border-primary/20 bg-primary/5"
         />
         <MetricCard
-          title="Available Stock"
-          value="0"
+          title="Ready for shipping"
+          value={(stats?.ready_for_shipping_count ?? 0).toString()}
           className="border-green-500/20 bg-green-500/5"
         />
         <MetricCard
-          title="Reserved Items"
-          value="0"
+          title="Shipped"
+          value={(stats?.shipped_count ?? 0).toString()}
           className="border-yellow-500/20 bg-yellow-500/5"
         />
         <MetricCard
-          title="Low Stock Alert"
-          value="0"
+          title="Flagged"
+          value={(stats?.flagged_count ?? 0).toString()}
           className="border-destructive/20 bg-destructive/5"
         />
       </div>
@@ -423,6 +452,29 @@ export default function ChinaWarehouse() {
               </>
             )}
           />
+          <div className="flex items-center justify-between pt-4">
+            <div className="text-sm text-muted-foreground">
+              Page {page} of {Math.max(1, Math.ceil(count / PAGE_SIZE))} • {count} total
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!hasPrev || page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!hasNext}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -430,7 +482,10 @@ export default function ChinaWarehouse() {
         open={showNewGoodsDialog}
         onOpenChange={setShowNewGoodsDialog}
         warehouse="china"
-        onCreated={() => setSearch((s) => s)}
+        onCreated={() => {
+          setPage(1);
+          setSearch((s) => s);
+        }}
       />
     </div>
   );
