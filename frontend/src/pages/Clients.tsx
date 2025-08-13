@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NewClientDialog } from "@/components/dialogs/NewClientDialog";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { adminService } from "@/services/adminService";
 import type { User } from "@/services/authService";
 import { DataTable, Column } from "@/components/data-table/DataTable";
@@ -48,6 +48,66 @@ export default function Clients() {
   const [historyItems, setHistoryItems] = useState<BackendCargoItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+
+  // Pagination state
+  const [allClients, setAllClients] = useState<User[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loadingAllClients, setLoadingAllClients] = useState(false);
+
+  // Function to fetch all clients across all pages
+  const fetchAllClients = async (
+    searchParams: Record<string, string | boolean>
+  ) => {
+    setLoadingAllClients(true);
+    try {
+      let allResults: User[] = [];
+      let currentPage = 1;
+      let hasMore = true;
+      let total = 0;
+
+      while (hasMore) {
+        const search = new URLSearchParams();
+        Object.entries(searchParams).forEach(([k, v]) =>
+          search.append(k, String(v))
+        );
+        search.append("page", currentPage.toString());
+
+        const response = await adminService.getAllUsers(
+          Object.fromEntries(search.entries())
+        );
+
+        if (response.data) {
+          allResults = [...allResults, ...(response.data.results || [])];
+          total = response.data.count || 0;
+          hasMore = !!response.data.next;
+          currentPage++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      setAllClients(allResults);
+      setTotalCount(total);
+    } catch (error) {
+      console.error("Failed to fetch all clients:", error);
+      setAllClients([]);
+      setTotalCount(0);
+    } finally {
+      setLoadingAllClients(false);
+    }
+  };
+
+  // Load all clients when filters change
+  useEffect(() => {
+    const params: Record<string, string | boolean> = {
+      user_role: "CUSTOMER",
+      ordering: "-date_joined",
+    };
+    if (searchTerm) params.search = searchTerm;
+    if (filterStatus !== "all") params.is_active = filterStatus === "active";
+
+    fetchAllClients(params);
+  }, [searchTerm, filterStatus]);
 
   // Load ALL shipments for the selected client when details drawer opens
   useEffect(() => {
@@ -91,55 +151,45 @@ export default function Clients() {
     return params;
   }, [searchTerm, filterStatus]);
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["clients", queryParams],
-    queryFn: async () => {
-      const search = new URLSearchParams();
-      Object.entries(queryParams).forEach(([k, v]) =>
-        search.append(k, String(v))
-      );
-      return adminService.getAllUsers(Object.fromEntries(search.entries()));
-    },
-  });
-
-  const rawUsers = useMemo(
-    () => (data?.data?.results || []) as User[],
-    [data?.data?.results]
+  const clients = useMemo(
+    () =>
+      allClients.map((u) => {
+        const name = u.full_name || `${u.first_name} ${u.last_name}`.trim();
+        const lastActivity = formatDate(u.date_joined);
+        // Placeholders until shipment aggregation is wired
+        const totalShipments =
+          (u as unknown as { total_shipments?: number })?.total_shipments ?? 0;
+        const activeShipments =
+          (u as unknown as { active_shipments?: number })?.active_shipments ??
+          0;
+        const totalValueNum = (u as unknown as { total_value?: number })
+          ?.total_value;
+        const totalValue =
+          typeof totalValueNum === "number" ? `$${totalValueNum}` : "-";
+        return {
+          id: u.id,
+          name,
+          email: u.email || "-",
+          phone: u.phone || "-",
+          region: u.region || "-",
+          status: u.is_active ? ("active" as const) : ("inactive" as const),
+          lastActivity,
+          totalShipments,
+          activeShipments,
+          totalValue,
+          _raw: u,
+        };
+      }),
+    [allClients]
   );
-  const clients = rawUsers.map((u) => {
-    const name = u.full_name || `${u.first_name} ${u.last_name}`.trim();
-    const lastActivity = formatDate(u.date_joined);
-    // Placeholders until shipment aggregation is wired
-    const totalShipments =
-      (u as unknown as { total_shipments?: number })?.total_shipments ?? 0;
-    const activeShipments =
-      (u as unknown as { active_shipments?: number })?.active_shipments ?? 0;
-    const totalValueNum = (u as unknown as { total_value?: number })
-      ?.total_value;
-    const totalValue =
-      typeof totalValueNum === "number" ? `$${totalValueNum}` : "-";
-    return {
-      id: u.id,
-      name,
-      email: u.email || "-",
-      phone: u.phone || "-",
-      region: u.region || "-",
-      status: u.is_active ? ("active" as const) : ("inactive" as const),
-      lastActivity,
-      totalShipments,
-      activeShipments,
-      totalValue,
-      _raw: u,
-    };
-  });
 
   const counts = useMemo(
     () => ({
-      all: rawUsers.length,
-      active: rawUsers.filter((u) => u.is_active).length,
-      inactive: rawUsers.filter((u) => !u.is_active).length,
+      all: allClients.length,
+      active: allClients.filter((u) => u.is_active).length,
+      inactive: allClients.filter((u) => !u.is_active).length,
     }),
-    [rawUsers]
+    [allClients]
   );
 
   const cols: Column<(typeof clients)[number]>[] = [
@@ -317,7 +367,7 @@ export default function Clients() {
           id="clients"
           rows={clients}
           columns={cols}
-          loading={isLoading}
+          loading={loadingAllClients}
           empty={
             <div className="text-muted-foreground">
               No clients yet. Add Client or Import from Excel.
@@ -375,17 +425,25 @@ export default function Clients() {
                   )
                     return;
                   try {
-                    await adminService.updateAdminUser(row._raw.id, {
-                      is_active: false,
-                    });
+                    await adminService.updateClientStatus(row._raw.id, false);
                     toast({
                       title: "Client blocked",
                       description: `${
                         row._raw.full_name || row._raw.email
                       } is now inactive.`,
                     });
-                    // Refresh list
-                    queryClient.invalidateQueries({ queryKey: ["clients"] });
+                    // Refresh list by re-fetching all clients
+                    const params: {
+                      ordering: string;
+                      search?: string;
+                      is_active?: boolean;
+                    } = {
+                      ordering: "-date_joined",
+                    };
+                    if (searchTerm) params.search = searchTerm;
+                    if (filterStatus !== "all")
+                      params.is_active = filterStatus === "active";
+                    fetchAllClients(params);
                   } catch (e: unknown) {
                     toast({
                       title: "Failed to block",

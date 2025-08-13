@@ -1,5 +1,5 @@
-import { apiClient, ApiResponse, PaginatedResponse } from './api';
-import { User } from './authService';
+import { apiClient, ApiResponse, PaginatedResponse } from "./api";
+import { User } from "./authService";
 
 export interface AdminUser {
   id: number;
@@ -10,8 +10,8 @@ export interface AdminUser {
   email?: string;
   phone: string;
   region: string;
-  user_role: 'STAFF' | 'ADMIN' | 'MANAGER' | 'SUPER_ADMIN';
-  user_type: 'INDIVIDUAL' | 'BUSINESS';
+  user_role: "STAFF" | "ADMIN" | "MANAGER" | "SUPER_ADMIN";
+  user_type: "INDIVIDUAL" | "BUSINESS";
   is_active: boolean;
   is_admin_user: boolean;
   accessible_warehouses: string[];
@@ -33,8 +33,8 @@ export interface CreateAdminRequest {
   email?: string;
   phone: string;
   region: string;
-  user_role: 'STAFF' | 'ADMIN' | 'MANAGER' | 'SUPER_ADMIN';
-  user_type: 'INDIVIDUAL' | 'BUSINESS';
+  user_role: "STAFF" | "ADMIN" | "MANAGER" | "SUPER_ADMIN";
+  user_type: "INDIVIDUAL" | "BUSINESS";
   accessible_warehouses: string[];
   can_create_users: boolean;
   can_manage_inventory: boolean;
@@ -50,7 +50,7 @@ export interface UpdateAdminRequest {
   company_name?: string;
   email?: string;
   region?: string;
-  user_role?: 'STAFF' | 'ADMIN' | 'MANAGER' | 'SUPER_ADMIN';
+  user_role?: "STAFF" | "ADMIN" | "MANAGER" | "SUPER_ADMIN";
   is_active?: boolean;
   accessible_warehouses?: string[];
   can_create_users?: boolean;
@@ -80,51 +80,60 @@ export interface UserStats {
 
 export const adminService = {
   // Get all admin users (requires appropriate permissions)
-  async getAdminUsers(filters: AdminFilters = {}): Promise<ApiResponse<PaginatedResponse<AdminUser>>> {
+  async getAdminUsers(
+    filters: AdminFilters = {}
+  ): Promise<ApiResponse<PaginatedResponse<AdminUser>>> {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         params.append(key, value.toString());
       }
     });
-    
-  const endpoint = `/api/auth/admin/users/?user_role=ADMIN&${params.toString()}`;
+
+    const endpoint = `/api/auth/admin/users/?user_role=ADMIN&${params.toString()}`;
     return apiClient.get<PaginatedResponse<AdminUser>>(endpoint);
   },
 
   // Get admin user by ID
   async getAdminUserById(id: number): Promise<ApiResponse<AdminUser>> {
-  return apiClient.get<AdminUser>(`/api/auth/admin/users/${id}/`);
+    return apiClient.get<AdminUser>(`/api/auth/admin/users/${id}/`);
   },
 
   // Create new admin user (requires SUPER_ADMIN or MANAGER permissions)
-  async createAdminUser(data: CreateAdminRequest): Promise<ApiResponse<AdminUser>> {
-  return apiClient.post<AdminUser>('/api/auth/admin/users/', data);
+  async createAdminUser(
+    data: CreateAdminRequest
+  ): Promise<ApiResponse<AdminUser>> {
+    return apiClient.post<AdminUser>("/api/auth/admin/users/", data);
   },
 
   // Update admin user (requires appropriate permissions)
-  async updateAdminUser(id: number, data: UpdateAdminRequest): Promise<ApiResponse<AdminUser>> {
-  return apiClient.put<AdminUser>(`/api/auth/admin/users/${id}/`, data);
+  async updateAdminUser(
+    id: number,
+    data: UpdateAdminRequest
+  ): Promise<ApiResponse<AdminUser>> {
+    return apiClient.put<AdminUser>(`/api/auth/admin/users/${id}/`, data);
   },
 
   // Delete admin user (requires SUPER_ADMIN permissions)
   async deleteAdminUser(id: number): Promise<ApiResponse<void>> {
-  return apiClient.delete<void>(`/api/auth/admin/users/${id}/`);
+    return apiClient.delete<void>(`/api/auth/admin/users/${id}/`);
   },
 
   // Get user statistics (admin only)
   async getUserStats(): Promise<ApiResponse<UserStats>> {
-  return apiClient.get<UserStats>('/api/auth/admin/users/statistics/');
+    return apiClient.get<UserStats>("/api/auth/admin/users/statistics/");
   },
 
   // Get current user profile
   async getCurrentUserProfile(): Promise<ApiResponse<User>> {
-    return apiClient.get<User>('/api/auth/profile/');
+    return apiClient.get<User>("/api/auth/profile/");
   },
 
   // Update current user profile
-  async updateCurrentUserProfile(data: Partial<User>): Promise<ApiResponse<User>> {
-    return apiClient.put<User>('/api/auth/profile/', data);
+  async updateCurrentUserProfile(
+    data: Partial<User>
+  ): Promise<ApiResponse<User>> {
+    return apiClient.put<User>("/api/auth/profile/", data);
   },
 
   // Change password
@@ -133,84 +142,112 @@ export const adminService = {
     new_password: string;
     confirm_password: string;
   }): Promise<ApiResponse<{ message: string }>> {
-    return apiClient.post<{ message: string }>('/api/auth/password-change/', data);
+    return apiClient.post<{ message: string }>(
+      "/api/auth/password-change/",
+      data
+    );
   },
 
-  // Get all users (super admin only) 
-  async getAllUsers(filters: AdminFilters = {}): Promise<ApiResponse<PaginatedResponse<User>>> {
+  // Get all users (super admin only)
+  async getAllUsers(
+    filters: AdminFilters = {}
+  ): Promise<ApiResponse<PaginatedResponse<User>>> {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         params.append(key, value.toString());
       }
     });
-    
-  const endpoint = `/api/auth/admin/users/?${params.toString()}`;
+
+    const endpoint = `/api/auth/admin/users/?${params.toString()}`;
     return apiClient.get<PaginatedResponse<User>>(endpoint);
   },
 
   // Get users by role
   async getUsersByRole(role: string): Promise<ApiResponse<User[]>> {
-    return this.getAllUsers({ user_role: role }).then(response => ({
+    return this.getAllUsers({ user_role: role }).then((response) => ({
       ...response,
-      data: response.data?.results || []
+      data: response.data?.results || [],
     }));
   },
 
   // Get active users
   async getActiveUsers(): Promise<ApiResponse<User[]>> {
-    return this.getAllUsers({ is_active: true }).then(response => ({
+    return this.getAllUsers({ is_active: true }).then((response) => ({
       ...response,
-      data: response.data?.results || []
+      data: response.data?.results || [],
     }));
   },
 
   // Toggle user active status (admin only)
-  async toggleUserStatus(id: number, isActive: boolean): Promise<ApiResponse<AdminUser>> {
+  async toggleUserStatus(
+    id: number,
+    isActive: boolean
+  ): Promise<ApiResponse<AdminUser>> {
     return this.updateAdminUser(id, { is_active: isActive });
   },
 
   // Get user permissions summary
-  async getUserPermissions(id: number): Promise<ApiResponse<{
-    permissions: string[];
-    accessible_warehouses: string[];
-    admin_capabilities: string[];
-  }>> {
+  async getUserPermissions(id: number): Promise<
+    ApiResponse<{
+      permissions: string[];
+      accessible_warehouses: string[];
+      admin_capabilities: string[];
+    }>
+  > {
     const user = await this.getAdminUserById(id);
-    if (!user.data) throw new Error('User not found');
-    
+    if (!user.data) throw new Error("User not found");
+
     const permissions: string[] = [];
     const adminCapabilities: string[] = [];
-    
+
     if (user.data.can_create_users) {
-      permissions.push('CREATE_USERS');
-      adminCapabilities.push('User Management');
+      permissions.push("CREATE_USERS");
+      adminCapabilities.push("User Management");
     }
     if (user.data.can_manage_inventory) {
-      permissions.push('MANAGE_INVENTORY');
-      adminCapabilities.push('Inventory Management');
+      permissions.push("MANAGE_INVENTORY");
+      adminCapabilities.push("Inventory Management");
     }
     if (user.data.can_view_analytics) {
-      permissions.push('VIEW_ANALYTICS');
-      adminCapabilities.push('Analytics Access');
+      permissions.push("VIEW_ANALYTICS");
+      adminCapabilities.push("Analytics Access");
     }
     if (user.data.can_manage_admins) {
-      permissions.push('MANAGE_ADMINS');
-      adminCapabilities.push('Admin Management');
+      permissions.push("MANAGE_ADMINS");
+      adminCapabilities.push("Admin Management");
     }
     if (user.data.can_access_admin_panel) {
-      permissions.push('ADMIN_PANEL_ACCESS');
-      adminCapabilities.push('Admin Panel Access');
+      permissions.push("ADMIN_PANEL_ACCESS");
+      adminCapabilities.push("Admin Panel Access");
     }
-    
+
     return {
       data: {
         permissions,
         accessible_warehouses: user.data.accessible_warehouses,
-        admin_capabilities: adminCapabilities
+        admin_capabilities: adminCapabilities,
       },
       success: true,
-      message: 'User permissions retrieved successfully'
+      message: "User permissions retrieved successfully",
     };
-  }
-}; 
+  },
+
+  // Update client/user status (for regular users, not admin users)
+  async updateClientStatus(
+    id: number,
+    isActive: boolean
+  ): Promise<ApiResponse<User>> {
+    return apiClient.patch(`/api/v1/auth/users/${id}/`, {
+      is_active: isActive,
+    });
+  },
+
+  // Update client/user profile (for regular users)
+  async updateClient(
+    id: number,
+    data: Partial<User>
+  ): Promise<ApiResponse<User>> {
+    return apiClient.patch(`/api/v1/auth/users/${id}/`, data);
+  },
+};
