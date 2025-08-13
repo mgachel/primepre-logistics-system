@@ -235,6 +235,22 @@ export const cargoService = {
     );
   },
 
+  // Create a CargoItem (backend-aligned Create serializer)
+  async createBackendCargoItem(data: {
+    container: string; // container_id
+    client: number;
+    tracking_id?: string;
+    item_description: string;
+    quantity: number;
+    weight?: number | null;
+    cbm: number;
+    unit_value?: number | null;
+    total_value?: number | null;
+    status?: "pending" | "in_transit" | "delivered" | "delayed";
+  }): Promise<ApiResponse<BackendCargoItem>> {
+    return apiClient.post<BackendCargoItem>("/api/cargo/cargo-items/", data);
+  },
+
   // Delete a CargoItem
   async deleteBackendCargoItem(itemId: string): Promise<ApiResponse<void>> {
     return apiClient.delete<void>(
