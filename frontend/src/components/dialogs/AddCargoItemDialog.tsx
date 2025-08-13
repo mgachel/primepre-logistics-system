@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,8 +18,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { cargoService } from "@/services/cargoService";
+import { clientService, Client } from "@/services/clientService";
 
 interface AddCargoItemDialogProps {
   open: boolean;
@@ -43,7 +57,14 @@ export function AddCargoItemDialog({
   const [quantity, setQuantity] = useState("");
   const [weight, setWeight] = useState("");
   const [cbm, setCbm] = useState("");
-  const [clientName, setClientName] = useState("");
+  const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
+  const [clientQuery, setClientQuery] = useState("");
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<{
+    id: number;
+    label: string;
+  } | null>(null);
   const [notes, setNotes] = useState("");
 
   const resetForm = () => {
@@ -52,17 +73,44 @@ export function AddCargoItemDialog({
     setQuantity("");
     setWeight("");
     setCbm("");
-    setClientName("");
+    setSelectedClient(null);
+    setClientQuery("");
     setNotes("");
   };
+
+  // Load clients when popover opens or query changes
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (!clientPopoverOpen) return;
+      setClientsLoading(true);
+      try {
+        const res = await clientService.getClients({
+          search: clientQuery,
+          limit: 10,
+        });
+        if (!cancelled) {
+          setClients(res.data?.results || []);
+        }
+      } catch (e) {
+        // silent fail in combobox; optional toast
+      } finally {
+        if (!cancelled) setClientsLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientPopoverOpen, clientQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!itemType || !description || !quantity || !clientName) {
+    if (!description || !quantity || !cbm || !selectedClient) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields",
+        description: "Description, quantity, CBM, and client are required",
         variant: "destructive",
       });
       return;
@@ -70,16 +118,21 @@ export function AddCargoItemDialog({
 
     setLoading(true);
     try {
-      await cargoService.createCargoItem({
-        container: parseInt(containerId, 10),
-        description,
+      const payload = {
+        container: containerId,
+        client: selectedClient.id,
+        item_description: itemType
+          ? `${itemType}: ${description}`
+          : description,
         quantity: parseInt(quantity, 10),
-        weight: weight ? parseFloat(weight) : 0,
-        cbm: cbm ? parseFloat(cbm) : 0,
-        shipping_mark: clientName,
-        notes: notes || undefined,
-        type: "SEA", // Default to SEA, can be determined by container type
-      });
+        weight: weight ? parseFloat(weight) : null,
+        cbm: parseFloat(cbm),
+        // Optionally support values/ status later
+      } as const;
+
+      const res = await cargoService.createBackendCargoItem(payload);
+      if (!res.success)
+        throw new Error(res.message || "Failed to add cargo item");
 
       toast({
         title: "Success",
@@ -122,7 +175,7 @@ export function AddCargoItemDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="itemType">Item Type *</Label>
+              <Label htmlFor="itemType">Item Type</Label>
               <Select value={itemType} onValueChange={setItemType}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -163,14 +216,62 @@ export function AddCargoItemDialog({
             />
           </div>
 
-          <div>
-            <Label htmlFor="clientName">Client Name *</Label>
-            <Input
-              id="clientName"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              placeholder="Client or consignee name"
-            />
+          <div className="space-y-1">
+            <Label>Client *</Label>
+            <Popover
+              open={clientPopoverOpen}
+              onOpenChange={setClientPopoverOpen}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={clientPopoverOpen}
+                  className="w-full justify-between"
+                >
+                  {selectedClient ? selectedClient.label : "Select client..."}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-0">
+                <Command>
+                  <CommandInput
+                    placeholder="Search clients by name or shipping mark..."
+                    value={clientQuery}
+                    onValueChange={setClientQuery}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      {clientsLoading ? "Loading..." : "No clients found."}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {clients.map((c) => (
+                        <CommandItem
+                          key={c.id}
+                          onSelect={() => {
+                            setSelectedClient({
+                              id: c.id,
+                              label:
+                                c.full_name ||
+                                c.shipping_mark ||
+                                `Client #${c.id}`,
+                            });
+                            setClientPopoverOpen(false);
+                          }}
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium">{c.full_name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {c.shipping_mark}
+                            </span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -188,7 +289,7 @@ export function AddCargoItemDialog({
             </div>
 
             <div>
-              <Label htmlFor="cbm">CBM (m³)</Label>
+              <Label htmlFor="cbm">CBM (m³) *</Label>
               <Input
                 id="cbm"
                 type="number"
