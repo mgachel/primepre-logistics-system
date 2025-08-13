@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   Plus,
@@ -75,6 +76,7 @@ function mapStatus(
 
 export default function SeaCargo() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
   const [selectedContainer, setSelectedContainer] =
@@ -409,23 +411,7 @@ export default function SeaCargo() {
             <>
               <DropdownMenuItem
                 onClick={() => {
-                  setSelectedContainer({
-                    id: row.container_id,
-                    containerNo: row.container_id,
-                    client: `${row.total_clients} clients`,
-                    origin: row.route?.split(" to ")[0] || "-",
-                    destination: row.route?.split(" to ")[1] || "-",
-                    loadingDate: row.load_date,
-                    eta: row.eta,
-                    cbm: String(row.cbm ?? 0),
-                    weight: row.weight ? `${row.weight} kg` : "-",
-                    status: "in-transit",
-                    vessel: "-",
-                    voyage: "-",
-                    goods: "-",
-                    notes: "",
-                  });
-                  setShowContainerDetails(true);
+                  navigate(`/containers/${row.container_id}`);
                 }}
               >
                 <Eye className="h-4 w-4 mr-2" /> View Details
