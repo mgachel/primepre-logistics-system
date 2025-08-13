@@ -122,6 +122,13 @@ export interface AdminWarehouseStatistics {
   delivered_count?: number;
 }
 
+export interface ExcelUploadResponse {
+  success?: boolean; // some backends may include this at root
+  message?: string;
+  created_count?: number;
+  errors?: Array<string | { row?: number; error: string }>; // be flexible
+}
+
 export const warehouseService = {
   // Get China warehouse items (customer view)
   async getChinaWarehouseItems(
@@ -332,12 +339,16 @@ export const warehouseService = {
   },
 
   // Admin statistics
-  async getAdminChinaStatistics(): Promise<ApiResponse<AdminWarehouseStatistics>> {
+  async getAdminChinaStatistics(): Promise<
+    ApiResponse<AdminWarehouseStatistics>
+  > {
     return apiClient.get<AdminWarehouseStatistics>(
       `/api/goods/china/statistics/`
     );
   },
-  async getAdminGhanaStatistics(): Promise<ApiResponse<AdminWarehouseStatistics>> {
+  async getAdminGhanaStatistics(): Promise<
+    ApiResponse<AdminWarehouseStatistics>
+  > {
     return apiClient.get<AdminWarehouseStatistics>(
       `/api/goods/ghana/statistics/`
     );
@@ -426,18 +437,28 @@ export const warehouseService = {
   },
 
   // Excel upload (admin/staff only)
-  async uploadChinaExcel(file: File): Promise<ApiResponse<unknown>> {
+  async uploadChinaExcel(
+    file: File
+  ): Promise<ApiResponse<ExcelUploadResponse>> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("warehouse", "china");
-    return apiClient.post<unknown>("/api/goods/china/upload_excel/", formData);
+    return apiClient.post<ExcelUploadResponse>(
+      "/api/goods/china/upload_excel/",
+      formData
+    );
   },
 
-  async uploadGhanaExcel(file: File): Promise<ApiResponse<unknown>> {
+  async uploadGhanaExcel(
+    file: File
+  ): Promise<ApiResponse<ExcelUploadResponse>> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("warehouse", "ghana");
-    return apiClient.post<unknown>("/api/goods/ghana/upload_excel/", formData);
+    return apiClient.post<ExcelUploadResponse>(
+      "/api/goods/ghana/upload_excel/",
+      formData
+    );
   },
 
   // Download templates (admin/staff only)
