@@ -60,8 +60,11 @@ export function AddCargoItemDialog({
   const [trackingId, setTrackingId] = useState("");
   const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
+  const [debouncedClientQuery, setDebouncedClientQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
+  const [clientPage, setClientPage] = useState(1);
+  const [clientsHasNext, setClientsHasNext] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [notes, setNotes] = useState("");
 
@@ -77,31 +80,49 @@ export function AddCargoItemDialog({
     setNotes("");
   };
 
-  // Load clients when popover opens or query changes
+  // Debounce the client query to reduce API calls
+  useEffect(() => {
+    const t = setTimeout(
+      () => setDebouncedClientQuery(clientQuery.trim()),
+      300
+    );
+    return () => clearTimeout(t);
+  }, [clientQuery]);
+
+  // Helper to fetch clients (with pagination)
+  const fetchClients = async (page: number, append = false) => {
+    setClientsLoading(true);
+    try {
+      const res = await clientService.getClients({
+        search: debouncedClientQuery || undefined,
+        page,
+      });
+      const results = res.data?.results || [];
+      const hasNext = Boolean(res.data?.next);
+      setClients((prev) => (append ? [...prev, ...results] : results));
+      setClientsHasNext(hasNext);
+    } catch (e) {
+      // silent fail in combobox
+    } finally {
+      setClientsLoading(false);
+    }
+  };
+
+  // Load clients when popover opens or debounced query changes
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       if (!clientPopoverOpen) return;
-      setClientsLoading(true);
-      try {
-        const res = await clientService.getClients({
-          search: clientQuery,
-          limit: 10,
-        });
-        if (!cancelled) {
-          setClients(res.data?.results || []);
-        }
-      } catch (e) {
-        // silent fail in combobox; optional toast
-      } finally {
-        if (!cancelled) setClientsLoading(false);
-      }
+      if (cancelled) return;
+      setClientPage(1);
+      await fetchClients(1, false);
     };
     load();
     return () => {
       cancelled = true;
     };
-  }, [clientPopoverOpen, clientQuery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientPopoverOpen, debouncedClientQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -292,6 +313,20 @@ export function AddCargoItemDialog({
                           </div>
                         </CommandItem>
                       ))}
+                      {clientsHasNext && (
+                        <CommandItem
+                          disabled={clientsLoading}
+                          onSelect={async () => {
+                            const nextPage = clientPage + 1;
+                            setClientPage(nextPage);
+                            await fetchClients(nextPage, true);
+                          }}
+                        >
+                          {clientsLoading
+                            ? "Loading more..."
+                            : "Load more clients"}
+                        </CommandItem>
+                      )}
                     </CommandGroup>
                   </CommandList>
                 </Command>
