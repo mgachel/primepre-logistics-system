@@ -57,14 +57,12 @@ export function AddCargoItemDialog({
   const [quantity, setQuantity] = useState("");
   const [weight, setWeight] = useState("");
   const [cbm, setCbm] = useState("");
+  const [trackingId, setTrackingId] = useState("");
   const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<{
-    id: number;
-    label: string;
-  } | null>(null);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [notes, setNotes] = useState("");
 
   const resetForm = () => {
@@ -73,6 +71,7 @@ export function AddCargoItemDialog({
     setQuantity("");
     setWeight("");
     setCbm("");
+    setTrackingId("");
     setSelectedClient(null);
     setClientQuery("");
     setNotes("");
@@ -118,7 +117,7 @@ export function AddCargoItemDialog({
 
     setLoading(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         container: containerId,
         client: selectedClient.id,
         item_description: itemType
@@ -128,9 +127,27 @@ export function AddCargoItemDialog({
         weight: weight ? parseFloat(weight) : null,
         cbm: parseFloat(cbm),
         // Optionally support values/ status later
-      } as const;
+      };
 
-      const res = await cargoService.createBackendCargoItem(payload);
+      // Only include tracking_id if provided; backend will auto-generate if omitted
+      if (trackingId.trim()) {
+        payload.tracking_id = trackingId.trim();
+      }
+
+      const res = await cargoService.createBackendCargoItem(
+        payload as {
+          container: string;
+          client: number;
+          tracking_id?: string;
+          item_description: string;
+          quantity: number;
+          weight?: number | null;
+          cbm: number;
+          unit_value?: number | null;
+          total_value?: number | null;
+          status?: "pending" | "in_transit" | "delivered" | "delayed";
+        }
+      );
       if (!res.success)
         throw new Error(res.message || "Failed to add cargo item");
 
@@ -216,6 +233,16 @@ export function AddCargoItemDialog({
             />
           </div>
 
+          <div>
+            <Label htmlFor="trackingId">Tracking ID (optional)</Label>
+            <Input
+              id="trackingId"
+              value={trackingId}
+              onChange={(e) => setTrackingId(e.target.value)}
+              placeholder="Enter a tracking ID, or leave blank to auto-generate"
+            />
+          </div>
+
           <div className="space-y-1">
             <Label>Client *</Label>
             <Popover
@@ -230,7 +257,11 @@ export function AddCargoItemDialog({
                   aria-expanded={clientPopoverOpen}
                   className="w-full justify-between"
                 >
-                  {selectedClient ? selectedClient.label : "Select client..."}
+                  {selectedClient
+                    ? selectedClient.full_name ||
+                      selectedClient.shipping_mark ||
+                      `Client #${selectedClient.id}`
+                    : "Select client..."}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="p-0">
@@ -249,13 +280,7 @@ export function AddCargoItemDialog({
                         <CommandItem
                           key={c.id}
                           onSelect={() => {
-                            setSelectedClient({
-                              id: c.id,
-                              label:
-                                c.full_name ||
-                                c.shipping_mark ||
-                                `Client #${c.id}`,
-                            });
+                            setSelectedClient(c);
                             setClientPopoverOpen(false);
                           }}
                         >
