@@ -232,61 +232,83 @@ export default function GhanaWarehouse() {
       setUploading(true);
       try {
         const res = await warehouseService.uploadGhanaExcel(file);
-        const created = res.data?.created_count ?? 0;
-        const rawErrors = (res.data?.errors || []) as Array<
-          string | { row?: number; error: string }
-        >;
-        const errors = rawErrors
-          .map((er) =>
-            typeof er === "string"
-              ? er
-              : er?.row
-              ? `Row ${er.row}: ${er.error}`
-              : er?.error
-          )
-          .filter(Boolean) as string[];
-        const hadErrors = errors.length > 0;
 
-        if (!res.success || created === 0) {
-          const sample = errors.slice(0, 3).join(" | ");
-          const raw = res.message || "";
-          const missing = raw.match(/Missing required columns:\s*([^'"\]}]*)/i);
-          const cleaned = raw
-            .replace(/ErrorDetail\(string=/g, "")
-            .replace(/,\s*code='[^']*'\)/g, ")")
-            .replace(/[[{}]]/g, "")
-            .replace(/^["']|["']$/g, "");
-          const friendly = missing
-            ? `Missing required columns: ${missing[1].trim()}. Please download and use the template.`
-            : sample ||
-              cleaned ||
-              "No items were created from this file. Please check that the columns match the template and required fields are filled.";
+        if (res.success && res.data) {
+          const { message, results } = res.data;
+          const {
+            total_processed,
+            successful_creates,
+            failed_creates,
+            errors,
+          } = results;
+
+          if (successful_creates === 0) {
+            // No items were created - show detailed error message
+            const errorMessages = errors.slice(0, 3); // Show first 3 errors
+            const displayError =
+              errorMessages.length > 0
+                ? errorMessages.join(". ")
+                : "No items were created from this file. Please check that the columns match the template and required fields are filled.";
+
+            toast({
+              title: "Upload failed",
+              description: displayError,
+              variant: "destructive",
+            });
+          } else {
+            // Some or all items were created successfully
+            const hasErrors = failed_creates > 0;
+            const description = hasErrors
+              ? `Created ${successful_creates} item(s) successfully. ${failed_creates} item(s) failed. ${
+                  errors.length > 0 ? `Example error: ${errors[0]}` : ""
+                }`
+              : `Successfully created ${successful_creates} item(s).`;
+
+            toast({
+              title: hasErrors ? "Partial upload success" : "Upload successful",
+              description,
+              variant: hasErrors ? "default" : "default",
+            });
+
+            // Refresh the data regardless of partial failures
+            setPage(1);
+            setSearch((s) => s); // Trigger reload
+
+            // Refresh statistics
+            const statsRes = await warehouseService.getAdminGhanaStatistics();
+            if (statsRes.success) setStats(statsRes.data);
+          }
+        } else {
+          // API call failed
+          const errorMsg = res.message || "Upload failed. Please try again.";
           toast({
             title: "Upload failed",
-            description: friendly,
+            description: errorMsg,
             variant: "destructive",
           });
-        } else {
-          const detail = hadErrors
-            ? `Created ${created} item(s), but ${errors.length} row(s) failed.`
-            : `Created ${created} item(s).`;
-          const more = hadErrors ? ` Example: ${errors[0]}` : "";
-          toast({
-            title: "Upload complete",
-            description: `${detail}${more}`,
-          });
+        }
+      } catch (err) {
+        // Network or unexpected error
+        let errorMessage = "Upload failed due to a network error.";
+
+        if (err instanceof Error) {
+          // Check if it's a validation error from the backend
+          if (err.message.includes("Missing required columns")) {
+            errorMessage =
+              "Missing required columns. Please download and use the template file.";
+          } else if (err.message.includes("File must be an Excel file")) {
+            errorMessage = "Please upload a valid Excel file (.xlsx or .xls).";
+          } else if (err.message.includes("File size must be less than")) {
+            errorMessage =
+              "File is too large. Please upload a file smaller than 10MB.";
+          } else {
+            errorMessage = err.message;
+          }
         }
 
-        // refresh list and stats regardless of outcome
-        setPage(1);
-        setSearch((s) => s);
-        const statsRes = await warehouseService.getAdminGhanaStatistics();
-        if (statsRes.success) setStats(statsRes.data);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Upload failed";
         toast({
           title: "Upload failed",
-          description: msg,
+          description: errorMessage,
           variant: "destructive",
         });
       } finally {
