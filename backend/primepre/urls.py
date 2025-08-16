@@ -23,5 +23,7 @@ urlpatterns = [
     path('django-admin/', admin.site.urls),  # Keep default admin as backup
     path('api/auth/', include('users.urls')),
     path('api/cargo/', include('cargo.urls')),
+    path('api/analytics/', include('analytics.urls')),
     path('', include('GoodsRecieved.urls')),
+    path('api/rates/', include('rates.urls')),  # Rates endpoints
 ]

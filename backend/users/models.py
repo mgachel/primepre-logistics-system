@@ -5,7 +5,8 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import timedelta
 import random
-import secrets
+import secrets   
+
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, phone, password=None, **extra_fields):
@@ -75,6 +76,10 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
     can_manage_inventory = models.BooleanField(
         default=False,
         help_text="Can manage warehouse inventory"
+    )
+    can_manage_rates = models.BooleanField(
+        default=False,
+        help_text="Can manage shipping rates"
     )
     can_view_analytics = models.BooleanField(
         default=False,
@@ -184,6 +189,8 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
             permissions.append("Create Users")
         if self.can_manage_inventory:
             permissions.append("Manage Inventory")
+        if self.can_manage_rates:
+            permissions.append("Manage Rates")
         if self.can_view_analytics:
             permissions.append("View Analytics")
         if self.can_manage_admins:
@@ -213,6 +220,7 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
             self.is_superuser = True
             self.can_create_users = True
             self.can_manage_inventory = True
+            self.can_manage_rates = True
             self.can_view_analytics = True
             self.can_manage_admins = True
             self.accessible_warehouses = ['china', 'ghana']  # Super admin has access to all
@@ -221,12 +229,14 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
         elif self.user_role == 'MANAGER':
             self.can_create_users = True
             self.can_manage_inventory = True
+            self.can_manage_rates = True
             self.can_view_analytics = True
             if not self.accessible_warehouses:
                 self.accessible_warehouses = ['china', 'ghana']
         
         elif self.user_role == 'ADMIN':
             self.can_manage_inventory = True
+            self.can_manage_rates = True
             self.can_view_analytics = True
             if not self.accessible_warehouses:
                 self.accessible_warehouses = ['china']  # Default to china

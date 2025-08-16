@@ -103,6 +103,18 @@ class CanAccessWarehouse(BasePermission):
         return request.user.can_access_warehouse(warehouse)
 
 
+class IsManagerOrAbove(BasePermission):
+    """
+    Permission class to check if user is Manager or above (MANAGER or SUPER_ADMIN)
+    """
+    def has_permission(self, request, view):
+        return (
+            request.user and 
+            request.user.is_authenticated and 
+            request.user.user_role in ['MANAGER', 'SUPER_ADMIN']
+        )
+
+
 class IsOwnerOrAdmin(BasePermission):
     """
     Permission class to check if user is owner of object or admin
