@@ -467,20 +467,44 @@ export const warehouseService = {
 
   // Download templates (admin/staff only)
   async downloadChinaTemplate(): Promise<Blob> {
-    const response = await fetch("/api/goods/china/download_template/", {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-      },
-    });
+    const API_BASE_URL =
+      import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+    const response = await fetch(
+      `${API_BASE_URL}/api/goods/china/download_template/`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to download template: ${response.status} ${response.statusText}`
+      );
+    }
+
     return response.blob();
   },
 
   async downloadGhanaTemplate(): Promise<Blob> {
-    const response = await fetch("/api/goods/ghana/download_template/", {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-      },
-    });
+    const API_BASE_URL =
+      import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+    const response = await fetch(
+      `${API_BASE_URL}/api/goods/ghana/download_template/`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to download template: ${response.status} ${response.statusText}`
+      );
+    }
+
     return response.blob();
   },
 };
