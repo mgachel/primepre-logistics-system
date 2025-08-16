@@ -123,10 +123,14 @@ export interface AdminWarehouseStatistics {
 }
 
 export interface ExcelUploadResponse {
-  success?: boolean; // some backends may include this at root
-  message?: string;
-  created_count?: number;
-  errors?: Array<string | { row?: number; error: string }>; // be flexible
+  message: string;
+  results: {
+    total_processed: number;
+    successful_creates: number;
+    failed_creates: number;
+    errors: string[];
+    created_items: string[];
+  };
 }
 
 export const warehouseService = {
