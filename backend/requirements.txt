@@ -14,3 +14,4 @@ xlrd==2.0.1
 whitenoise==6.7.0
 gunicorn==21.2.0
 dj-database-url==3.0.1
+setuptools
