@@ -17,6 +17,7 @@ interface AuthContextType {
     confirm_password: string;
   }) => Promise<boolean>;
   logout: () => Promise<void>;
+  updateUser: (userData: Partial<User>) => void;
   loading: boolean;
   // Role-based helper functions
   isAdmin: () => boolean;
@@ -147,6 +148,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateUser = (userData: Partial<User>): void => {
+    if (user) {
+      const updatedUser = { ...user, ...userData };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
   // Role-based helper functions using backend user_role format
   const isAdmin = (): boolean => {
     return user?.user_role === 'ADMIN';
@@ -234,7 +243,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user, 
       login,
       register,
-      logout, 
+      logout,
+      updateUser,
       loading,
       isAdmin,
       isCustomer,

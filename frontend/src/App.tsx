@@ -21,6 +21,7 @@ import GhanaWarehouse from "./pages/GhanaWarehouse";
 import Claims from "./pages/Claims";
 import CustomerShipments from "./pages/CustomerShipments";
 import CustomerClaims from "./pages/CustomerClaims";
+import CustomerNotes from "./pages/CustomerNotes";
 import Admins from "./pages/Admins";
 import Settings from "./pages/Settings";
 import ShippingRates from "./pages/ShippingRates";
@@ -217,6 +218,21 @@ const App = () => (
                     customerComponent={
                       <AppLayout>
                         <CustomerClaims />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-notes"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <CustomerNotes />
                       </AppLayout>
                     }
                   />

@@ -13,7 +13,8 @@ import {
   X,
   ChevronDown,
   FileText,
-  Bell
+  Bell,
+  StickyNote
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
@@ -57,6 +58,7 @@ const customerNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "My Shipments", href: "/my-shipments", icon: Ship },
   { name: "My Claims", href: "/my-claims", icon: FileText },
+  { name: "My Notes", href: "/my-notes", icon: StickyNote },
   { name: "Notifications", href: "/notifications", icon: Bell },
   { name: "Profile", href: "/profile", icon: UserCog },
 ];
