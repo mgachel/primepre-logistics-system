@@ -378,9 +378,26 @@ class CustomerCargoContainerViewSet(viewsets.ReadOnlyModelViewSet):
         if self.request.user.user_role != 'CUSTOMER':
             return CargoContainer.objects.none()
         
-        return CargoContainer.objects.filter(
+        queryset = CargoContainer.objects.filter(
             cargo_items__client=self.request.user
         ).distinct()
+        
+        # Apply filters
+        cargo_type = self.request.query_params.get('cargo_type')
+        status_filter = self.request.query_params.get('status')
+        search = self.request.query_params.get('search')
+        
+        if cargo_type:
+            queryset = queryset.filter(cargo_type=cargo_type)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if search:
+            queryset = queryset.filter(
+                Q(container_id__icontains=search) |
+                Q(route__icontains=search)
+            )
+        
+        return queryset.order_by('-created_at')
     
     @action(detail=True, methods=['get'])
     def my_cargo_items(self, request, pk=None):
@@ -403,7 +420,25 @@ class CustomerCargoItemViewSet(viewsets.ReadOnlyModelViewSet):
         if self.request.user.user_role != 'CUSTOMER':
             return CargoItem.objects.none()
         
-        return CargoItem.objects.filter(client=self.request.user)
+        queryset = CargoItem.objects.filter(client=self.request.user)
+        
+        # Apply filters
+        cargo_type = self.request.query_params.get('cargo_type')
+        status_filter = self.request.query_params.get('status')
+        search = self.request.query_params.get('search')
+        
+        if cargo_type:
+            queryset = queryset.filter(container__cargo_type=cargo_type)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if search:
+            queryset = queryset.filter(
+                Q(tracking_id__icontains=search) |
+                Q(item_description__icontains=search) |
+                Q(container__container_id__icontains=search)
+            )
+        
+        return queryset.select_related('container').order_by('-created_at')
 
 
 class CustomerCargoDashboardView(APIView):
@@ -414,30 +449,35 @@ class CustomerCargoDashboardView(APIView):
         if request.user.user_role != 'CUSTOMER':
             return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
         
-        # Get customer's cargo statistics
-        total_cargo_items = CargoItem.objects.filter(client=request.user).count()
-        pending_items = CargoItem.objects.filter(client=request.user, status='pending').count()
-        in_transit_items = CargoItem.objects.filter(client=request.user, status='in_transit').count()
-        delivered_items = CargoItem.objects.filter(client=request.user, status='delivered').count()
+        # Get optional cargo type filter
+        cargo_type = request.query_params.get('cargo_type')
         
-        # Get customer's containers
-        customer_containers = CargoContainer.objects.filter(
-            cargo_items__client=request.user
-        ).distinct()
+        # Base queryset for customer's cargo items
+        items_queryset = CargoItem.objects.filter(client=request.user)
+        containers_queryset = CargoContainer.objects.filter(cargo_items__client=request.user).distinct()
+        
+        # Apply cargo type filter if specified
+        if cargo_type:
+            items_queryset = items_queryset.filter(container__cargo_type=cargo_type)
+            containers_queryset = containers_queryset.filter(cargo_type=cargo_type)
+        
+        # Get customer's cargo statistics
+        total_cargo_items = items_queryset.count()
+        pending_items = items_queryset.filter(status='pending').count()
+        in_transit_items = items_queryset.filter(status='in_transit').count()
+        delivered_items = items_queryset.filter(status='delivered').count()
         
         # Recent cargo items
-        recent_items = CargoItem.objects.filter(
-            client=request.user
-        ).order_by('-created_at')[:5]
+        recent_items = items_queryset.order_by('-created_at')[:5]
         
         data = {
             'total_cargo_items': total_cargo_items,
             'pending_items': pending_items,
             'in_transit_items': in_transit_items,
             'delivered_items': delivered_items,
-            'total_containers': customer_containers.count(),
+            'total_containers': containers_queryset.count(),
             'recent_items': CargoItemSerializer(recent_items, many=True).data,
-            'containers': CargoContainerSerializer(customer_containers, many=True).data
+            'containers': CargoContainerSerializer(containers_queryset, many=True).data
         }
         
         return Response(data)

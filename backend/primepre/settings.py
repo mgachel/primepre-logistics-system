@@ -57,8 +57,8 @@ INSTALLED_APPS = [
     'users',
     'cargo',
     'GoodsRecieved',
-    'rates',
-    #'system_settings',
+    'rates',  
+    'notes',
     'analytics',
     
     # Third party apps

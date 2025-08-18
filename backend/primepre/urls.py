@@ -26,4 +26,5 @@ urlpatterns = [
     path('api/analytics/', include('analytics.urls')),
     path('', include('GoodsRecieved.urls')),
     path('api/rates/', include('rates.urls')),  # Rates endpoints
+    path('api/notes/', include('notes.urls')),
 ]
