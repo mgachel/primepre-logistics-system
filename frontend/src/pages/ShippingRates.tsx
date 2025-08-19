@@ -5,14 +5,38 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Ship, Plane, DollarSign, AlertCircle, Loader2, Edit, Trash2, ArrowLeft } from "lucide-react";
-import { ratesService, Rate, CreateRateRequest, RateStats } from "@/services/ratesService";
+import {
+  Search,
+  Plus,
+  Ship,
+  Plane,
+  DollarSign,
+  AlertCircle,
+  Loader2,
+  Edit,
+  Trash2,
+  ArrowLeft,
+} from "lucide-react";
+import {
+  ratesService,
+  Rate,
+  CreateRateRequest,
+  RateStats,
+} from "@/services/ratesService";
 
 const ShippingRates = () => {
-  const [selectedCategory, setSelectedCategory] = useState<"SEA_RATES" | "AIR_RATES">("SEA_RATES");
+  const [selectedCategory, setSelectedCategory] = useState<
+    "SEA_RATES" | "AIR_RATES"
+  >("SEA_RATES");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +56,7 @@ const ShippingRates = () => {
     origin_country: "",
     destination_country: "",
     office_name: "",
-    amount: 0
+    amount: 0,
   });
 
   // Fetch rates data
@@ -45,23 +69,23 @@ const ShippingRates = () => {
         ratesService.getRates({
           rate_type: selectedCategory,
           search: searchQuery || undefined,
-          ordering: "-created_at"
+          ordering: "-created_at",
         }),
-        ratesService.getRateStats({ rate_type: selectedCategory })
+        ratesService.getRateStats({ rate_type: selectedCategory }),
       ]);
 
       if (ratesResponse.success && ratesResponse.data) {
         setRates(ratesResponse.data.results || []);
       } else {
-        throw new Error(ratesResponse.message || 'Failed to fetch rates');
+        throw new Error(ratesResponse.message || "Failed to fetch rates");
       }
 
       if (statsResponse.success && statsResponse.data) {
         setStats(statsResponse.data);
       }
     } catch (error) {
-      console.error('Error fetching rates:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load rates');
+      console.error("Error fetching rates:", error);
+      setError(error instanceof Error ? error.message : "Failed to load rates");
       toast({
         title: "Error",
         description: "Failed to load shipping rates",
@@ -80,7 +104,13 @@ const ShippingRates = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.title || !formData.origin_country || !formData.destination_country || !formData.office_name || formData.amount <= 0) {
+    if (
+      !formData.title ||
+      !formData.origin_country ||
+      !formData.destination_country ||
+      !formData.office_name ||
+      formData.amount <= 0
+    ) {
       toast({
         title: "Error",
         description: "Please fill in all required fields with valid values",
@@ -112,19 +142,20 @@ const ShippingRates = () => {
           origin_country: "",
           destination_country: "",
           office_name: "",
-          amount: 0
+          amount: 0,
         });
 
         setShowAddForm(false);
         fetchRates(); // Refresh the list
       } else {
-        throw new Error(response.message || 'Failed to create rate');
+        throw new Error(response.message || "Failed to create rate");
       }
     } catch (error) {
-      console.error('Error creating rate:', error);
+      console.error("Error creating rate:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to create rate',
+        description:
+          error instanceof Error ? error.message : "Failed to create rate",
         variant: "destructive",
       });
     } finally {
@@ -135,17 +166,17 @@ const ShippingRates = () => {
   // Handle create rate
   const handleCreateRate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       setCreating(true);
       const response = await ratesService.createRate(formData);
-      
+
       if (response.success) {
         toast({
           title: "Success",
-          description: "Rate created successfully"
+          description: "Rate created successfully",
         });
-        
+
         // Reset form
         setFormData({
           category: "NORMAL_GOODS",
@@ -155,20 +186,21 @@ const ShippingRates = () => {
           origin_country: "",
           destination_country: "",
           office_name: "",
-          amount: 0
+          amount: 0,
         });
-        
+
         setShowAddForm(false);
         fetchRates();
       } else {
-        throw new Error(response.message || 'Failed to create rate');
+        throw new Error(response.message || "Failed to create rate");
       }
     } catch (error) {
-      console.error('Error creating rate:', error);
+      console.error("Error creating rate:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create rate",
-        variant: "destructive"
+        description:
+          error instanceof Error ? error.message : "Failed to create rate",
+        variant: "destructive",
       });
     } finally {
       setCreating(false);
@@ -177,7 +209,11 @@ const ShippingRates = () => {
 
   // Handle rate deletion
   const handleDeleteRate = async (rateId: number, title: string) => {
-    if (!confirm(`Are you sure you want to delete the rate "${title}"? This action cannot be undone.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete the rate "${title}"? This action cannot be undone.`
+      )
+    ) {
       return;
     }
 
@@ -191,13 +227,14 @@ const ShippingRates = () => {
         });
         fetchRates(); // Refresh the list
       } else {
-        throw new Error(response.message || 'Failed to delete rate');
+        throw new Error(response.message || "Failed to delete rate");
       }
     } catch (error) {
-      console.error('Error deleting rate:', error);
+      console.error("Error deleting rate:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to delete rate',
+        description:
+          error instanceof Error ? error.message : "Failed to delete rate",
         variant: "destructive",
       });
     }
@@ -205,14 +242,14 @@ const ShippingRates = () => {
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'NORMAL_GOODS':
-        return 'bg-blue-100 text-blue-800';
-      case 'SPECIAL_GOODS':
-        return 'bg-purple-100 text-purple-800';
-      case 'SMALL_GOODS':
-        return 'bg-green-100 text-green-800';
+      case "NORMAL_GOODS":
+        return "bg-blue-100 text-blue-800";
+      case "SPECIAL_GOODS":
+        return "bg-purple-100 text-purple-800";
+      case "SMALL_GOODS":
+        return "bg-green-100 text-green-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -231,11 +268,11 @@ const ShippingRates = () => {
               </Badge>
             )}
           </div>
-          
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search rates..." 
+            <Input
+              placeholder="Search rates..."
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -254,7 +291,9 @@ const ShippingRates = () => {
 
         {/* Category Selection */}
         <div className="space-y-3">
-          <h4 className="font-medium text-sm uppercase tracking-wide text-muted-foreground">Rate Type</h4>
+          <h4 className="font-medium text-sm uppercase tracking-wide text-muted-foreground">
+            Rate Type
+          </h4>
           <div className="grid grid-cols-2 gap-2">
             <Button
               variant={selectedCategory === "SEA_RATES" ? "default" : "outline"}
@@ -280,7 +319,9 @@ const ShippingRates = () => {
         {/* Stats Summary */}
         {stats && (
           <div className="space-y-3">
-            <h4 className="font-medium text-sm uppercase tracking-wide text-muted-foreground">Statistics</h4>
+            <h4 className="font-medium text-sm uppercase tracking-wide text-muted-foreground">
+              Statistics
+            </h4>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Total Rates:</span>
@@ -298,7 +339,9 @@ const ShippingRates = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Avg Amount:</span>
-                    <span className="font-medium">${Math.round(stats.amount.avg)}</span>
+                    <span className="font-medium">
+                      ${Math.round(stats.amount.avg)}
+                    </span>
                   </div>
                 </>
               )}
@@ -318,7 +361,7 @@ const ShippingRates = () => {
               {selectedCategory === "SEA_RATES" ? "Sea Rates" : "Air Rates"}
             </h4>
           </div>
-          
+
           {loading ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -330,7 +373,10 @@ const ShippingRates = () => {
           ) : (
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {rates.slice(0, 10).map((rate) => (
-                <div key={rate.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 group">
+                <div
+                  key={rate.id}
+                  className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 group"
+                >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       {selectedCategory === "SEA_RATES" ? (
@@ -339,7 +385,9 @@ const ShippingRates = () => {
                         <Plane className="h-3 w-3 text-green-600 flex-shrink-0" />
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm truncate">{rate.title}</p>
+                        <p className="font-medium text-sm truncate">
+                          {rate.title}
+                        </p>
                         <p className="text-xs text-muted-foreground truncate">
                           {rate.category_display}
                         </p>
@@ -379,45 +427,66 @@ const ShippingRates = () => {
         {showAddForm ? (
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center gap-2 mb-6">
-              <ArrowLeft className="h-5 w-5 cursor-pointer" onClick={() => setShowAddForm(false)} />
+              <ArrowLeft
+                className="h-5 w-5 cursor-pointer"
+                onClick={() => setShowAddForm(false)}
+              />
               <h2 className="text-2xl font-bold">Add New Shipping Rate</h2>
             </div>
 
             <form onSubmit={handleCreateRate} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label htmlFor="title" className="text-sm font-medium">Rate Title</Label>
+                  <Label htmlFor="title" className="text-sm font-medium">
+                    Rate Title
+                  </Label>
                   <Input
                     id="title"
                     type="text"
                     placeholder="e.g., Sea Regular Rate"
                     value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
                     required
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="amount" className="text-sm font-medium">Amount ($)</Label>
+                  <Label htmlFor="amount" className="text-sm font-medium">
+                    Amount ($)
+                  </Label>
                   <Input
                     id="amount"
                     type="number"
                     step="0.01"
                     placeholder="0.00"
                     value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        amount: parseFloat(e.target.value) || 0,
+                      })
+                    }
                     required
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="rate_type" className="text-sm font-medium">Rate Type</Label>
+                  <Label htmlFor="rate_type" className="text-sm font-medium">
+                    Rate Type
+                  </Label>
                   <select
                     id="rate_type"
                     title="Select rate type"
                     className="w-full p-2 border border-border rounded-md"
                     value={formData.rate_type}
-                    onChange={(e) => setFormData({ ...formData, rate_type: e.target.value as 'SEA_RATES' | 'AIR_RATES' })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        rate_type: e.target.value as "SEA_RATES" | "AIR_RATES",
+                      })
+                    }
                     required
                   >
                     <option value="">Select Rate Type</option>
@@ -427,13 +496,23 @@ const ShippingRates = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="category" className="text-sm font-medium">Category</Label>
+                  <Label htmlFor="category" className="text-sm font-medium">
+                    Category
+                  </Label>
                   <select
                     id="category"
                     title="Select goods category"
                     className="w-full p-2 border border-border rounded-md"
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as 'NORMAL_GOODS' | 'SPECIAL_GOODS' | 'SMALL_GOODS' })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        category: e.target.value as
+                          | "NORMAL_GOODS"
+                          | "SPECIAL_GOODS"
+                          | "SMALL_GOODS",
+                      })
+                    }
                     required
                   >
                     <option value="">Select Category</option>
@@ -444,49 +523,71 @@ const ShippingRates = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="origin" className="text-sm font-medium">Origin</Label>
+                  <Label htmlFor="origin" className="text-sm font-medium">
+                    Origin
+                  </Label>
                   <Input
                     id="origin"
                     type="text"
                     placeholder="e.g., China"
                     value={formData.origin_country}
-                    onChange={(e) => setFormData({ ...formData, origin_country: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        origin_country: e.target.value,
+                      })
+                    }
                     required
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="destination" className="text-sm font-medium">Destination</Label>
+                  <Label htmlFor="destination" className="text-sm font-medium">
+                    Destination
+                  </Label>
                   <Input
                     id="destination"
                     type="text"
                     placeholder="e.g., Ghana"
                     value={formData.destination_country}
-                    onChange={(e) => setFormData({ ...formData, destination_country: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        destination_country: e.target.value,
+                      })
+                    }
                     required
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <Label htmlFor="office" className="text-sm font-medium">Office</Label>
+                  <Label htmlFor="office" className="text-sm font-medium">
+                    Office
+                  </Label>
                   <Input
                     id="office"
                     type="text"
                     placeholder="e.g., Tema Office"
                     value={formData.office_name}
-                    onChange={(e) => setFormData({ ...formData, office_name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, office_name: e.target.value })
+                    }
                     required
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <Label htmlFor="description" className="text-sm font-medium">Description (Optional)</Label>
+                  <Label htmlFor="description" className="text-sm font-medium">
+                    Description (Optional)
+                  </Label>
                   <textarea
                     id="description"
                     className="w-full p-2 border border-border rounded-md min-h-[80px]"
                     placeholder="Additional details about this rate..."
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
                   />
                 </div>
               </div>
@@ -499,10 +600,14 @@ const ShippingRates = () => {
                       Creating...
                     </>
                   ) : (
-                    'Create Rate'
+                    "Create Rate"
                   )}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowAddForm(false)}
+                >
                   Cancel
                 </Button>
               </div>
@@ -513,8 +618,12 @@ const ShippingRates = () => {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold">Shipping Rates Management</h2>
-                <p className="text-muted-foreground">Manage your shipping rates for sea and air cargo</p>
+                <h2 className="text-2xl font-bold">
+                  Shipping Rates Management
+                </h2>
+                <p className="text-muted-foreground">
+                  Manage your shipping rates for sea and air cargo
+                </p>
               </div>
               <div className="flex gap-2">
                 <Button
@@ -533,13 +642,15 @@ const ShippingRates = () => {
               <div className="p-4 border-b">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold">
-                    {selectedCategory === "SEA_RATES" ? "Sea Rates" : "Air Rates"}
+                    {selectedCategory === "SEA_RATES"
+                      ? "Sea Rates"
+                      : "Air Rates"}
                   </h3>
                   <div className="flex items-center gap-2">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="Search rates..." 
+                      <Input
+                        placeholder="Search rates..."
                         className="pl-10 w-64"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -560,7 +671,9 @@ const ShippingRates = () => {
                     <Ship className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="font-semibold mb-2">No rates found</h3>
                     <p className="text-muted-foreground mb-4">
-                      {searchQuery ? "No rates match your search criteria." : "Get started by adding your first shipping rate."}
+                      {searchQuery
+                        ? "No rates match your search criteria."
+                        : "Get started by adding your first shipping rate."}
                     </p>
                     <Button onClick={() => setShowAddForm(true)}>
                       <Plus className="h-4 w-4 mr-2" />
@@ -571,7 +684,9 @@ const ShippingRates = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="text-left p-4 font-medium">Rate Details</th>
+                        <th className="text-left p-4 font-medium">
+                          Rate Details
+                        </th>
                         <th className="text-left p-4 font-medium">Route</th>
                         <th className="text-left p-4 font-medium">Category</th>
                         <th className="text-left p-4 font-medium">Office</th>
@@ -581,7 +696,10 @@ const ShippingRates = () => {
                     </thead>
                     <tbody>
                       {rates.map((rate) => (
-                        <tr key={rate.id} className="border-b hover:bg-muted/30">
+                        <tr
+                          key={rate.id}
+                          className="border-b hover:bg-muted/30"
+                        >
                           <td className="p-4">
                             <div className="flex items-center gap-3">
                               {rate.rate_type === "SEA_RATES" ? (
@@ -592,7 +710,9 @@ const ShippingRates = () => {
                               <div>
                                 <p className="font-medium">{rate.title}</p>
                                 {rate.description && (
-                                  <p className="text-sm text-muted-foreground">{rate.description}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {rate.description}
+                                  </p>
                                 )}
                               </div>
                             </div>
@@ -616,7 +736,9 @@ const ShippingRates = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDeleteRate(rate.id, rate.title)}
+                                onClick={() =>
+                                  handleDeleteRate(rate.id, rate.title)
+                                }
                               >
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
