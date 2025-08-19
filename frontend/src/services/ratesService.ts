@@ -85,7 +85,7 @@ export const ratesService = {
     filters: RateFilters = {}
   ): Promise<ApiResponse<PaginatedResponse<Rate>>> {
     const params = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
         params.append(key, value.toString());
@@ -128,9 +128,11 @@ export const ratesService = {
   },
 
   // Get rate statistics
-  async getRateStats(filters: RateFilters = {}): Promise<ApiResponse<RateStats>> {
+  async getRateStats(
+    filters: RateFilters = {}
+  ): Promise<ApiResponse<RateStats>> {
     const params = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
         params.append(key, value.toString());
@@ -142,9 +144,11 @@ export const ratesService = {
   },
 
   // Get all routes (origin-destination pairs)
-  async getRoutes(filters: RateFilters = {}): Promise<ApiResponse<RouteInfo[]>> {
+  async getRoutes(
+    filters: RateFilters = {}
+  ): Promise<ApiResponse<RouteInfo[]>> {
     const params = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
         params.append(key, value.toString());
@@ -156,9 +160,11 @@ export const ratesService = {
   },
 
   // Get all offices
-  async getOffices(filters: RateFilters = {}): Promise<ApiResponse<OfficeInfo[]>> {
+  async getOffices(
+    filters: RateFilters = {}
+  ): Promise<ApiResponse<OfficeInfo[]>> {
     const params = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
         params.append(key, value.toString());
@@ -170,7 +176,9 @@ export const ratesService = {
   },
 
   // Get rates by category
-  async getRatesByCategory(category: Rate['category']): Promise<ApiResponse<Rate[]>> {
+  async getRatesByCategory(
+    category: Rate["category"]
+  ): Promise<ApiResponse<Rate[]>> {
     return this.getRates({ category }).then((response) => ({
       ...response,
       data: response.data?.results || [],
@@ -178,7 +186,9 @@ export const ratesService = {
   },
 
   // Get rates by type
-  async getRatesByType(rate_type: Rate['rate_type']): Promise<ApiResponse<Rate[]>> {
+  async getRatesByType(
+    rate_type: Rate["rate_type"]
+  ): Promise<ApiResponse<Rate[]>> {
     return this.getRates({ rate_type }).then((response) => ({
       ...response,
       data: response.data?.results || [],
@@ -190,9 +200,9 @@ export const ratesService = {
     origin: string,
     destination: string
   ): Promise<ApiResponse<Rate[]>> {
-    return this.getRates({ 
-      origin_country: origin, 
-      destination_country: destination 
+    return this.getRates({
+      origin_country: origin,
+      destination_country: destination,
     }).then((response) => ({
       ...response,
       data: response.data?.results || [],
