@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'rates',  
     'notes',
     'analytics',
+    'claims',  # Add claims app
     
     # Third party apps
     'rest_framework',

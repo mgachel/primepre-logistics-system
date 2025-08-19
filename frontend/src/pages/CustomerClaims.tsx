@@ -1,131 +1,296 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { 
-  FileText, 
-  AlertTriangle,
+import React, { useState, useEffect } from 'react';
+import {
+  Plus,
   Search,
   Filter,
-  Eye,
-  Plus,
+  Calendar,
+  Package,
+  AlertCircle,
   CheckCircle,
   Clock,
-  XCircle
+  XCircle,
+  FileText,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { claimsService, Claim, CreateClaimData } from '@/services/claimsService';
+import { formatDate, formatRelative } from '@/lib/date';
 
 export default function CustomerClaims() {
-  const { user } = useAuth();
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Mock data for customer claims
-  const claims = [
-    {
-      id: 'CL-001',
-      shipmentId: 'SH-002',
-      type: 'Damaged Goods',
-      status: 'Under Review',
-      amount: '$500.00',
-      date: '2024-01-13',
-      description: 'Package arrived with visible damage to the outer packaging. Contents appear to be intact but require inspection.',
-      evidence: ['damage_photo_1.jpg', 'damage_photo_2.jpg']
-    },
-    {
-      id: 'CL-002',
-      shipmentId: 'SH-001',
-      type: 'Delayed Delivery',
-      status: 'Pending',
-      amount: '$200.00',
-      date: '2024-01-18',
-      description: 'Shipment delayed by 5 days beyond the original ETA. This caused additional storage costs.',
-      evidence: ['delay_notification.pdf', 'storage_invoice.pdf']
-    },
-    {
-      id: 'CL-003',
-      shipmentId: 'SH-003',
-      type: 'Lost Items',
-      status: 'Approved',
-      amount: '$1,200.00',
-      date: '2024-01-22',
-      description: 'Two items from the shipment were missing upon delivery. Inventory count confirmed the loss.',
-      evidence: ['inventory_list.pdf', 'delivery_receipt.pdf']
-    }
-  ];
+  // Form state for creating new claim
+  const [newClaim, setNewClaim] = useState<CreateClaimData>({
+    tracking_id: '',
+    item_name: '',
+    item_description: '',
+  });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Approved':
-        return <Badge variant="default" className="bg-green-100 text-green-800">Approved</Badge>;
-      case 'Under Review':
-        return <Badge variant="default" className="bg-blue-100 text-blue-800">Under Review</Badge>;
-      case 'Pending':
-        return <Badge variant="default" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-      case 'Rejected':
-        return <Badge variant="default" className="bg-red-100 text-red-800">Rejected</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
+  // Load claims
+  const loadClaims = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('Loading customer claims...');
+      const response = await claimsService.getCustomerClaims();
+      console.log('Customer claims raw response:', response);
+      console.log('Claims response success:', response.success);
+      console.log('Claims data type:', typeof response.data);
+      console.log('Claims data:', response.data);
+      console.log('Is array?', Array.isArray(response.data));
+      
+      // Handle the response properly - check if the request was successful
+      if (response.success && response.data) {
+        const claimsData = Array.isArray(response.data) ? response.data : [];
+        console.log('Setting claims data:', claimsData);
+        setClaims(claimsData);
+      } else {
+        console.log('Claims response unsuccessful or no data, setting empty array');
+        setClaims([]);
+      }
+    } catch (err) {
+      console.error('Failed to load claims:', err);
+      setError('Failed to load claims. Please try again.');
+      setClaims([]); // Reset to empty array on error
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Approved':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'Under Review':
-        return <Clock className="h-4 w-4 text-blue-500" />;
-      case 'Pending':
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      case 'Rejected':
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <FileText className="h-4 w-4 text-gray-500" />;
+  // Create new claim
+  const handleCreateClaim = async () => {
+    if (!newClaim.tracking_id || !newClaim.item_name || !newClaim.item_description) {
+      setError('Please fill in all required fields.');
+      return;
+    }
+
+    try {
+      setCreating(true);
+      setError(null);
+      setSuccess(null);
+
+      const response = await claimsService.createClaim(newClaim);
+      
+      // Add the new claim to the list if response is successful
+      if (response.success && response.data) {
+        setClaims(prev => [response.data, ...prev]);
+        
+        // Reset form and close modal
+        setNewClaim({
+          tracking_id: '',
+          item_name: '',
+          item_description: '',
+        });
+        setShowCreateModal(false);
+        setSuccess('Claim submitted successfully!');
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError('Failed to create claim. Please try again.');
+      }
+    } catch (err: unknown) {
+      console.error('Failed to create claim:', err);
+      const apiError = err as { response?: { data?: Record<string, string[]> } };
+      
+      if (apiError?.response?.data) {
+        const errorMessages = Object.entries(apiError.response.data)
+          .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+          .join('; ');
+        setError(`Failed to create claim: ${errorMessages}`);
+      } else {
+        setError('Failed to create claim. Please try again.');
+      }
+    } finally {
+      setCreating(false);
     }
   };
 
-  const filteredClaims = claims.filter(claim => {
-    const matchesSearch = claim.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         claim.shipmentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         claim.type.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || claim.status === statusFilter;
+  // Filter claims
+  const filteredClaims = (claims || []).filter(claim => {
+    const matchesSearch = searchTerm === '' || 
+      claim.tracking_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      claim.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      claim.item_description.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || statusFilter === '' || claim.status === statusFilter;
+    
     return matchesSearch && matchesStatus;
   });
+
+  // Get status icon
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'PENDING':
+        return <Clock className="h-4 w-4" />;
+      case 'UNDER_REVIEW':
+        return <AlertCircle className="h-4 w-4" />;
+      case 'APPROVED':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'RESOLVED':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'REJECTED':
+        return <XCircle className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
+    }
+  };
+
+  // Get status badge variant
+  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+      case 'PENDING':
+        return 'outline';
+      case 'UNDER_REVIEW':
+        return 'secondary';
+      case 'APPROVED':
+      case 'RESOLVED':
+        return 'default';
+      case 'REJECTED':
+        return 'destructive';
+      default:
+        return 'outline';
+    }
+  };
+
+  useEffect(() => {
+    loadClaims();
+  }, []);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Claims</h1>
           <p className="text-muted-foreground">
-            Track and manage your claim requests
+            Submit and track claims for lost or damaged items
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          New Claim
-        </Button>
+        <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add New Claim
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Submit New Claim</DialogTitle>
+              <DialogDescription>
+                Provide details about the lost or damaged item to start a claim.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div>
+                <Label htmlFor="tracking_id">Tracking ID / Tracking Number *</Label>
+                <Input
+                  id="tracking_id"
+                  value={newClaim.tracking_id}
+                  onChange={(e) => setNewClaim(prev => ({ ...prev, tracking_id: e.target.value }))}
+                  placeholder="Enter tracking number"
+                />
+              </div>
+              <div>
+                <Label htmlFor="item_name">Item Name *</Label>
+                <Input
+                  id="item_name"
+                  value={newClaim.item_name}
+                  onChange={(e) => setNewClaim(prev => ({ ...prev, item_name: e.target.value }))}
+                  placeholder="Enter item name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="item_description">Item Description *</Label>
+                <Textarea
+                  id="item_description"
+                  value={newClaim.item_description}
+                  onChange={(e) => setNewClaim(prev => ({ ...prev, item_description: e.target.value }))}
+                  placeholder="Describe the item and the issue in detail..."
+                  rows={4}
+                />
+              </div>
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowCreateModal(false)}
+                  disabled={creating}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateClaim} disabled={creating}>
+                  {creating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Claim'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
+
+      {/* Status Messages */}
+      {error && (
+        <Alert className="border-red-200 bg-red-50">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="border-green-200 bg-green-50">
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">
+            {success}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Filters */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Filter className="h-4 w-4 mr-2" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4">
+        <CardContent className="p-4">
+          <div className="flex gap-4 items-center">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by claim ID, shipment ID, or type..."
+                  placeholder="Search claims by tracking ID, item name, or description..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -134,139 +299,105 @@ export default function CustomerClaims() {
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
+                <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Under Review">Under Review</SelectItem>
-                <SelectItem value="Approved">Approved</SelectItem>
-                <SelectItem value="Rejected">Rejected</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="UNDER_REVIEW">Under Review</SelectItem>
+                <SelectItem value="APPROVED">Approved</SelectItem>
+                <SelectItem value="RESOLVED">Resolved</SelectItem>
+                <SelectItem value="REJECTED">Rejected</SelectItem>
               </SelectContent>
             </Select>
+            <Button variant="outline" size="sm" onClick={loadClaims} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Claims List */}
-      <div className="grid gap-4">
-        {filteredClaims.map((claim) => (
-          <Card key={claim.id}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    {getStatusIcon(claim.status)}
-                    <div>
-                      <div className="font-semibold">{claim.id}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {claim.type} • Shipment: {claim.shipmentId}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-4">
-                  <div className="text-right">
-                    <div className="font-medium">{claim.amount}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Filed: {claim.date}
-                    </div>
-                  </div>
-                  
-                  <div className="text-right">
-                    {getStatusBadge(claim.status)}
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {claim.evidence.length} evidence files
-                    </div>
-                  </div>
-                  
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Claim Description */}
-              <div className="mt-4 p-4 bg-muted rounded-lg">
-                <div className="text-sm text-muted-foreground mb-2">Description:</div>
-                <div className="text-sm">{claim.description}</div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {filteredClaims.length === 0 && (
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading claims...</p>
+          </div>
+        </div>
+      ) : filteredClaims.length === 0 ? (
         <Card>
-          <CardContent className="p-12 text-center">
-            <div className="text-muted-foreground">
-              No claims found matching your criteria.
-            </div>
+          <CardContent className="text-center py-12">
+            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Claims Found</h3>
+            <p className="text-muted-foreground mb-4">
+              {claims.length === 0 
+                ? "You haven't submitted any claims yet."
+                : "No claims match your current filters."
+              }
+            </p>
+            {claims.length === 0 && (
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Submit Your First Claim
+              </Button>
+            )}
           </CardContent>
         </Card>
-      )}
+      ) : (
+        <div className="space-y-4">
+          {filteredClaims.map((claim) => (
+            <Card key={claim.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      {claim.item_name}
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Claim #{claim.id} • Tracking: {claim.tracking_id}
+                    </p>
+                  </div>
+                  <Badge variant={getStatusBadgeVariant(claim.status)} className="flex items-center gap-1">
+                    {getStatusIcon(claim.status)}
+                    {claimsService.getStatusLabel(claim.status)}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-3">
+                  <div>
+                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Description</h4>
+                    <p className="text-sm">{claim.item_description}</p>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>Submitted {formatRelative(claim.created_at)}</span>
+                    </div>
+                    <div>
+                      {claim.days_since_submission === 0 
+                        ? 'Submitted today' 
+                        : `${claim.days_since_submission} day${claim.days_since_submission > 1 ? 's' : ''} ago`
+                      }
+                    </div>
+                  </div>
 
-      {/* New Claim Form (Hidden by default, can be toggled) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Submit New Claim</CardTitle>
-          <CardDescription>
-            Submit a new claim for any issues with your shipments
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium">Shipment ID</label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select shipment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SH-001">SH-001</SelectItem>
-                  <SelectItem value="SH-002">SH-002</SelectItem>
-                  <SelectItem value="SH-003">SH-003</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Claim Type</label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select claim type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="damaged">Damaged Goods</SelectItem>
-                  <SelectItem value="delayed">Delayed Delivery</SelectItem>
-                  <SelectItem value="lost">Lost Items</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <div>
-            <label className="text-sm font-medium">Claim Amount</label>
-            <Input placeholder="$0.00" />
-          </div>
-          
-          <div>
-            <label className="text-sm font-medium">Description</label>
-            <Textarea 
-              placeholder="Please provide a detailed description of the issue..."
-              rows={4}
-            />
-          </div>
-          
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline">Cancel</Button>
-            <Button>Submit Claim</Button>
-          </div>
-        </CardContent>
-      </Card>
+                  {claim.admin_notes && (
+                    <div className="mt-3 p-3 bg-muted rounded-lg">
+                      <h4 className="font-medium text-sm mb-1">Admin Notes</h4>
+                      <p className="text-sm">{claim.admin_notes}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
-} 
+}
