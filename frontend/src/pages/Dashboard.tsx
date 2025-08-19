@@ -9,6 +9,7 @@ import {
   Plus,
   Upload,
   RefreshCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -26,6 +27,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
 import { cargoService, BackendCargoContainer } from "@/services/cargoService";
 import { dashboardService } from "@/services/dashboardService";
+import { claimsService } from "@/services/claimsService";
+import { useAuth } from "@/contexts/AuthContext";
 import type { WarehouseItem } from "@/services/warehouseService";
 import type {
   CargoContainer as LegacyCargoContainer,
@@ -45,11 +48,18 @@ type CargoDashboard = {
   total_cargo_items?: number;
   recent_containers?: CargoContainer[];
 };
-// --
 
 export default function Dashboard() {
   const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
   const queryClient = useQueryClient();
+  const { isCustomer } = useAuth();
+
+  // Customer Claims (only for customers)
+  const { data: customerClaims, isLoading: loadingClaims } = useQuery({
+    queryKey: ["customer-claims"],
+    queryFn: () => claimsService.getCustomerClaims(),
+    enabled: isCustomer(), // Only fetch if user is a customer
+  });
 
   // Admin/user stats
   const { data: userStats, isLoading: loadingUsers } = useQuery({
@@ -57,26 +67,32 @@ export default function Dashboard() {
     queryFn: () => adminService.getUserStats(),
   });
 
-  // Goods statistics (admin endpoints)
+  // Goods statistics (admin endpoints for admins, customer endpoints for customers)
   const { data: chinaStats, isLoading: loadingChina } = useQuery({
-    queryKey: ["goods-stats", "china"],
-    queryFn: () => apiClient.get<GoodsStats>("/api/goods/china/statistics/"),
+    queryKey: ["goods-stats", "china", isCustomer() ? "customer" : "admin"],
+    queryFn: () => isCustomer() 
+      ? apiClient.get<GoodsStats>("/api/customer/goods/china/my_statistics/")
+      : apiClient.get<GoodsStats>("/api/goods/china/statistics/"),
   });
   const { data: ghanaStats, isLoading: loadingGhana } = useQuery({
-    queryKey: ["goods-stats", "ghana"],
-    queryFn: () => apiClient.get<GoodsStats>("/api/goods/ghana/statistics/"),
+    queryKey: ["goods-stats", "ghana", isCustomer() ? "customer" : "admin"],
+    queryFn: () => isCustomer()
+      ? apiClient.get<GoodsStats>("/api/customer/goods/ghana/my_statistics/")
+      : apiClient.get<GoodsStats>("/api/goods/ghana/statistics/"),
   });
 
-  // In-transit containers (sea and air)
+  // In-transit containers (sea and air) - use customer endpoints for customers
   const { data: seaInTransit, isLoading: loadingSea } = useQuery({
-    queryKey: ["containers", "sea", "in_transit"],
-    queryFn: () =>
-      cargoService.getContainers({ cargo_type: "sea", status: "in_transit" }),
+    queryKey: ["containers", "sea", "in_transit", isCustomer() ? "customer" : "admin"],
+    queryFn: () => isCustomer()
+      ? cargoService.getCustomerContainers({ cargo_type: "sea", status: "in_transit" })
+      : cargoService.getContainers({ cargo_type: "sea", status: "in_transit" }),
   });
   const { data: airInTransit, isLoading: loadingAir } = useQuery({
-    queryKey: ["containers", "air", "in_transit"],
-    queryFn: () =>
-      cargoService.getContainers({ cargo_type: "air", status: "in_transit" }),
+    queryKey: ["containers", "air", "in_transit", isCustomer() ? "customer" : "admin"],
+    queryFn: () => isCustomer()
+      ? cargoService.getCustomerContainers({ cargo_type: "air", status: "in_transit" })
+      : cargoService.getContainers({ cargo_type: "air", status: "in_transit" }),
   });
 
   // Fetch ALL in-transit containers across pagination for table completeness
@@ -124,15 +140,6 @@ export default function Dashboard() {
     queryFn: () => dashboardService.getRecentActivity(),
   });
 
-  // Recent user registrations for admin (augment recent activity)
-  const { data: recentUsers } = useQuery<ApiResponse<PaginatedResponse<User>>>({
-    queryKey: ["recent-users", { ordering: "-date_joined", limit: 5 }],
-    queryFn: () =>
-      apiClient.get<PaginatedResponse<User>>(
-        "/api/auth/admin/users/?ordering=-date_joined&limit=5"
-      ),
-  });
-
   const stats = useMemo(() => {
     const cbmInWarehouse =
       (chinaStats?.data?.total_cbm || 0) + (ghanaStats?.data?.total_cbm || 0);
@@ -142,7 +149,15 @@ export default function Dashboard() {
     const activeClients =
       (userStats as ApiResponse<UserStats> | undefined)?.data?.active_users ??
       0;
-    return { cbmInWarehouse, activeShipments, totalCargoItems, activeClients };
+    
+    // Calculate pending claims for customers
+    const pendingClaims = isCustomer() 
+      ? (customerClaims?.success && customerClaims.data 
+          ? customerClaims.data.filter(claim => claim.status === 'PENDING').length 
+          : 0)
+      : 0;
+    
+    return { cbmInWarehouse, activeShipments, totalCargoItems, activeClients, pendingClaims };
   }, [
     chinaStats,
     ghanaStats,
@@ -150,6 +165,8 @@ export default function Dashboard() {
     airInTransit,
     itemsInTransit,
     userStats,
+    customerClaims,
+    isCustomer,
   ]);
 
   const transitingCargo = useMemo(() => {
@@ -233,7 +250,7 @@ export default function Dashboard() {
     });
 
     // Users joined events
-    const userJoins = ((recentUsers?.data?.results ?? []) as User[]).map(
+    const userJoins = ((userStats?.data?.recent_users ?? []) as User[]).map(
       (u) => ({
         id: String(u.id),
         when: (u as User).date_joined as unknown as string,
@@ -250,10 +267,10 @@ export default function Dashboard() {
         new Date(b.when || 0).getTime() - new Date(a.when || 0).getTime()
     );
     return combined.slice(0, 7);
-  }, [recentActivity, recentUsers]);
+  }, [recentActivity, userStats]);
 
   const loadingStats =
-    loadingChina || loadingGhana || loadingSea || loadingAir || loadingUsers;
+    loadingChina || loadingGhana || loadingSea || loadingAir || loadingUsers || (isCustomer() && loadingClaims);
   const loadingTransiting = loadingAllTransit;
 
   type Row = {
@@ -357,19 +374,15 @@ export default function Dashboard() {
         <div className="flex items-center space-x-3 mt-4 sm:mt-0">
           <Button variant="outline" size="sm">
             <Calendar className="h-4 w-4 mr-2" />
-            Last 30 days
-          </Button>
-          <Button size="sm" onClick={() => setShowNewCargoDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Cargo
+            This Month
           </Button>
         </div>
       </div>
 
-      {/* Metrics Grid */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {loadingStats ? (
-          Array.from({ length: 4 }).map((_, i) => (
+          Array.from({ length: isCustomer() ? 4 : 4 }).map((_, i) => (
             <div key={i} className="logistics-card p-6">
               <Skeleton className="h-4 w-24 mb-4" />
               <Skeleton className="h-8 w-32" />
@@ -377,30 +390,68 @@ export default function Dashboard() {
           ))
         ) : (
           <>
-            <MetricCard
-              title="CBM in Warehouse"
-              value={stats.cbmInWarehouse.toString()}
-              icon={Package}
-              change={{ value: "+2.1%", type: "increase" }}
-            />
-            <MetricCard
-              title="Active Shipments"
-              value={stats.activeShipments.toString()}
-              icon={Truck}
-              change={{ value: "-1.3%", type: "decrease" }}
-            />
-            <MetricCard
-              title="Total Cargo Items"
-              value={stats.totalCargoItems.toString()}
-              icon={TrendingUp}
-              change={{ value: "+0.4%", type: "increase" }}
-            />
-            <MetricCard
-              title="Active Clients"
-              value={stats.activeClients.toString()}
-              icon={Users}
-              change={{ value: "0%", type: "neutral" }}
-            />
+            {isCustomer() ? (
+              // Customer Dashboard Cards
+              <>
+                <MetricCard
+                  title="CBM in Warehouse"
+                  value={stats.cbmInWarehouse.toString()}
+                  icon={Package}
+                  change={{ value: "+2.1%", type: "increase" }}
+                />
+                <MetricCard
+                  title="Active Shipments"
+                  value={stats.activeShipments.toString()}
+                  icon={Truck}
+                  change={{ value: "-1.3%", type: "decrease" }}
+                />
+                <Link to="/my-claims" className="block">
+                  <MetricCard
+                    title="Pending Claims"
+                    value={stats.pendingClaims.toString()}
+                    icon={AlertTriangle}
+                    change={{ 
+                      value: stats.pendingClaims > 0 ? "Requires attention" : "All resolved", 
+                      type: stats.pendingClaims > 0 ? "decrease" : "neutral" 
+                    }}
+                  />
+                </Link>
+                <MetricCard
+                  title="Total Cargo Items"
+                  value={stats.totalCargoItems.toString()}
+                  icon={TrendingUp}
+                  change={{ value: "+0.4%", type: "increase" }}
+                />
+              </>
+            ) : (
+              // Admin Dashboard Cards
+              <>
+                <MetricCard
+                  title="CBM in Warehouse"
+                  value={stats.cbmInWarehouse.toString()}
+                  icon={Package}
+                  change={{ value: "+2.1%", type: "increase" }}
+                />
+                <MetricCard
+                  title="Active Shipments"
+                  value={stats.activeShipments.toString()}
+                  icon={Truck}
+                  change={{ value: "-1.3%", type: "decrease" }}
+                />
+                <MetricCard
+                  title="Total Cargo Items"
+                  value={stats.totalCargoItems.toString()}
+                  icon={TrendingUp}
+                  change={{ value: "+0.4%", type: "increase" }}
+                />
+                <MetricCard
+                  title="Active Clients"
+                  value={stats.activeClients.toString()}
+                  icon={Users}
+                  change={{ value: "0%", type: "neutral" }}
+                />
+              </>
+            )}
           </>
         )}
       </div>

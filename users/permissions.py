@@ -13,6 +13,18 @@ class IsAdminUser(BasePermission):
         )
 
 
+class IsCustomer(BasePermission):
+    """
+    Permission class to check if user is a customer
+    """
+    def has_permission(self, request, view):
+        return (
+            request.user and 
+            request.user.is_authenticated and 
+            request.user.user_role == 'CUSTOMER'
+        )
+
+
 class IsSuperAdminUser(BasePermission):
     """
     Permission class to check if user is a Super Admin
