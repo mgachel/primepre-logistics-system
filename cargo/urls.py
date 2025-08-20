@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
+from .customer_shipments_views import CustomerShipmentsView, CustomerShipmentStatsView, customer_shipment_tracking
 
 # Create router for ViewSets (Admin/Staff)
 router = DefaultRouter()
@@ -26,6 +27,14 @@ urlpatterns = [
     # Customer-specific API routes
     path('customer/', include(customer_router.urls)),
     path('customer/dashboard/', views.CustomerCargoDashboardView.as_view(), name='customer-cargo-dashboard'),
+    
+    # Customer Shipments Page - Main feature
+    path('customer/shipments/', CustomerShipmentsView.as_view(), name='customer-shipments'),
+    path('customer/shipments/stats/', CustomerShipmentStatsView.as_view(), name='customer-shipments-stats'),
+    path('customer/shipments/track/<str:tracking_id>/', customer_shipment_tracking, name='customer-shipment-tracking'),
+    
+    # Utility endpoints for shipping marks
+    path('shipping-marks/', views.CustomerShippingMarkListView.as_view(), name='shipping-marks'),
     
     # Template views (if needed for frontend)
     path('dashboard-template/', views.cargo_dashboard, name='cargo-dashboard-template'),
