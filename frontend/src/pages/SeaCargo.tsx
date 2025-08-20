@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
 import { EditCargoContainerDialog } from "@/components/dialogs/EditCargoContainerDialog";
 import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
+import { ExcelUploadButton } from "@/components/ui/ExcelUploadButton";
 import {
   cargoService,
   BackendCargoContainer,
@@ -290,10 +291,24 @@ export default function SeaCargo() {
             local time zone
           </p>
         </div>
-        <Button onClick={() => setShowNewCargoDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Cargo
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowNewCargoDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Cargo
+          </Button>
+          <ExcelUploadButton
+            uploadType="sea_cargo"
+            variant="outline"
+            onUploadComplete={(response) => {
+              toast({
+                title: "Excel upload completed",
+                description: `Successfully processed ${response.summary.created || 0} sea cargo items`,
+              });
+              // Refresh the data
+              window.location.reload();
+            }}
+          />
+        </div>
       </div>
 
       {/* Summary Cards */}

@@ -231,138 +231,198 @@ class ClientShipmentSummaryViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class BulkCargoItemUploadView(APIView):
-    """View for bulk uploading cargo items from Excel"""
+    """Bulk upload cargo items via Excel - Enhanced version"""
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        serializer = BulkCargoItemSerializer(data=request.data)
+        """Handle bulk upload via Excel file - Routes to enhanced Excel processor"""
+        if 'file' not in request.FILES:
+            return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        file = request.FILES['file']
+        
+        # Check if this is a legacy format upload (with container_id) or new format
+        container_id = request.data.get('container_id')
+        upload_type = request.data.get('upload_type', 'sea_cargo')
+        warehouse_location = request.data.get('warehouse_location')
+        
+        # Validate file type
+        if not file.name.endswith(('.xlsx', '.xls')):
+            return Response({'error': 'Only Excel files are allowed'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # If container_id is provided, this is legacy sea cargo upload
+        if container_id:
+            upload_type = 'sea_cargo'
+        
+        # Import and use the ExcelUploadProcessor
+        from .excel_upload_views import ExcelUploadProcessor
+        
+        try:
+            processor = ExcelUploadProcessor(
+                file=file,
+                upload_type=upload_type,
+                warehouse_location=warehouse_location,
+                uploader_user_id=request.user.id
+            )
+            
+            result = processor.process()
+            
+            if result['success']:
+                return Response({
+                    'message': 'File processed successfully',
+                    'summary': result['summary'],
+                    'results': result['results']
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': result['error'],
+                    'summary': result['summary'],
+                    'results': result['results']
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            # Fallback to legacy processing if new processor fails
+            return self._legacy_bulk_upload(request, file, container_id)
+    
+    def _legacy_bulk_upload(self, request, file, container_id):
+        """Legacy bulk upload method for backward compatibility"""
+        serializer = BulkCargoItemSerializer(data={'excel_file': file, 'container_id': container_id})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        excel_file = serializer.validated_data['excel_file']
-        container_id = serializer.validated_data['container_id']
+        excel_file = file
         
         try:
             # Get container
             container = get_object_or_404(CargoContainer, container_id=container_id)
             
-            # Read Excel or CSV file with enhanced error handling
+            # Read Excel file with enhanced error handling
             try:
                 if excel_file.name.endswith('.csv'):
-                    # Try different encodings for CSV files
-                    try:
-                        df = pd.read_csv(excel_file, encoding='utf-8')
-                    except UnicodeDecodeError:
-                        try:
-                            excel_file.seek(0)  # Reset file pointer
-                            df = pd.read_csv(excel_file, encoding='latin1')
-                        except UnicodeDecodeError:
-                            excel_file.seek(0)  # Reset file pointer
-                            df = pd.read_csv(excel_file, encoding='cp1252')
+                    df = pd.read_csv(excel_file, encoding='utf-8')
                 else:
-                    # Read Excel file with multiple engine attempts
-                    try:
-                        df = pd.read_excel(excel_file, engine='openpyxl')
-                    except Exception:
-                        try:
-                            excel_file.seek(0)  # Reset file pointer
-                            df = pd.read_excel(excel_file, engine='xlrd')
-                        except Exception:
-                            excel_file.seek(0)  # Reset file pointer
-                            # Try reading as binary and force encoding
-                            df = pd.read_excel(excel_file, engine='openpyxl', 
-                                             na_filter=False, keep_default_na=False)
+                    df = pd.read_excel(excel_file, engine='openpyxl')
                     
             except Exception as e:
-                error_msg = str(e)
-                if 'codec' in error_msg or 'decode' in error_msg or 'utf-8' in error_msg:
-                    return Response({
-                        'error': 'File encoding error: The Excel file contains characters that cannot be read. Please save your file as a new .xlsx file or remove special characters.',
-                        'suggestions': [
-                            'Save your Excel file as a new .xlsx file using "Save As"',
-                            'Remove any special characters or symbols from your data',
-                            'Try converting to CSV with UTF-8 encoding',
-                            'Use the sample template files provided',
-                            'Ensure your file is not corrupted'
-                        ],
-                        'technical_error': error_msg
-                    }, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    return Response({
-                        'error': f'Failed to read file. The file may be corrupted or in an unsupported format. Technical error: {error_msg}',
-                        'suggestions': [
-                            'Save your Excel file as a new .xlsx file',
-                            'Try converting to CSV with UTF-8 encoding',
-                            'Check for special characters in your data',
-                            'Use the sample files as templates',
-                            'Ensure the file is not password protected'
-                        ]
-                    }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Expected columns
-            required_columns = [
-                'shipping_mark', 'item_description', 'quantity', 'cbm'
-            ]
-            
-            # Check if required columns exist
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
                 return Response({
-                    'error': f'Missing required columns: {", ".join(missing_columns)}',
-                    'required_columns': required_columns
+                    'error': f'Failed to read file: {str(e)}',
+                    'suggestion': 'Please ensure your file is a valid Excel format and try again'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            created_items = []
-            errors = []
+            # If file doesn't have expected columns, try position-based mapping
+            required_columns = ['shipping_mark', 'item_description', 'quantity', 'cbm']
+            missing_columns = [col for col in required_columns if col not in df.columns]
             
-            for index, row in df.iterrows():
-                try:
-                    # Get customer by shipping mark
-                    try:
-                        client = CustomerUser.objects.get(shipping_mark=row['shipping_mark'])
-                    except CustomerUser.DoesNotExist:
-                        errors.append({
-                            'row': index + 1,
-                            'error': f"Customer with shipping mark '{row['shipping_mark']}' not found. Please create the customer first."
-                        })
-                        continue
-                    
-                    # Create cargo item
-                    cargo_item = CargoItem.objects.create(
-                        container=container,
-                        client=client,
-                        item_description=row['item_description'],
-                        quantity=int(row['quantity']),
-                        cbm=float(row['cbm']),
-                        weight=float(row.get('weight', 0)) if pd.notna(row.get('weight')) else None,
-                        unit_value=float(row.get('unit_value', 0)) if pd.notna(row.get('unit_value')) else None,
-                        total_value=float(row.get('total_value', 0)) if pd.notna(row.get('total_value')) else None,
-                        status=row.get('status', 'pending')
-                    )
-                    
-                    created_items.append(cargo_item)
-                    
-                    # Update client shipment summary
-                    summary, created = ClientShipmentSummary.objects.get_or_create(
-                        container=container,
-                        client=client
-                    )
-                    summary.update_totals()
-                    
-                except Exception as e:
-                    errors.append(f"Row {index + 2}: {str(e)}")
+            if missing_columns:
+                # Try position-based mapping as fallback
+                return self._position_based_processing(df, container, request.user)
             
-            return Response({
-                'message': f'Successfully created {len(created_items)} cargo items',
-                'created_items': len(created_items),
-                'errors': errors,
-                'items': CargoItemSerializer(created_items, many=True).data
-            }, status=status.HTTP_201_CREATED)
+            # Process with column names (legacy method)
+            return self._column_based_processing(df, container, request.user)
             
         except Exception as e:
             return Response({
                 'error': f'Failed to process Excel file: {str(e)}'
             }, status=status.HTTP_400_BAD_REQUEST)
+    
+    def _position_based_processing(self, df, container, user):
+        """Process Excel using position-based mapping"""
+        created_items = []
+        errors = []
+        
+        for index, row in df.iterrows():
+            try:
+                # Position-based mapping
+                shipping_mark = str(row.iloc[0]).strip() if len(row) > 0 and pd.notna(row.iloc[0]) else None
+                description = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else 'Imported item'
+                quantity = int(float(row.iloc[2])) if len(row) > 2 and pd.notna(row.iloc[2]) else 1
+                cbm = float(row.iloc[3]) if len(row) > 3 and pd.notna(row.iloc[3]) else 0.0
+                
+                if not shipping_mark:
+                    errors.append(f"Row {index + 2}: Shipping mark is required")
+                    continue
+                
+                # Get or create customer
+                customer, created = CustomerUser.objects.get_or_create(
+                    shipping_mark=shipping_mark,
+                    defaults={
+                        'phone': f'+000{shipping_mark}',
+                        'first_name': shipping_mark.replace('PM', ''),
+                        'last_name': 'Imported',
+                        'user_role': 'CUSTOMER'
+                    }
+                )
+                
+                # Create cargo item
+                cargo_item = CargoItem.objects.create(
+                    container=container,
+                    client=customer,
+                    item_description=description,
+                    quantity=quantity,
+                    cbm=cbm,
+                    status='pending'
+                )
+                
+                created_items.append(cargo_item)
+                
+            except Exception as e:
+                errors.append(f"Row {index + 2}: {str(e)}")
+        
+        return Response({
+            'message': f'Position-based processing: Successfully created {len(created_items)} cargo items',
+            'created_items': len(created_items),
+            'errors': errors,
+            'items': CargoItemSerializer(created_items, many=True).data
+        }, status=status.HTTP_201_CREATED)
+    
+    def _column_based_processing(self, df, container, user):
+        """Process Excel using column names (legacy method)"""
+        created_items = []
+        errors = []
+        
+        for index, row in df.iterrows():
+            try:
+                # Get customer by shipping mark
+                try:
+                    client = CustomerUser.objects.get(shipping_mark=row['shipping_mark'])
+                except CustomerUser.DoesNotExist:
+                    errors.append({
+                        'row': index + 1,
+                        'error': f"Customer with shipping mark '{row['shipping_mark']}' not found. Please create the customer first."
+                    })
+                    continue
+                
+                # Create cargo item
+                cargo_item = CargoItem.objects.create(
+                    container=container,
+                    client=client,
+                    item_description=row['item_description'],
+                    quantity=int(row['quantity']),
+                    cbm=float(row['cbm']),
+                    weight=float(row.get('weight', 0)) if pd.notna(row.get('weight')) else None,
+                    unit_value=float(row.get('unit_value', 0)) if pd.notna(row.get('unit_value')) else None,
+                    total_value=float(row.get('total_value', 0)) if pd.notna(row.get('total_value')) else None,
+                    status=row.get('status', 'pending')
+                )
+                
+                created_items.append(cargo_item)
+                
+                # Update client shipment summary
+                summary, created = ClientShipmentSummary.objects.get_or_create(
+                    container=container,
+                    client=client
+                )
+                summary.update_totals()
+                
+            except Exception as e:
+                errors.append(f"Row {index + 2}: {str(e)}")
+        
+        return Response({
+            'message': f'Successfully created {len(created_items)} cargo items',
+            'created_items': len(created_items),
+            'errors': errors,
+            'items': CargoItemSerializer(created_items, many=True).data
+        }, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
@@ -380,6 +440,109 @@ def cargo_statistics(request):
         'total_in_transit': total_in_transit,
         'total_containers': sea_containers + air_containers
     })
+
+
+class EnhancedExcelUploadView(APIView):
+    """Enhanced Excel upload that supports both Goods Received and Sea Cargo"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Handle Excel file upload with enhanced processing"""
+        if 'file' not in request.FILES:
+            return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        file = request.FILES['file']
+        upload_type = request.data.get('upload_type', 'sea_cargo')
+        warehouse_location = request.data.get('warehouse_location')
+        
+        # Validate file type
+        if not file.name.endswith(('.xlsx', '.xls')):
+            return Response({
+                'error': 'Only Excel files (.xlsx, .xls) are allowed',
+                'file_received': file.name
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Import and use the ExcelUploadProcessor
+        from .excel_upload_views import ExcelUploadProcessor
+        
+        try:
+            processor = ExcelUploadProcessor(
+                file=file,
+                upload_type=upload_type,
+                warehouse_location=warehouse_location,
+                uploader_user_id=request.user.id
+            )
+            
+            result = processor.process()
+            
+            if result['success']:
+                return Response({
+                    'message': 'File processed successfully',
+                    'summary': result['summary'],
+                    'results': result['results'],
+                    'upload_info': {
+                        'file_name': file.name,
+                        'upload_type': upload_type,
+                        'warehouse_location': warehouse_location,
+                        'processed_by': getattr(request.user, 'phone', str(request.user)),
+                        'processed_at': datetime.now().isoformat()
+                    }
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': result['error'],
+                    'summary': result['summary'],
+                    'results': result['results'],
+                    'upload_info': {
+                        'file_name': file.name,
+                        'upload_type': upload_type,
+                        'warehouse_location': warehouse_location
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            return Response({
+                'error': f'Failed to process file: {str(e)}',
+                'file_name': file.name,
+                'suggestions': [
+                    'Check if the file is corrupted',
+                    'Ensure the file follows the template format',
+                    'Try downloading a fresh template',
+                    'Verify all required columns are present'
+                ]
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ExcelTemplateDownloadView(APIView):
+    """Download Excel templates for uploads"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Generate and download Excel template"""
+        upload_type = request.query_params.get('type', 'goods_received')
+        warehouse_location = request.query_params.get('warehouse', 'China')
+        
+        # Import and use the ExcelTemplateView
+        from .excel_upload_views import ExcelTemplateView
+        
+        try:
+            template_view = ExcelTemplateView()
+            template_view.request = request
+            
+            if upload_type == 'goods_received':
+                return template_view._generate_goods_received_template(warehouse_location)
+            elif upload_type == 'sea_cargo':
+                return template_view._generate_sea_cargo_template()
+            else:
+                return Response({
+                    'error': 'Invalid template type',
+                    'available_types': ['goods_received', 'sea_cargo']
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            return Response({
+                'error': f'Failed to generate template: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # Template views for frontend (if needed)

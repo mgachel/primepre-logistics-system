@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { NewGoodsDialog } from "@/components/dialogs/NewGoodsDialog";
+import { ExcelUploadButton } from "@/components/ui/ExcelUploadButton";
 import {
   warehouseService,
   WarehouseItem,
@@ -349,15 +350,23 @@ export default function GhanaWarehouse() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
+          <ExcelUploadButton
+            uploadType="goods_received"
+            warehouse="Ghana"
             variant="outline"
             size="sm"
-            onClick={onUpload}
-            disabled={uploading}
+            onUploadComplete={(response) => {
+              toast({
+                title: "Excel upload completed",
+                description: `Successfully processed ${response.summary.created || 0} goods received items`,
+              });
+              // Refresh the data
+              setSearch((s) => s); // Trigger reload
+            }}
           >
             <Upload className="h-4 w-4" />
-            {uploading ? "Uploading..." : "Import Excel"}
-          </Button>
+            Import Excel
+          </ExcelUploadButton>
           <Button variant="outline" size="sm" onClick={onExportTemplate}>
             <Download className="h-4 w-4" />
             Template
