@@ -100,10 +100,34 @@ class CargoContainerViewSet(viewsets.ModelViewSet):
         
         items = CargoItem.objects.filter(container=container)
         if shipping_mark:
-            items = items.filter(shipping_mark__shipping_mark=shipping_mark)
+            items = items.filter(client__shipping_mark=shipping_mark)
         
         serializer = CargoItemSerializer(items, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def add_cargo_item(self, request, pk=None):
+        """Add a cargo item to this container using shipping mark"""
+        container = self.get_object()
+        
+        # Create a copy of the data and add the container
+        data = request.data.copy()
+        data['container'] = container.container_id
+        
+        serializer = CargoItemCreateSerializer(data=data)
+        if serializer.is_valid():
+            cargo_item = serializer.save()
+            
+            # Update or create client shipment summary
+            summary, created = ClientShipmentSummary.objects.get_or_create(
+                container=container,
+                client=cargo_item.client
+            )
+            summary.update_totals()
+            
+            return Response(CargoItemSerializer(cargo_item).data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CargoItemViewSet(viewsets.ModelViewSet):
@@ -151,8 +175,15 @@ class CargoItemViewSet(viewsets.ModelViewSet):
 class CustomerUserViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for accessing customer/client information"""
     queryset = CustomerUser.objects.filter(user_role='CUSTOMER')
-    serializer_class = CustomerUserSerializer
     permission_classes = [IsAuthenticated]
+    
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action"""
+        if self.action == 'list' or self.action == 'retrieve':
+            # For cargo item selection, use simplified serializer showing only shipping mark
+            from .serializers import CustomerShippingMarkSerializer
+            return CustomerShippingMarkSerializer
+        return CustomerUserSerializer
     
     def get_queryset(self):
         queryset = CustomerUser.objects.filter(user_role='CUSTOMER')
@@ -481,3 +512,28 @@ class CustomerCargoDashboardView(APIView):
         }
         
         return Response(data)
+
+
+class CustomerShippingMarkListView(APIView):
+    """Simple view to list customer shipping marks for dropdowns"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        customers = CustomerUser.objects.filter(user_role='CUSTOMER').values('id', 'shipping_mark')
+        return Response(list(customers))
+
+
+# Template views for frontend (if needed)
+def cargo_dashboard(request):
+    """Template view for cargo dashboard"""
+    return render(request, 'cargo/dashboard.html')
+
+
+def sea_cargo_view(request):
+    """Template view for sea cargo"""
+    return render(request, 'cargo/sea_cargo.html')
+
+
+def air_cargo_view(request):
+    """Template view for air cargo"""
+    return render(request, 'cargo/air_cargo.html')

@@ -6,10 +6,23 @@ from users.models import CustomerUser
 class CustomerUserSerializer(serializers.ModelSerializer):
     """Serializer for customer/client information"""
     full_name = serializers.CharField(source='get_full_name', read_only=True)
+    display_name = serializers.SerializerMethodField()
     
     class Meta:
         model = CustomerUser
-        fields = ['id', 'first_name', 'last_name', 'full_name', 'company_name', 'shipping_mark', 'phone', 'email']
+        fields = ['id', 'first_name', 'last_name', 'full_name', 'company_name', 'shipping_mark', 'phone', 'email', 'display_name']
+    
+    def get_display_name(self, obj):
+        """For cargo item selection, display only shipping mark"""
+        return obj.shipping_mark
+
+
+class CustomerShippingMarkSerializer(serializers.ModelSerializer):
+    """Simplified serializer showing only shipping mark for cargo item client selection"""
+    
+    class Meta:
+        model = CustomerUser
+        fields = ['id', 'shipping_mark']
 
 
 class CargoItemSerializer(serializers.ModelSerializer):
@@ -28,13 +41,29 @@ class CargoItemSerializer(serializers.ModelSerializer):
 
 class CargoItemCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating cargo items"""
+    client_shipping_mark = serializers.CharField(write_only=True, required=False, help_text="Shipping mark of the client")
     
     class Meta:
         model = CargoItem
         fields = [
-            'container', 'client', 'tracking_id', 'item_description', 'quantity', 
+            'container', 'client', 'client_shipping_mark', 'tracking_id', 'item_description', 'quantity', 
             'weight', 'cbm', 'unit_value', 'total_value', 'status'
         ]
+    
+    def validate(self, attrs):
+        # If client_shipping_mark is provided, find the client by shipping mark
+        if 'client_shipping_mark' in attrs and attrs['client_shipping_mark']:
+            try:
+                client = CustomerUser.objects.get(shipping_mark=attrs['client_shipping_mark'])
+                attrs['client'] = client
+            except CustomerUser.DoesNotExist:
+                raise serializers.ValidationError({
+                    'client_shipping_mark': f"No customer found with shipping mark: {attrs['client_shipping_mark']}"
+                })
+            # Remove the shipping mark from attrs as it's not a model field
+            del attrs['client_shipping_mark']
+        
+        return attrs
 
 
 class ClientShipmentSummarySerializer(serializers.ModelSerializer):
