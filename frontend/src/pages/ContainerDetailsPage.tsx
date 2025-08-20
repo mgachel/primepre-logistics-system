@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { DataTable, Column } from "@/components/data-table/DataTable";
 import { AddCargoItemDialog } from "@/components/dialogs/AddCargoItemDialog";
+import { ContainerExcelUploadButton } from "@/components/ui/ContainerExcelUploadButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -339,6 +340,17 @@ export default function ContainerDetailsPage() {
             <RefreshCcw className="h-4 w-4" />
             Refresh
           </Button>
+          <ContainerExcelUploadButton
+            containerId={containerId!}
+            onUploadComplete={(response) => {
+              toast({
+                title: "Excel upload completed",
+                description: `Successfully processed ${response.summary.created || 0} cargo items for this container`,
+              });
+              // Refresh the data
+              reloadData();
+            }}
+          />
           <Button size="sm" onClick={() => setShowAddItemDialog(true)}>
             <Plus className="h-4 w-4" />
             Add Item

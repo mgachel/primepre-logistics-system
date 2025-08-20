@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 from .customer_shipments_views import CustomerShipmentsView, CustomerShipmentStatsView, customer_shipment_tracking
+from .excel_upload_views import ExcelUploadView, ExcelTemplateView, ContainerExcelUploadView, ContainerExcelTemplateView
 
 # Create router for ViewSets (Admin/Staff)
 router = DefaultRouter()
@@ -35,6 +36,17 @@ urlpatterns = [
     
     # Utility endpoints for shipping marks
     path('shipping-marks/', views.CustomerShippingMarkListView.as_view(), name='shipping-marks'),
+    
+    # Excel upload endpoints
+    path('excel/upload/', ExcelUploadView.as_view(), name='excel-upload'),
+    path('excel/template/', ExcelTemplateView.as_view(), name='excel-template'),
+    path('excel/enhanced-upload/', views.EnhancedExcelUploadView.as_view(), name='enhanced-excel-upload'),
+    path('excel/download-template/', views.ExcelTemplateDownloadView.as_view(), name='excel-download-template'),
+    
+    # Container-specific excel upload endpoints
+    path('containers/<str:container_id>/excel/upload/', ContainerExcelUploadView.as_view(), name='container-excel-upload'),
+    path('containers/<str:container_id>/excel/template/', ContainerExcelTemplateView.as_view(), name='container-excel-template'),
+    path('excel/container-template/', ContainerExcelTemplateView.as_view(), name='container-excel-template-general'),
     
     # Template views (if needed for frontend)
     path('dashboard-template/', views.cargo_dashboard, name='cargo-dashboard-template'),
