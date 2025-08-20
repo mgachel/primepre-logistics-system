@@ -43,14 +43,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install -r requirements.txt   # <- corrected path
 
       - name: Run migrations
         run: |
-          cd backend
-          python manage.py migrate
+          python manage.py migrate          # <- no cd needed
 
       - name: Run tests
         run: |
-          cd backend
-          python manage.py test
+          python manage.py test             # <- no cd needed
