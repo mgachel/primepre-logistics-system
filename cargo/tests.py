@@ -7,6 +7,8 @@ from GoodsRecieved.models import GoodsReceivedChina, GoodsReceivedGhana
 from decimal import Decimal
 from datetime import date
 import json
+import uuid
+
 
 User = get_user_model()
 
@@ -96,21 +98,24 @@ class CargoModuleTestCase(APITestCase):
         self.client.force_authenticate(user=self.admin_user)
         
         data = {
-            'container': self.sea_container.container_id,
-            'client_shipping_mark': self.customer.shipping_mark,
-            'item_description': 'Test Electronics',
-            'quantity': 5,
-            'cbm': 2.5,
-            'weight': 100.0,
-            'unit_value': 50.00,
-            'total_value': 250.00
+           'container': self.sea_container.pk,  
+           'client': self.customer.pk,   
+            'tracking_id': str(uuid.uuid4()),                   
+           'item_description': 'Test Electronics',
+           'quantity': 5,
+           'cbm': 2.5,
+           'weight': 100.0,
+           'unit_value': 50.00,
+           'total_value': 250.00,
         }
         
         response = self.client.post('/api/cargo/cargo-items/', data)
+        print("Status code:", response.status_code)
+        print("Response content:", response.data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         
         # Check that item was linked to correct customer
-        item = CargoItem.objects.get(id=response.data['id'])
+        item = CargoItem.objects.get(tracking_id=response.data['tracking_id'])
         self.assertEqual(item.client, self.customer)
         self.assertEqual(item.client.shipping_mark, self.customer.shipping_mark)
     
