@@ -149,7 +149,7 @@ class ExcelUploadProcessor:
             
             try:
                 # Extract data by column index (header-agnostic)
-                shipping_mark = self._get_column_value(row, 0, str, required=True)
+                shipping_mark = self._get_column_value(row, 0, str, required=False)
                 date_of_receipt = self._get_column_value(row, 1, 'date', required=True)
                 date_of_loading = self._get_column_value(row, 2, 'date', required=False)
                 description = self._get_column_value(row, 3, str, required=False, default='')
@@ -191,7 +191,7 @@ class ExcelUploadProcessor:
                 row_number = row_data['row_number']
                 
                 try:
-                    # Get or create customer stub
+                    # Try to get existing customer - don't create automatically
                     customer = self._get_or_create_customer(row_data['shipping_mark'])
                     
                     # Generate unique key for idempotency
@@ -218,7 +218,7 @@ class ExcelUploadProcessor:
                     
                     # Prepare data for model
                     data = {
-                        'customer': customer,
+                        'customer': customer,  # Can be None for unknown shipping marks
                         'shipping_mark': row_data['shipping_mark'],
                         'supply_tracking': supplier_tracking,
                         'cbm': row_data['cbm'],
@@ -231,8 +231,7 @@ class ExcelUploadProcessor:
                     if existing_record:
                         # Update existing record
                         for key, value in data.items():
-                            if key != 'customer':
-                                setattr(existing_record, key, value)
+                            setattr(existing_record, key, value)
                         existing_record.save()
                         self._add_success(row_number, "updated", f"Updated existing record for {row_data['shipping_mark']}")
                     else:
@@ -280,7 +279,7 @@ class ExcelUploadProcessor:
             try:
                 if self.container_id:
                     # Container-specific upload format
-                    shipping_mark = self._get_column_value(row, 0, str, required=True)
+                    shipping_mark = self._get_column_value(row, 0, str, required=False)
                     date_of_loading = self._get_column_value(row, 1, 'date', required=False)
                     description = self._get_column_value(row, 2, str, required=False, default='')
                     quantity = self._get_column_value(row, 3, int, required=False, default=0)
@@ -296,8 +295,8 @@ class ExcelUploadProcessor:
                         continue
                 else:
                     # General upload format with container reference
-                    container_ref = self._get_column_value(row, 0, str, required=True)
-                    shipping_mark = self._get_column_value(row, 1, str, required=True)
+                    container_ref = self._get_column_value(row, 0, str, required=False)
+                    shipping_mark = self._get_column_value(row, 1, str, required=False)
                     date_of_loading = self._get_column_value(row, 2, 'date', required=False)
                     description = self._get_column_value(row, 3, str, required=False, default='')
                     quantity = self._get_column_value(row, 4, int, required=False, default=0)
@@ -340,8 +339,13 @@ class ExcelUploadProcessor:
                 row_number = row_data['row_number']
                 
                 try:
-                    # Get or create customer stub
+                    # Try to get existing customer - don't create automatically  
                     customer = self._get_or_create_customer(row_data['shipping_mark'])
+                    
+                    # Skip cargo items for unknown shipping marks since CargoItem requires a client
+                    if customer is None:
+                        self._add_error(row_number, f"Unknown shipping mark: {row_data['shipping_mark']}. Please create customer first.")
+                        continue
                     
                     # Generate unique key for idempotency
                     unique_key = self._generate_unique_key(
@@ -461,27 +465,16 @@ class ExcelUploadProcessor:
             return default
     
     def _get_or_create_customer(self, shipping_mark: str) -> CustomerUser:
-        """Get existing customer or create stub according to specifications"""
+        """Get existing customer - do not create new ones automatically"""
         # Clean shipping mark
         shipping_mark = shipping_mark.strip()
         
-        customer, created = CustomerUser.objects.get_or_create(
-            shipping_mark=shipping_mark,
-            defaults={
-                'phone': f'+000{shipping_mark}',  # Placeholder phone (required field)
-                'first_name': shipping_mark.replace('PM', '').replace('pm', ''),
-                'last_name': 'Auto-Created',
-                'user_role': 'CUSTOMER',
-                'is_active': True,
-                'region': 'Unknown',  # Will be updated when customer provides info
-                # Status will be 'pending' until customer provides more details
-            }
-        )
-        
-        if created:
-            print(f"Created customer stub for shipping mark: {shipping_mark}")
-        
-        return customer
+        try:
+            customer = CustomerUser.objects.get(shipping_mark=shipping_mark)
+            return customer
+        except CustomerUser.DoesNotExist:
+            # Return None for unknown shipping marks - don't create automatically
+            return None
     
     def _get_or_create_container(self, container_ref: str) -> CargoContainer:
         """Get existing container or create placeholder"""
@@ -555,8 +548,16 @@ class ExcelUploadView(APIView):
             
             if not serializer.is_valid():
                 print(f"Serializer errors: {serializer.errors}")
+                # Extract specific error message if available
+                if 'non_field_errors' in serializer.errors:
+                    error_message = serializer.errors['non_field_errors'][0]
+                elif 'warehouse_location' in serializer.errors:
+                    error_message = serializer.errors['warehouse_location'][0]
+                else:
+                    error_message = 'Invalid upload data'
+                
                 return Response(
-                    {'error': 'Invalid upload data', 'details': serializer.errors},
+                    {'error': error_message, 'details': serializer.errors},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             

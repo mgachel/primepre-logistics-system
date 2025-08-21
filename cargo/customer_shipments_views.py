@@ -20,15 +20,26 @@ class CustomerShipmentsView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        # Get customer's shipping mark
-        customer = request.user
-        if not hasattr(customer, 'shipping_mark') or not customer.shipping_mark:
-            return Response(
-                {'error': 'No shipping mark found for this customer'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Get shipping mark - either from query parameter (admin access) or user's shipping mark
+        query_shipping_mark = request.query_params.get('shipping_mark')
         
-        shipping_mark = customer.shipping_mark
+        if query_shipping_mark:
+            # Admin access - allow querying any shipping mark
+            if not request.user.is_staff and request.user.user_role not in ['ADMIN', 'STAFF']:
+                return Response(
+                    {'error': 'Permission denied'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            shipping_mark = query_shipping_mark
+        else:
+            # Customer access - use their own shipping mark
+            customer = request.user
+            if not hasattr(customer, 'shipping_mark') or not customer.shipping_mark:
+                return Response(
+                    {'error': 'No shipping mark found for this customer'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            shipping_mark = customer.shipping_mark
         
         # Query parameters for filtering
         status_filter = request.query_params.get('status')
@@ -95,11 +106,26 @@ class CustomerShipmentsView(APIView):
         air_cargo = CargoItemSerializer(air_cargo_query, many=True).data
         
         # Calculate summaries
+        # Try to get customer info for display
+        try:
+            if query_shipping_mark:
+                # For admin queries, try to find the customer
+                customer_obj = CustomerUser.objects.filter(shipping_mark=shipping_mark).first()
+                customer_name = customer_obj.get_full_name() if customer_obj else 'Unknown Customer'
+                company_name = customer_obj.company_name if customer_obj else ''
+            else:
+                # For user queries, use the authenticated user
+                customer_name = request.user.get_full_name()
+                company_name = request.user.company_name or ''
+        except:
+            customer_name = 'Unknown Customer'
+            company_name = ''
+            
         summary_data = {
             'customer_info': {
                 'shipping_mark': shipping_mark,
-                'customer_name': customer.get_full_name(),
-                'company_name': customer.company_name or '',
+                'customer_name': customer_name,
+                'company_name': company_name,
             },
             'goods_received_china': {
                 'count': china_goods_query.count(),

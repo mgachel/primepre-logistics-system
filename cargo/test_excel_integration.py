@@ -50,6 +50,26 @@ class ExcelUploadIntegrationTestCase(APITestCase):
     def test_complete_workflow_goods_received_to_customer_shipments(self):
         """Test complete workflow: Excel upload → Goods Received → Customer Shipments sync"""
         
+        # Step 0: Create customers first (since we no longer auto-create them)
+        customer1 = CustomerUser.objects.create(
+            phone='+233111001001',
+            email='john@test.com',
+            password='testpass123',
+            first_name='John',
+            last_name='Doe',
+            shipping_mark='PMJOHN01',
+            user_role='CUSTOMER'
+        )
+        customer2 = CustomerUser.objects.create(
+            phone='+233111001002',
+            email='jane@test.com',
+            password='testpass123',
+            first_name='Jane',
+            last_name='Smith',
+            shipping_mark='PMJANE02',
+            user_role='CUSTOMER'
+        )
+        
         # Step 1: Upload Goods Received (China) via Excel
         goods_data = {
             'Shipping Mark': ['PMJOHN01', 'PMJANE02', 'PMJOHN01'],  # Note: PMJOHN01 appears twice
@@ -78,7 +98,7 @@ class ExcelUploadIntegrationTestCase(APITestCase):
         china_records = GoodsReceivedChina.objects.all()
         self.assertEqual(china_records.count(), 3)
         
-        # Verify customers created
+        # Verify customers were linked correctly (not created, but linked)
         customers = CustomerUser.objects.filter(shipping_mark__in=['PMJOHN01', 'PMJANE02'])
         self.assertEqual(customers.count(), 2)
         
@@ -181,8 +201,8 @@ class ExcelUploadIntegrationTestCase(APITestCase):
         self.assertEqual(sea_cargo_total['total_quantity'], 7)
         self.assertEqual(float(sea_cargo_total['total_cbm']), 2.1)
     
-    def test_unknown_shipping_mark_creates_customer_stub(self):
-        """Test that unknown shipping marks create customer stubs automatically"""
+    def test_unknown_shipping_mark_handles_gracefully(self):
+        """Test that unknown shipping marks are handled gracefully without creating customers"""
         
         # Upload with completely new shipping marks
         data = {
@@ -208,24 +228,18 @@ class ExcelUploadIntegrationTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['summary']['created'], 2)
         
-        # Verify customer stubs were created
-        new_customer = CustomerUser.objects.get(shipping_mark='PMNEW99')
-        self.assertEqual(new_customer.first_name, 'NEW99')
-        self.assertEqual(new_customer.last_name, 'Imported')
-        self.assertEqual(new_customer.user_role, 'CUSTOMER')
-        self.assertTrue(new_customer.is_active)
+        # Verify Goods Received records were created even without customers
+        china_records = GoodsReceivedChina.objects.filter(shipping_mark__in=['PMNEW99', 'PMTEST88'])
+        self.assertEqual(china_records.count(), 2)
         
-        test_customer = CustomerUser.objects.get(shipping_mark='PMTEST88')
-        self.assertEqual(test_customer.first_name, 'TEST88')
-        self.assertEqual(test_customer.last_name, 'Imported')
+        # Verify customers were NOT created automatically
+        customers = CustomerUser.objects.filter(shipping_mark__in=['PMNEW99', 'PMTEST88'])
+        self.assertEqual(customers.count(), 0)
         
-        # Verify they appear in Customer Shipments
-        shipments_url = reverse('cargo:customer-shipments')
-        response = self.client.get(shipments_url, {'shipping_mark': 'PMNEW99'})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
-        shipment_data = response.data
-        self.assertGreater(shipment_data['goods_received_china']['total_quantity'], 0)
+        # Verify the records have null customer fields
+        for record in china_records:
+            self.assertIsNone(record.customer)
+            self.assertIn(record.shipping_mark, ['PMNEW99', 'PMTEST88'])
     
     def test_idempotent_re_upload(self):
         """Test that re-uploading same file doesn't create duplicates"""
