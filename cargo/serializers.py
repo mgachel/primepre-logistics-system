@@ -81,28 +81,40 @@ class ClientShipmentSummarySerializer(serializers.ModelSerializer):
 
 
 class CargoContainerSerializer(serializers.ModelSerializer):
-    total_cargo_items = serializers.ReadOnlyField()
     total_clients = serializers.ReadOnlyField()
-    is_demurrage = serializers.ReadOnlyField()
-    client_summaries = ClientShipmentSummarySerializer(many=True, read_only=True, source='clientshipmentsummary_set')
+    loading_date = serializers.DateField(source='load_date', read_only=True)
+    total_cbm = serializers.FloatField(source='cbm', read_only=True)
+    rate = serializers.DecimalField(source='rates', max_digits=10, decimal_places=2, read_only=True)
     
     class Meta:
         model = CargoContainer
         fields = [
-            'container_id', 'cargo_type', 'weight', 'cbm', 'load_date', 'eta',
+            'container_id', 'loading_date', 'eta', 'rate', 'total_cbm', 'status', 'total_clients', 
+            'load_date', 'cbm', 'rates'  # Include original fields for compatibility
+        ]
+        read_only_fields = ['total_clients', 'loading_date', 'total_cbm', 'rate']
+
+
+class CargoContainerDetailSerializer(serializers.ModelSerializer):
+    """Detailed serializer with all fields and cargo items"""
+    total_cargo_items = serializers.ReadOnlyField()
+    total_clients = serializers.ReadOnlyField()
+    is_demurrage = serializers.ReadOnlyField()
+    client_summaries = ClientShipmentSummarySerializer(many=True, read_only=True, source='clientshipmentsummary_set')
+    cargo_items = CargoItemSerializer(many=True, read_only=True)
+    loading_date = serializers.DateField(source='load_date')
+    total_cbm = serializers.FloatField(source='cbm')
+    rate = serializers.DecimalField(source='rates', max_digits=10, decimal_places=2, read_only=True)
+    
+    class Meta:
+        model = CargoContainer
+        fields = [
+            'container_id', 'cargo_type', 'weight', 'cbm', 'loading_date', 'eta',
             'unloading_date', 'route', 'rates', 'stay_days', 'delay_days', 'status',
             'total_cargo_items', 'total_clients', 'is_demurrage', 'client_summaries',
-            'created_at', 'updated_at'
+            'cargo_items', 'created_at', 'updated_at', 'rate', 'total_cbm'
         ]
-        read_only_fields = ['total_cargo_items', 'total_clients', 'is_demurrage', 'created_at', 'updated_at']
-
-
-class CargoContainerDetailSerializer(CargoContainerSerializer):
-    """Detailed serializer with cargo items"""
-    cargo_items = CargoItemSerializer(many=True, read_only=True)
-    
-    class Meta(CargoContainerSerializer.Meta):
-        fields = CargoContainerSerializer.Meta.fields + ['cargo_items']
+        read_only_fields = ['total_cargo_items', 'total_clients', 'is_demurrage', 'created_at', 'updated_at', 'rate']
 
 
 class CargoContainerCreateSerializer(serializers.ModelSerializer):

@@ -200,6 +200,13 @@ export default function SeaCargo() {
 
   const cols: Column<BackendCargoContainer>[] = [
     {
+      id: "created_at",
+      header: "Created",
+      accessor: () => "", // Hidden column for sorting only
+      sort: (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      width: "0px", // Hide the column
+    },
+    {
       id: "select",
       header: (
         <input aria-label="Select all" type="checkbox" className="rounded" />
@@ -216,37 +223,25 @@ export default function SeaCargo() {
     },
     {
       id: "container",
-      header: "Container No.",
+      header: "Container ID",
       accessor: (c) => <span className="font-medium">{c.container_id}</span>,
       sort: (a, b) => a.container_id.localeCompare(b.container_id),
       sticky: true,
       clickable: true,
     },
     {
-      id: "clients",
-      header: "Clients",
-      accessor: (c) => `${c.total_clients}`,
-      sort: (a, b) => a.total_clients - b.total_clients,
-      align: "right",
-      width: "110px",
-    },
-    {
-      id: "route",
-      header: "Route",
-      accessor: (c) => (
-        <div className="flex items-center text-sm">
-          <MapPin className="h-3 w-3 mr-1 text-muted-foreground" />
-          {(c.route?.split(" to ")[0] || "-") +
-            " → " +
-            (c.route?.split(" to ")[1] || "-")}
-        </div>
-      ),
-      sort: (a, b) => (a.route || "").localeCompare(b.route || ""),
-    },
-    {
-      id: "load",
+      id: "loading_date",
       header: "Loading Date",
-      accessor: (c) => formatDate(c.load_date),
+      accessor: (c) => {
+        if (!c.load_date) {
+          return <span className="text-sm text-muted-foreground">-</span>;
+        }
+        try {
+          return <span className="text-sm">{formatDate(c.load_date)}</span>;
+        } catch {
+          return <span className="text-sm text-muted-foreground">-</span>;
+        }
+      },
       sort: (a, b) => (a.load_date || "").localeCompare(b.load_date || ""),
     },
     {
@@ -271,9 +266,41 @@ export default function SeaCargo() {
       sort: (a, b) => (a.eta || "").localeCompare(b.eta || ""),
     },
     {
+      id: "rate",
+      header: "Rate",
+      accessor: (c) => {
+        if (!c.rates || c.rates === null) {
+          return <span className="text-sm text-muted-foreground">-</span>;
+        }
+        return <span className="text-sm font-medium">${Number(c.rates).toLocaleString()}</span>;
+      },
+      sort: (a, b) => (Number(a.rates) || 0) - (Number(b.rates) || 0),
+      align: "right",
+    },
+    {
+      id: "total_cbm",
+      header: "Total CBM",
+      accessor: (c) => {
+        if (!c.cbm || c.cbm === null) {
+          return <span className="text-sm text-muted-foreground">-</span>;
+        }
+        return <span className="text-sm">{c.cbm} m³</span>;
+      },
+      sort: (a, b) => (a.cbm || 0) - (b.cbm || 0),
+      align: "right",
+    },
+    {
       id: "status",
       header: "Status",
       accessor: (c) => <StatusBadge status={mapStatus(c.status)} />,
+    },
+    {
+      id: "clients",
+      header: "Clients",
+      accessor: (c) => `${c.total_clients}`,
+      sort: (a, b) => a.total_clients - b.total_clients,
+      align: "right",
+      width: "80px",
     },
   ];
 
@@ -421,6 +448,7 @@ export default function SeaCargo() {
           rows={filteredCargo}
           columns={cols}
           loading={loading}
+          defaultSort={{ column: "created_at", direction: "desc" }}
           empty={
             <div className="text-muted-foreground">
               No sea cargo yet. Add Cargo or Import from Excel.
@@ -564,6 +592,14 @@ export default function SeaCargo() {
         open={showNewCargoDialog}
         onOpenChange={setShowNewCargoDialog}
         defaultType="sea"
+        onCreated={async (containerId) => {
+          // Reload data to show the new container at the top
+          await reloadData();
+          toast({
+            title: "Success",
+            description: `Container ${containerId} has been created and appears at the top of the list.`,
+          });
+        }}
       />
 
       <EditCargoContainerDialog

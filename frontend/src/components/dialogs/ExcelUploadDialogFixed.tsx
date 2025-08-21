@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Upload,
@@ -248,19 +249,20 @@ export function ExcelUploadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
-          <DialogTitle className="text-xl font-bold">
+      <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="text-lg">
             Excel Upload - {uploadType === 'goods_received' ? 'Goods Received' : 'Sea Cargo'}
             {containerId && ` (Container: ${containerId})`}
           </DialogTitle>
-          <DialogDescription className="text-sm">
+          <DialogDescription>
             Upload your Excel file with strict column order requirements
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto min-h-0 p-6 bg-gray-50/30">
-          <div className="space-y-6">
+        <div className="flex-1 overflow-hidden min-h-0">
+          <ScrollArea className="h-full px-1">
+            <div className="space-y-4 pr-3 pb-4">
               {/* Column Specifications */}
               <Card>
                 <CardHeader>
@@ -271,22 +273,22 @@ export function ExcelUploadDialog({
                   <p className="text-sm text-muted-foreground">{columnSpecs.description}</p>
                 </CardHeader>
                 <CardContent>
-                  <div className="max-h-48 overflow-y-auto pr-2">
+                  <div className="max-h-40 overflow-y-auto">
                     <div className="space-y-2">
                       {columnSpecs.columns.map((col) => (
-                        <div key={col.index} className="flex items-start gap-3 p-3 rounded-lg bg-gradient-to-r from-muted/50 to-muted/30 border">
-                          <Badge variant={col.required ? "default" : "secondary"} className="mt-0.5 flex-shrink-0 min-w-[60px] justify-center">
+                        <div key={col.index} className="flex items-start gap-3 p-2 rounded-lg bg-muted/50">
+                          <Badge variant={col.required ? "default" : "secondary"} className="mt-0.5 flex-shrink-0">
                             Col {col.index + 1}
                           </Badge>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className="font-semibold text-sm">{col.name}</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium">{col.name}</span>
                               {col.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
                               {col.index === 5 && uploadType === 'goods_received' && (
-                                <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">SKIPPED</Badge>
+                                <Badge variant="outline" className="text-xs bg-red-50 text-red-700">SKIPPED</Badge>
                               )}
                             </div>
-                            <p className="text-xs text-muted-foreground leading-relaxed">{col.description}</p>
+                            <p className="text-sm text-muted-foreground mt-1">{col.description}</p>
                           </div>
                         </div>
                       ))}
@@ -321,7 +323,7 @@ export function ExcelUploadDialog({
                     {uploadType === 'goods_received' && (
                       <div className="space-y-2">
                         <Label>Warehouse</Label>
-                        <Select value={warehouse} onValueChange={(value: WarehouseLocation) => setWarehouse(value)}>
+                        <Select value={warehouse} onValueChange={(value: 'China' | 'Ghana') => setWarehouse(value)}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -475,28 +477,26 @@ export function ExcelUploadDialog({
                 </Card>
               )}
             </div>
-          </div>
+          </ScrollArea>
+        </div>
 
-        <DialogFooter className="flex-shrink-0 p-6 pt-4 border-t bg-white shadow-lg">
-          <div className="flex gap-3 w-full justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)} className="min-w-[100px]">
-              {uploadResult ? 'Close' : 'Cancel'}
+        <DialogFooter className="flex-shrink-0 mt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {uploadResult ? 'Close' : 'Cancel'}
+          </Button>
+          {!uploadResult && (
+            <Button 
+              onClick={handleUpload} 
+              disabled={!selectedFile || uploading}
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4 mr-2" />
+              )}
+              Upload File
             </Button>
-            {!uploadResult && (
-              <Button 
-                onClick={handleUpload} 
-                disabled={!selectedFile || uploading}
-                className="min-w-[120px]"
-              >
-                {uploading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Upload className="h-4 w-4 mr-2" />
-                )}
-                Upload File
-              </Button>
-            )}
-          </div>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
