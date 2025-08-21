@@ -27,12 +27,13 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   rowActions?: (row: T) => ReactNode;
   renderBulkBar?: (selectedRows: T[]) => ReactNode;
+  defaultSort?: { column: string; direction: "asc" | "desc" };
 }
 
-export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, rowActions, renderBulkBar }: DataTableProps<T>) {
+export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, rowActions, renderBulkBar, defaultSort }: DataTableProps<T>) {
   const [visible, setVisible] = useState<Record<string, boolean>>(() => persistGet(`dt:${id}:cols`, Object.fromEntries(columns.map(c => [c.id, true]))));
-  const [sortBy, setSortBy] = useState<string | null>(() => persistGet(`dt:${id}:sortBy`, null as string | null));
-  const [sortDir, setSortDir] = useState<"asc" | "desc">(() => persistGet(`dt:${id}:sortDir`, "asc"));
+  const [sortBy, setSortBy] = useState<string | null>(() => persistGet(`dt:${id}:sortBy`, defaultSort?.column || null));
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(() => persistGet(`dt:${id}:sortDir`, defaultSort?.direction || "asc"));
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   useEffect(() => { persistSet(`dt:${id}:cols`, visible); }, [id, visible]);

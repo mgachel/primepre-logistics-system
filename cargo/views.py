@@ -60,7 +60,7 @@ class CargoContainerViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        queryset = CargoContainer.objects.all()
+        queryset = CargoContainer.objects.all().order_by('-created_at')
         cargo_type = self.request.query_params.get('cargo_type')
         status_filter = self.request.query_params.get('status')
         search = self.request.query_params.get('search')

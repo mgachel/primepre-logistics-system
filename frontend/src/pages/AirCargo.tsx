@@ -233,16 +233,14 @@ export default function AirCargo() {
 
   type Row = {
     id: string;
-    tracking: string;
-    awb: string;
-    client: string;
-    route: string;
-    airline: string;
-    flight: string;
-    departure: string;
-    arrival: string;
+    container_id: string;
+    loading_date: string;
     eta: string | null;
+    rate: number | null;
+    total_cbm: number | null;
     status: "in-transit" | "delivered" | "pending" | "delayed";
+    clients: number;
+    created_at: string;
     _raw: BackendCargoContainer;
   };
 
@@ -257,20 +255,16 @@ export default function AirCargo() {
             : (container.status as Row["status"]);
         return {
           id: container.container_id,
-          tracking: container.container_id,
-          awb: container.container_id,
-          client: `${container.total_clients} clients`,
-          route: container.route ?? "-",
-          airline: "-",
-          flight: "-",
-          departure: container.load_date
+          container_id: container.container_id,
+          loading_date: container.load_date
             ? formatDate(new Date(container.load_date))
             : "-",
-          arrival: container.unloading_date
-            ? formatDate(new Date(container.unloading_date))
-            : "-",
           eta: container.eta ?? null,
+          rate: container.rates ? Number(container.rates) : null,
+          total_cbm: container.cbm ?? null,
           status,
+          clients: container.total_clients,
+          created_at: container.created_at,
           _raw: container,
         };
       }),
@@ -284,6 +278,13 @@ export default function AirCargo() {
   
     const columns: Column<Row>[] = [
     {
+      id: "created_at",
+      header: "Created",
+      accessor: () => "", // Hidden column for sorting only
+      sort: (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      width: "0px", // Hide the column
+    },
+    {
       id: "select",
       header: (
         <input type="checkbox" className="rounded" aria-label="Select all" />
@@ -295,49 +296,35 @@ export default function AirCargo() {
       sticky: true,
     },
     {
-      id: "tracking",
-      header: "Container/AWB",
-      accessor: (r) => <span className="font-medium">{r.tracking}</span>,
-      sort: (a, b) => a.tracking.localeCompare(b.tracking),
+      id: "container_id",
+      header: "Container ID",
+      accessor: (r) => <span className="font-medium">{r.container_id}</span>,
+      sort: (a, b) => a.container_id.localeCompare(b.container_id),
       sticky: true,
+      clickable: true,
     },
     {
-      id: "awb",
-      header: "AWB Number",
-      accessor: (r) => <span className="font-mono text-sm">{r.awb}</span>,
-      sort: (a, b) => a.awb.localeCompare(b.awb),
-    },
-    {
-      id: "client",
-      header: "Client",
-      accessor: (r) => r.client,
-      sort: (a, b) => a.client.localeCompare(b.client),
-    },
-    {
-      id: "route",
-      header: "Route",
-      accessor: (r) => (
-        <div className="flex items-center text-sm">
-          <MapPin className="h-3 w-3 mr-1 text-muted-foreground" />
-          {r.route}
-        </div>
-      ),
-    },
-    {
-      id: "departure",
-      header: "Departure",
-      accessor: (r) => (
-        <span className="text-sm text-muted-foreground">{r.departure}</span>
-      ),
-      sort: (a, b) => (a.departure || "").localeCompare(b.departure || ""),
-    },
-    {
-      id: "arrival",
-      header: "Arrival",
-      accessor: (r) => (
-        <span className="text-sm text-muted-foreground">{r.arrival}</span>
-      ),
-      sort: (a, b) => (a.arrival || "").localeCompare(b.arrival || ""),
+      id: "loading_date",
+      header: "Loading Date",
+      accessor: (r) => {
+        if (!r.loading_date || r.loading_date === "-") {
+          return <span className="text-sm text-muted-foreground">-</span>;
+        }
+        try {
+          const date = new Date(r.loading_date);
+          if (isNaN(date.getTime())) {
+            return <span className="text-sm text-muted-foreground">-</span>;
+          }
+          return <span className="text-sm">{formatDate(date)}</span>;
+        } catch {
+          return <span className="text-sm text-muted-foreground">-</span>;
+        }
+      },
+      sort: (a, b) => {
+        if (!a.loading_date || a.loading_date === "-") return 1;
+        if (!b.loading_date || b.loading_date === "-") return -1;
+        return a.loading_date.localeCompare(b.loading_date);
+      },
     },
     {
       id: "eta",
@@ -372,9 +359,41 @@ export default function AirCargo() {
       sort: (a, b) => (a.eta || "").localeCompare(b.eta || ""),
     },
     {
+      id: "rate",
+      header: "Rate",
+      accessor: (r) => {
+        if (r.rate === null || r.rate === undefined) {
+          return <span className="text-sm text-muted-foreground">-</span>;
+        }
+        return <span className="text-sm font-medium">${r.rate.toLocaleString()}</span>;
+      },
+      sort: (a, b) => (a.rate || 0) - (b.rate || 0),
+      align: "right",
+    },
+    {
+      id: "total_cbm",
+      header: "Total CBM",
+      accessor: (r) => {
+        if (r.total_cbm === null || r.total_cbm === undefined) {
+          return <span className="text-sm text-muted-foreground">-</span>;
+        }
+        return <span className="text-sm">{r.total_cbm} m³</span>;
+      },
+      sort: (a, b) => (a.total_cbm || 0) - (b.total_cbm || 0),
+      align: "right",
+    },
+    {
       id: "status",
       header: "Status",
       accessor: (r) => <StatusBadge status={r.status} />,
+    },
+    {
+      id: "clients",
+      header: "Clients",
+      accessor: (r) => `${r.clients}`,
+      sort: (a, b) => a.clients - b.clients,
+      align: "right",
+      width: "80px",
     },
   ];
 
@@ -594,6 +613,7 @@ export default function AirCargo() {
               rows={rows}
               columns={columns}
               loading={loading}
+              defaultSort={{ column: "created_at", direction: "desc" }}
               empty={
                 <div className="text-center space-y-2 py-6">
                   <div className="text-muted-foreground">
@@ -667,7 +687,7 @@ export default function AirCargo() {
                   <DropdownMenuItem
                     className="text-destructive"
                     onClick={async () => {
-                      if (!confirm(`Delete cargo container ${row.tracking}?`))
+                      if (!confirm(`Delete cargo container ${row.container_id}?`))
                         return;
                       try {
                         await cargoService.deleteBackendContainer(
@@ -676,7 +696,7 @@ export default function AirCargo() {
                         await reloadData(); // Reload data instead of local state update
                         toast({
                           title: "Deleted",
-                          description: `${row.tracking} removed.`,
+                          description: `${row.container_id} removed.`,
                         });
                       } catch (e: unknown) {
                         toast({
@@ -716,6 +736,14 @@ export default function AirCargo() {
         open={showNewCargoDialog}
         onOpenChange={setShowNewCargoDialog}
         defaultType="air"
+        onCreated={async (containerId) => {
+          // Reload data to show the new container at the top
+          await reloadData();
+          toast({
+            title: "Success",
+            description: `Container ${containerId} has been created and appears at the top of the list.`,
+          });
+        }}
       />
 
       {/* Status Update Dialog */}
