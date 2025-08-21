@@ -1,0 +1,43 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout your code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Set up Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./frontend
+
+      # Build frontend
+      - name: Build frontend
+        run: npm run build
+        working-directory: ./frontend
+
+      # Deploy to Heroku
+      - name: Deploy frontend to Heroku
+        uses: akhileshns/heroku-deploy@v3.12.12
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }} # Ensure HEROKU_API_KEY is set in your repository secrets
+          heroku_app_name: "primepre-frontend"   # replace with your frontend app name
+          heroku_email: "iasantewaa001@st.ug.edu.gh"
+          usedocker: false
+          procfile: frontend/Procfile

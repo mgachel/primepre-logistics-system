@@ -376,7 +376,7 @@ export default function CustomerClaims() {
                   <div className="flex justify-between items-center text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      <span>Submitted {formatRelative(claim.created_at)}</span>
+                      <span>Submitted {formatRelative(new Date(claim.created_at))}</span>
                     </div>
                     <div>
                       {claim.days_since_submission === 0 
