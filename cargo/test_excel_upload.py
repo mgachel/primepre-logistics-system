@@ -402,7 +402,7 @@ class ExcelUploadProcessorTestCase(TestCase):
             route='Another Route',
             status='pending'
         )
-        self.assertIsNotNone(container.container.id) 
+        self.assertIsNotNone(new_container.id) 
         
         # Test creating new customer
         customer = processor._get_or_create_customer('PMTEST99')
