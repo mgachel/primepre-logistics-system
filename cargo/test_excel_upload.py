@@ -1,6 +1,7 @@
 import tempfile
 import pandas as pd
 import io
+from django.utils.crypto import get_random_string
 from datetime import date, datetime
 from decimal import Decimal
 from django.test import TestCase
@@ -401,7 +402,7 @@ class ExcelUploadProcessorTestCase(TestCase):
             route='Another Route',
             status='pending'
         )
-        self.assertIsNotNone(new_container.id) 
+        self.assertIsNotNone(container.container.id) 
         
         # Test creating new customer
         customer = processor._get_or_create_customer('PMTEST99')
