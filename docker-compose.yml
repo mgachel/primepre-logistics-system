@@ -21,7 +21,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    
+  frontend:
+    build: ./frontend
+    container_name: primepre-frontend
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - web
 
 volumes:
   postgres_data:

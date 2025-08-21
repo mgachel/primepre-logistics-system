@@ -48,8 +48,23 @@ import {
 import { DataTable, Column } from "@/components/data-table/DataTable";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
-import { persistGet, persistSet } from "@/lib/persist";
+import { formatDate, formatRelative } from "@/lib/date";
+// If "@/lib/persist" does not exist, add a fallback implementation here:
+export function persistGet<T = string>(key: string, defaultValue: T): T {
+  if (typeof window === "undefined") return defaultValue;
+  try {
+    const value = window.localStorage.getItem(key);
+    return value !== null ? (JSON.parse(value) as T) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+}
+export function persistSet<T = string>(key: string, value: T) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
 import { useToast } from "@/hooks/use-toast";
 
 interface AirCargoItem {
@@ -249,10 +264,10 @@ export default function AirCargo() {
           airline: "-",
           flight: "-",
           departure: container.load_date
-            ? formatDate(container.load_date)
+            ? formatDate(new Date(container.load_date))
             : "-",
           arrival: container.unloading_date
-            ? formatDate(container.unloading_date)
+            ? formatDate(new Date(container.unloading_date))
             : "-",
           eta: container.eta ?? null,
           status,
@@ -262,7 +277,12 @@ export default function AirCargo() {
     [filtered]
   );
 
-  const columns: Column<Row>[] = [
+  // Helper function to check if a date is overdue (in the past)
+  function isOverdue(date: Date): boolean {
+    return date.getTime() < new Date().getTime();
+  }
+  
+    const columns: Column<Row>[] = [
     {
       id: "select",
       header: (
@@ -337,7 +357,14 @@ export default function AirCargo() {
                 (overdue ? "text-destructive" : "text-muted-foreground")
               }
             >
-              {overdue ? `${daysLate(d)} days late` : formatRelative(d)}
+              {overdue
+                ? `${Math.max(
+                    Math.ceil(
+                      (new Date().getTime() - d.getTime()) / (1000 * 60 * 60 * 24)
+                    ),
+                    1
+                  )} days late`
+                : formatRelative(d)}
             </div>
           </div>
         );
@@ -809,7 +836,7 @@ export default function AirCargo() {
                   </label>
                   <p className="text-sm">
                     {viewContainer.load_date
-                      ? formatDate(viewContainer.load_date)
+                      ? formatDate(new Date(viewContainer.load_date))
                       : "Not set"}
                   </p>
                 </div>
@@ -845,7 +872,7 @@ export default function AirCargo() {
                   </label>
                   <p className="text-sm">
                     {viewContainer.eta
-                      ? formatDate(viewContainer.eta)
+                      ? formatDate(new Date(viewContainer.eta))
                       : "Not set"}
                   </p>
                 </div>
@@ -885,7 +912,7 @@ export default function AirCargo() {
                     Created
                   </label>
                   <p className="text-sm">
-                    {formatDate(viewContainer.created_at)}
+                    {formatDate(new Date(viewContainer.created_at))}
                   </p>
                 </div>
                 <div>
@@ -893,7 +920,7 @@ export default function AirCargo() {
                     Last Updated
                   </label>
                   <p className="text-sm">
-                    {formatDate(viewContainer.updated_at)}
+                    {formatDate(new Date(viewContainer.updated_at))}
                   </p>
                 </div>
               </div>
