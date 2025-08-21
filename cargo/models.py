@@ -37,10 +37,9 @@ class CargoContainer(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        
         return f"{self.container_id} - {self.get_cargo_type_display()} - {self.get_status_display()}"
      
-     @property
+    @property
     def id(self):
         # Alias for tests/code that expect a numeric-like .id on models
         return self.pk
@@ -74,15 +73,12 @@ class CargoItem(models.Model):
     container = models.ForeignKey(CargoContainer, on_delete=models.CASCADE, related_name='cargo_items')
     client = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cargo_items')
     tracking_id = models.CharField(max_length=100, unique=True, editable=True)  # Allow manual input
-    
-    # Item details
     item_description = models.TextField()
     quantity = models.IntegerField()
     weight = models.FloatField(null=True, blank=True)  # kg
     cbm = models.FloatField()  # Cubic meters
     unit_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     total_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    
     # Status and dates
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     delivered_date = models.DateField(null=True, blank=True)
@@ -151,4 +147,4 @@ class ClientShipmentSummary(models.Model):
         self.save()
 
     def __str__(self):
-        return f"{self.assigned_tracking} - {self.client.shipping_mark}"
+        return f"{self.assigned_tracking} - {self.client.shipping_mark}" 
