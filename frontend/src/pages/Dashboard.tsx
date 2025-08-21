@@ -82,16 +82,16 @@ export default function Dashboard() {
   });
 
   // In-transit containers (sea and air) - use customer endpoints for customers
-  const { data: seaInTransit, isLoading: loadingSea } = useQuery({
+  const { data: seaInTransit, isLoading: loadingSea } = useQuery<ApiResponse<PaginatedResponse<any>>>({
     queryKey: ["containers", "sea", "in_transit", isCustomer() ? "customer" : "admin"],
     queryFn: () => isCustomer()
-      ? cargoService.getCustomerContainers({ cargo_type: "sea", status: "in_transit" })
+      ? cargoService.getCustomerContainers({ status: "in_transit" })
       : cargoService.getContainers({ cargo_type: "sea", status: "in_transit" }),
   });
-  const { data: airInTransit, isLoading: loadingAir } = useQuery({
+  const { data: airInTransit, isLoading: loadingAir } = useQuery<ApiResponse<PaginatedResponse<any>>>({
     queryKey: ["containers", "air", "in_transit", isCustomer() ? "customer" : "admin"],
     queryFn: () => isCustomer()
-      ? cargoService.getCustomerContainers({ cargo_type: "air", status: "in_transit" })
+      ? cargoService.getCustomerContainers({ status: "in_transit" })
       : cargoService.getContainers({ cargo_type: "air", status: "in_transit" }),
   });
 
@@ -143,9 +143,12 @@ export default function Dashboard() {
   const stats = useMemo(() => {
     const cbmInWarehouse =
       (chinaStats?.data?.total_cbm || 0) + (ghanaStats?.data?.total_cbm || 0);
+    // Some query return shapes may place counts on the root or inside a `data` object.
+    // Coerce to any and check both possibilities to avoid type mismatch from the react-query generic.
     const activeShipments =
-      (seaInTransit?.data?.count || 0) + (airInTransit?.data?.count || 0);
-    const totalCargoItems = itemsInTransit?.data?.count || 0; // only items currently in transit
+      (((seaInTransit as any)?.data?.count ?? (seaInTransit as any)?.count) || 0) +
+      (((airInTransit as any)?.data?.count ?? (airInTransit as any)?.count) || 0);
+    const totalCargoItems = ((itemsInTransit as any)?.data?.count ?? (itemsInTransit as any)?.count) || 0; // only items currently in transit
     const activeClients =
       (userStats as ApiResponse<UserStats> | undefined)?.data?.active_users ??
       0;
@@ -187,20 +190,31 @@ export default function Dashboard() {
   const recentEvents = useMemo(() => {
     const items = (
       (recentActivity?.data?.recent_items ?? []) as WarehouseItem[]
-    ).map((it) => ({
-      id: it.primepre_id || String(it.id),
-      when: it.created_at || it.updated_at,
-      title: `Warehouse item ${
-        it.primepre_id ? `#${it.primepre_id}` : ""
-      }`.trim(),
-      detail: it.warehouse_location || "Warehouse",
-      status:
-        String(it.status || "").toLowerCase() === "flagged"
-          ? ("risk" as const)
-          : String(it.status || "").toLowerCase() === "delivered"
-          ? ("delivered" as const)
-          : ("pending" as const),
-    }));
+    ).map((it) => {
+      // Some backends may provide an external identifier using different keys;
+      // safely attempt to read those without assuming the typed model contains them.
+      const meta = it as unknown as Record<string, unknown>;
+      const externalId =
+        (meta["primepre_id"] ?? meta["primepreId"]) as string | undefined;
+      const externalIdStr = externalId ? String(externalId) : undefined;
+
+      return {
+        id: externalIdStr ?? String(it.id),
+        when: it.created_at || it.updated_at,
+        title: `Warehouse item ${externalIdStr ? `#${externalIdStr}` : ""}`.trim(),
+        detail:
+          (meta["warehouse_location"] as string) ||
+          (meta["warehouseLocation"] as string) ||
+          (meta["warehouse"] as string) ||
+          "Warehouse",
+        status:
+          String(it.status || "").toLowerCase() === "flagged"
+            ? ("risk" as const)
+            : String(it.status || "").toLowerCase() === "delivered"
+            ? ("delivered" as const)
+            : ("pending" as const),
+      };
+    });
 
     const cargoList = (
       (recentActivity?.data?.recent_cargo ?? []) as Array<
@@ -250,17 +264,17 @@ export default function Dashboard() {
     });
 
     // Users joined events
-    const userJoins = ((userStats?.data?.recent_users ?? []) as User[]).map(
-      (u) => ({
-        id: String(u.id),
-        when: (u as User).date_joined as unknown as string,
-        title: u.full_name
-          ? `${u.full_name} joined`
-          : `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() + " joined",
-        detail: u.email || "New user registration",
-        status: u.is_active ? ("active" as const) : ("inactive" as const),
-      })
-    );
+        const userJoins = (((userStats?.data as any)?.recent_users ?? []) as User[]).map(
+          (u) => ({
+            id: String(u.id),
+            when: (u as User).date_joined as unknown as string,
+            title: u.full_name
+              ? `${u.full_name} joined`
+              : `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() + " joined",
+            detail: u.email || "New user registration",
+            status: u.is_active ? ("active" as const) : ("inactive" as const),
+          })
+        );
 
     const combined = [...items, ...cargoList, ...userJoins].sort(
       (a, b) =>
