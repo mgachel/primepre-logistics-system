@@ -106,10 +106,10 @@ if __name__ == '__main__':
     try:
         success = test_container_excel_upload()
         if success:
-            print("\n✅ Container Excel upload test PASSED")
+            print("\n Container Excel upload test PASSED")
         else:
-            print("\n❌ Container Excel upload test FAILED")
+            print("\n Container Excel upload test FAILED")
     except Exception as e:
-        print(f"\n❌ Test failed with error: {e}")
+        print(f"\n Test failed with error: {e}")
         import traceback
         traceback.print_exc()

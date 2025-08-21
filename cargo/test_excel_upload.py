@@ -24,8 +24,11 @@ class ExcelUploadTestCase(APITestCase):
     def setUp(self):
         """Set up test data"""
         # Create test user
+        user_phone = '+233' + get_random_string(9, allowed_chars='0123456789')
+        customer_phone = '+233' + get_random_string(9, allowed_chars='0123456789')
+
         self.user = User.objects.create_user(
-            phone='+233123456789',
+            phone=user_phone,
             email='admin@test.com',
             password='testpass123',
             first_name='Test',
@@ -36,7 +39,7 @@ class ExcelUploadTestCase(APITestCase):
         
         # Create test customer
         self.customer = CustomerUser.objects.create(
-            phone='+233123456789',
+            phone=customer_phone,
             first_name='John',
             last_name='Doe',
             shipping_mark='PMJOHN01',
@@ -390,6 +393,15 @@ class ExcelUploadProcessorTestCase(TestCase):
             warehouse_location='China',
             uploader_user_id=self.user.id
         )
+        new_container = CargoContainer.objects.create(
+            container_id='SEA002',
+            cargo_type='sea',
+            load_date=date.today(),
+            eta=date.today(),
+            route='Another Route',
+            status='pending'
+        )
+        self.assertIsNotNone(new_container.id) 
         
         # Test creating new customer
         customer = processor._get_or_create_customer('PMTEST99')
