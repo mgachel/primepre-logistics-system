@@ -39,6 +39,11 @@ class CargoContainer(models.Model):
     def __str__(self):
         
         return f"{self.container_id} - {self.get_cargo_type_display()} - {self.get_status_display()}"
+     
+     @property
+    def id(self):
+        # Alias for tests/code that expect a numeric-like .id on models
+        return self.pk
     
     @property
     def is_demurrage(self):
