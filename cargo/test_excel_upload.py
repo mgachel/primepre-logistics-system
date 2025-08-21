@@ -1,6 +1,7 @@
 import tempfile
 import pandas as pd
 import io
+from django.utils.crypto import get_random_string
 from datetime import date, datetime
 from decimal import Decimal
 from django.test import TestCase

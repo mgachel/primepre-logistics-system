@@ -17,12 +17,9 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Try to load environment variables from .env file
-try:
-    from decouple import config
-except ImportError:
-    # Fallback to os.environ if python-decouple is not installed
-    config = os.environ.get
+
+from decouple import config
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
