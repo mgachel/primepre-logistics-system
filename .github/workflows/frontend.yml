@@ -32,6 +32,11 @@ jobs:
         run: npm run build
         working-directory: ./frontend
 
+        # Setup Heroku CLI (this fixes "heroku: not found")
+      - name: Install Heroku CLI
+        run: |
+          curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
+
       # Deploy to Heroku
       - name: Deploy frontend to Heroku
         uses: akhileshns/heroku-deploy@v3.12.12
