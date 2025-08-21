@@ -6,6 +6,7 @@ from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.utils.crypto import get_random_string
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from unittest.mock import patch, MagicMock
@@ -71,9 +72,9 @@ class ExcelUploadTestCase(APITestCase):
     
     def test_goods_received_china_upload(self):
         """Test Goods Received China Excel upload"""
-        # Create test data
+        # Create test data with shipping marks that don't exist
         data = {
-            'Shipping Mark': ['PMJOHN01', 'PMJANE02'],
+            'Shipping Mark': ['PMNEW01', 'PMNEW02'],  # Use new shipping marks
             'Date of Receipt': ['2024-12-30', '2024-12-31'],
             'Date of Loading': ['2025-01-05', ''],
             'Description': ['Electronics components', 'Furniture items'],
@@ -100,9 +101,13 @@ class ExcelUploadTestCase(APITestCase):
         china_records = GoodsReceivedChina.objects.all()
         self.assertEqual(china_records.count(), 2)
         
-        # Check customer creation
-        customers = CustomerUser.objects.filter(shipping_mark__in=['PMJOHN01', 'PMJANE02'])
-        self.assertEqual(customers.count(), 2)
+        # Check that customers were NOT created automatically (new behavior)
+        customers = CustomerUser.objects.filter(shipping_mark__in=['PMNEW01', 'PMNEW02'])
+        self.assertEqual(customers.count(), 0)  # No automatic customer creation
+        
+        # Check that goods received records have null customer fields
+        for record in china_records:
+            self.assertIsNone(record.customer)
     
     def test_goods_received_ghana_upload(self):
         """Test Goods Received Ghana Excel upload"""
@@ -139,9 +144,10 @@ class ExcelUploadTestCase(APITestCase):
     
     def test_sea_cargo_upload(self):
         """Test Sea Cargo Excel upload"""
+        # Use the existing customer from setUp (PMJOHN01) and test with an unknown one
         data = {
             'Container Ref/Number': ['SEA001', 'SEA002'],
-            'Shipping Mark': ['PMJOHN01', 'PMJANE02'],
+            'Shipping Mark': ['PMJOHN01', 'PMJANE02'],  # PMJOHN01 exists from setUp, PMJANE02 doesn't
             'Date of Loading': ['2025-01-05', '2025-01-06'],
             'Description': ['Mixed electronics', 'Furniture set'],
             'Quantity': [15, 8],
@@ -159,9 +165,17 @@ class ExcelUploadTestCase(APITestCase):
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
-        # Check that cargo items were created
+        # Check that only 1 cargo item was created (for existing customer)
         cargo_items = CargoItem.objects.all()
-        self.assertEqual(cargo_items.count(), 2)
+        self.assertEqual(cargo_items.count(), 1)
+        
+        # Check that one item succeeded and one failed
+        self.assertEqual(response.data['summary']['created'], 1)
+        self.assertEqual(response.data['summary']['errors'], 1)
+        
+        # Check that the successful item is for the existing customer
+        created_item = cargo_items.first()
+        self.assertEqual(created_item.client.shipping_mark, 'PMJOHN01')
         
         # Check that containers were created
         containers = CargoContainer.objects.all()
@@ -401,17 +415,28 @@ class ExcelUploadProcessorTestCase(TestCase):
             route='Another Route',
             status='pending'
         )
-        self.assertIsNotNone(new_container.id) 
+        self.assertIsNotNone(new_container.container_id) 
         
-        # Test creating new customer
+        # Test that unknown shipping marks return None (no automatic customer creation)
         customer = processor._get_or_create_customer('PMTEST99')
-        self.assertEqual(customer.shipping_mark, 'PMTEST99')
-        self.assertEqual(customer.first_name, 'TEST99')
-        self.assertEqual(customer.last_name, 'Imported')
+        self.assertIsNone(customer)
         
-        # Test getting existing customer
-        existing_customer = processor._get_or_create_customer('PMTEST99')
-        self.assertEqual(existing_customer.id, customer.id)
+        # Test that existing customers are returned correctly
+        # First create a customer manually
+        existing_customer = CustomerUser.objects.create(
+            phone='+233111000999',
+            email='existing@test.com',
+            password='testpass123',
+            first_name='Existing',
+            last_name='Customer',
+            shipping_mark='PMEXISTING',
+            user_role='CUSTOMER'
+        )
+        
+        # Now test that the processor can find this existing customer
+        found_customer = processor._get_or_create_customer('PMEXISTING')
+        self.assertEqual(found_customer.id, existing_customer.id)
+        self.assertEqual(found_customer.shipping_mark, 'PMEXISTING')
     
     def test_get_or_create_container(self):
         """Test container creation logic"""
@@ -429,7 +454,7 @@ class ExcelUploadProcessorTestCase(TestCase):
         
         # Test getting existing container
         existing_container = processor._get_or_create_container('TEST001')
-        self.assertEqual(existing_container.id, container.id)
+        self.assertEqual(existing_container.container_id, container.container_id)
     
     def test_generate_unique_key(self):
         """Test unique key generation"""
