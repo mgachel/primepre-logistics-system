@@ -176,14 +176,13 @@ class CustomerUserViewSet(viewsets.ModelViewSet):
     """ViewSet for accessing customer/client information"""
     queryset = CustomerUser.objects.filter(user_role='CUSTOMER')
     permission_classes = [IsAuthenticated]
-    
+
     def get_serializer_class(self):
-        """Return appropriate serializer based on action"""
         if self.action in ['list', 'retrieve']:
-            # For cargo item selection, use simplified serializer showing only shipping mark
             from .serializers import CustomerShippingMarkSerializer
             return CustomerShippingMarkSerializer
         return CustomerUserSerializer
+
     
     def get_queryset(self):
         queryset = CustomerUser.objects.filter(user_role='CUSTOMER')
