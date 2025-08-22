@@ -1,12 +1,81 @@
-import { apiClient, ApiResponse, PaginatedResponse } from './api';
-import { BackendCargoContainer, BackendCargoItem } from './cargoService';
+import { apiClient, ApiResponse, PaginatedResponse } from "./api";
+import { BackendCargoContainer, BackendCargoItem } from "./cargoService";
+
+// Backend response types for customer shipments API
+interface CustomerShipmentsResponse {
+  customer_info: {
+    shipping_mark: string;
+    customer_name: string;
+  };
+  goods_received_china: {
+    total: number;
+    pending: number;
+    shipped: number;
+    items: BackendCargoItem[];
+  };
+  goods_received_ghana: {
+    total: number;
+    pending: number;
+    shipped: number;
+    items: BackendCargoItem[];
+  };
+  sea_cargo: {
+    total: number;
+    pending: number;
+    in_transit: number;
+    delivered: number;
+    items: BackendCargoItem[];
+  };
+  air_cargo: {
+    total: number;
+    pending: number;
+    in_transit: number;
+    delivered: number;
+    items: BackendCargoItem[];
+  };
+}
+
+interface CustomerShipmentStatsResponse {
+  customer_info: {
+    shipping_mark: string;
+    customer_name: string;
+  };
+  categories: {
+    goods_received_china: {
+      total: number;
+      pending: number;
+      shipped: number;
+    };
+    goods_received_ghana: {
+      total: number;
+      pending: number;
+      shipped: number;
+    };
+    sea_cargo: {
+      total: number;
+      pending: number;
+      in_transit: number;
+      delivered: number;
+    };
+    air_cargo: {
+      total: number;
+      pending: number;
+      in_transit: number;
+      delivered: number;
+    };
+  };
+  totals: {
+    total_items: number;
+    total_pending: number;
+  };
+}
 
 // Customer Shipment Types (simplified view for customers)
 export interface CustomerShipment {
   id: string;
   tracking_id: string;
-  type: 'Sea Cargo' | 'Air Cargo';
-  status: 'pending' | 'in_transit' | 'delivered' | 'delayed' | 'processing';
+  type: "Sea Cargo" | "Air Cargo";
+  status: "pending" | "in_transit" | "delivered" | "delayed" | "processing";
   origin: string;
   destination: string;
   date: string;
@@ -22,7 +91,7 @@ export interface CustomerShipment {
   // Derived fields
   container_info?: {
     container_id: string;
-    cargo_type: 'sea' | 'air';
+    cargo_type: "sea" | "air";
     route: string;
     load_date: string;
     eta: string;
@@ -33,7 +102,7 @@ export interface CustomerShipment {
 export interface ShipmentFilters {
   search?: string;
   status?: string;
-  cargo_type?: 'sea' | 'air';
+  cargo_type?: "sea" | "air";
   date_from?: string;
   date_to?: string;
   page?: number;
@@ -53,144 +122,138 @@ export interface ShipmentStats {
 }
 
 export const customerShipmentsService = {
-  // Get customer cargo items (shipments)
-  async getShipments(filters: ShipmentFilters = {}): Promise<ApiResponse<PaginatedResponse<CustomerShipment>>> {
+  // Get customer cargo items (shipments) - filtered by current user's shipping mark
+  async getShipments(
+    filters: ShipmentFilters = {}
+  ): Promise<ApiResponse<PaginatedResponse<CustomerShipment>>> {
     const params = new URLSearchParams();
-    
-    if (filters.search) params.append('search', filters.search);
-    if (filters.status) params.append('status', filters.status);
-    if (filters.cargo_type) params.append('cargo_type', filters.cargo_type);
-    if (filters.date_from) params.append('date_from', filters.date_from);
-    if (filters.date_to) params.append('date_to', filters.date_to);
-    if (filters.page) params.append('page', filters.page.toString());
-    if (filters.page_size) params.append('page_size', filters.page_size.toString());
 
-    const response = await apiClient.get<any>(`/api/cargo/customer/cargo-items/?${params.toString()}`);
-    
-    // Get containers data to enrich shipment information
-    const containersResponse = await apiClient.get<any>('/api/cargo/customer/containers/');
-    
-    // Process containers data
-    let containersArray: BackendCargoContainer[] = [];
-    if (Array.isArray(containersResponse.data)) {
-      containersArray = containersResponse.data;
-    } else if (containersResponse.data && typeof containersResponse.data === 'object' && 'results' in containersResponse.data) {
-      containersArray = (containersResponse.data as { results: BackendCargoContainer[] }).results;
+    if (filters.search) params.append("search", filters.search);
+    if (filters.status) params.append("status", filters.status);
+    if (filters.cargo_type) params.append("cargo_type", filters.cargo_type);
+    if (filters.date_from) params.append("date_from", filters.date_from);
+    if (filters.date_to) params.append("date_to", filters.date_to);
+    if (filters.page) params.append("page", filters.page.toString());
+    if (filters.page_size)
+      params.append("page_size", filters.page_size.toString());
+
+    // Use the customer shipments endpoint that properly filters by shipping mark
+    const response = await apiClient.get<CustomerShipmentsResponse>(
+      `/api/cargo/customer/shipments/?${params.toString()}`
+    );
+
+    if (!response.success || !response.data) {
+      throw new Error("Failed to fetch customer shipments");
     }
 
-    // Create containers lookup
-    const containersMap = new Map<string, BackendCargoContainer>();
-    containersArray.forEach(container => {
-      containersMap.set(container.container_id, container);
-    });
+    // Extract cargo items from the appropriate sections based on cargo_type filter
+    let allItems: Array<BackendCargoItem & { sourceType: "sea" | "air" }> = [];
 
-    // Process response data
-    let cargoItems: BackendCargoItem[] = [];
-    let pagination = {
-      count: 0,
-      next: null,
-      previous: null,
-    };
-
-    if (Array.isArray(response.data)) {
-      cargoItems = response.data;
-      pagination.count = cargoItems.length;
-    } else if (response.data && typeof response.data === 'object') {
-      if ('results' in response.data) {
-        const paginatedData = response.data as PaginatedResponse<BackendCargoItem>;
-        cargoItems = paginatedData.results;
-        pagination = {
-          count: paginatedData.count,
-          next: paginatedData.next,
-          previous: paginatedData.previous,
-        };
-      }
+    if (!filters.cargo_type || filters.cargo_type === "sea") {
+      const seaItems = (response.data.sea_cargo?.items || []).map((item) => ({
+        ...item,
+        sourceType: "sea" as const,
+      }));
+      allItems = allItems.concat(seaItems);
+    }
+    if (!filters.cargo_type || filters.cargo_type === "air") {
+      const airItems = (response.data.air_cargo?.items || []).map((item) => ({
+        ...item,
+        sourceType: "air" as const,
+      }));
+      allItems = allItems.concat(airItems);
     }
 
-    // Transform cargo items to customer shipments
-    const shipments: CustomerShipment[] = cargoItems.map((item: BackendCargoItem) => {
-      const container = containersMap.get(item.container);
-      
-      return {
-        id: item.id,
-        tracking_id: item.tracking_id,
-        type: container?.cargo_type === 'air' ? 'Air Cargo' : 'Sea Cargo',
-        status: item.status,
-        origin: 'China', // Default origin based on business logic
-        destination: 'Ghana', // Default destination based on business logic
-        date: item.created_at,
-        eta: container?.eta,
-        delivered_date: item.delivered_date,
-        description: item.item_description,
-        quantity: item.quantity,
-        weight: item.weight,
-        cbm: item.cbm,
-        value: item.total_value,
-        container_id: item.container,
-        shipping_mark: item.client_shipping_mark,
-        container_info: container ? {
-          container_id: container.container_id,
-          cargo_type: container.cargo_type,
-          route: container.route,
-          load_date: container.load_date,
-          eta: container.eta,
-          status: container.status,
-        } : undefined,
-      };
-    });
+    // Transform cargo items to customer shipments format
+    const shipments: CustomerShipment[] = allItems.map((item) => ({
+      id: item.id,
+      tracking_id: item.tracking_id,
+      type: item.sourceType === "air" ? "Air Cargo" : "Sea Cargo",
+      status: item.status,
+      origin: "China",
+      destination: "Ghana",
+      date: item.created_at,
+      eta: undefined, // Container ETA not available in this response
+      delivered_date: item.delivered_date,
+      description: item.item_description,
+      quantity: item.quantity,
+      weight: item.weight,
+      cbm: item.cbm,
+      value: item.total_value,
+      container_id: item.container,
+      shipping_mark: item.client_shipping_mark,
+    }));
+
+    // Apply pagination (simple client-side for now)
+    const page = filters.page || 1;
+    const pageSize = filters.page_size || 10;
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedShipments = shipments.slice(startIndex, endIndex);
 
     return {
       data: {
-        results: shipments,
-        count: pagination.count,
-        next: pagination.next,
-        previous: pagination.previous,
+        results: paginatedShipments,
+        count: shipments.length,
+        next: endIndex < shipments.length ? `page=${page + 1}` : null,
+        previous: page > 1 ? `page=${page - 1}` : null,
       },
       success: true,
     };
   },
 
-  // Get shipment statistics
-  async getShipmentStats(cargo_type?: 'sea' | 'air'): Promise<ApiResponse<ShipmentStats>> {
+  // Get shipment statistics - filtered by current user's shipping mark
+  async getShipmentStats(
+    cargo_type?: "sea" | "air"
+  ): Promise<ApiResponse<ShipmentStats>> {
     try {
-      // Build query parameters
+      // Use the customer shipment stats endpoint that filters by shipping mark
       const params = new URLSearchParams();
       if (cargo_type) {
-        params.append('cargo_type', cargo_type);
-      }
-      
-      // Get cargo dashboard stats
-      const dashboardResponse = await apiClient.get<any>(`/api/cargo/customer/dashboard/?${params.toString()}`);
-      
-      // Get all cargo items for additional calculations (with same filter)
-      const itemsParams = new URLSearchParams();
-      if (cargo_type) {
-        itemsParams.append('cargo_type', cargo_type);
-      }
-      const itemsResponse = await apiClient.get<any>(`/api/cargo/customer/cargo-items/?${itemsParams.toString()}`);
-      
-      let cargoItems: BackendCargoItem[] = [];
-      if (Array.isArray(itemsResponse.data)) {
-        cargoItems = itemsResponse.data;
-      } else if (itemsResponse.data && typeof itemsResponse.data === 'object' && 'results' in itemsResponse.data) {
-        cargoItems = (itemsResponse.data as { results: BackendCargoItem[] }).results;
+        params.append("cargo_type", cargo_type);
       }
 
-      // Calculate additional stats
-      const totalValue = cargoItems.reduce((sum, item) => sum + (item.total_value || 0), 0);
-      const totalWeight = cargoItems.reduce((sum, item) => sum + (item.weight || 0), 0);
-      const totalCbm = cargoItems.reduce((sum, item) => sum + item.cbm, 0);
+      const response = await apiClient.get<CustomerShipmentStatsResponse>(
+        `/api/cargo/customer/shipments/stats/?${params.toString()}`
+      );
+
+      if (!response.success || !response.data) {
+        throw new Error("Failed to fetch shipment stats");
+      }
+
+      // Extract stats based on cargo type filter
+      const categories = response.data.categories;
+      let totalShipments = 0;
+      let inTransitShipments = 0;
+      let deliveredShipments = 0;
+      let pendingShipments = 0;
+
+      if (!cargo_type || cargo_type === "sea") {
+        const seaStats = categories.sea_cargo;
+        totalShipments += seaStats.total || 0;
+        inTransitShipments += seaStats.in_transit || 0;
+        deliveredShipments += seaStats.delivered || 0;
+        pendingShipments += seaStats.pending || 0;
+      }
+
+      if (!cargo_type || cargo_type === "air") {
+        const airStats = categories.air_cargo;
+        totalShipments += airStats.total || 0;
+        inTransitShipments += airStats.in_transit || 0;
+        deliveredShipments += airStats.delivered || 0;
+        pendingShipments += airStats.pending || 0;
+      }
 
       const stats: ShipmentStats = {
-        total_shipments: dashboardResponse.data.total_cargo_items || 0,
-        pending_shipments: dashboardResponse.data.pending_items || 0,
-        in_transit_shipments: dashboardResponse.data.in_transit_items || 0,
-        delivered_shipments: dashboardResponse.data.delivered_items || 0,
-        delayed_shipments: 0, // TODO: Add delayed status tracking
-        total_containers: dashboardResponse.data.total_containers || 0,
-        total_value: totalValue,
-        total_weight: totalWeight,
-        total_cbm: totalCbm,
+        total_shipments: totalShipments,
+        pending_shipments: pendingShipments,
+        in_transit_shipments: inTransitShipments,
+        delivered_shipments: deliveredShipments,
+        delayed_shipments: 0, // Not provided by backend stats endpoint
+        total_containers: 0, // Not provided by backend stats endpoint
+        total_value: 0, // Would need to be calculated from items
+        total_weight: 0, // Would need to be calculated from items
+        total_cbm: 0, // Would need to be calculated from items
       };
 
       return {
@@ -198,7 +261,7 @@ export const customerShipmentsService = {
         success: true,
       };
     } catch (error) {
-      console.error('Error fetching shipment stats:', error);
+      console.error("Error fetching shipment stats:", error);
       throw error;
     }
   },
@@ -207,16 +270,20 @@ export const customerShipmentsService = {
   async getShipmentById(id: string): Promise<ApiResponse<CustomerShipment>> {
     try {
       // Get the specific cargo item
-      const itemResponse = await apiClient.get<BackendCargoItem>(`/api/cargo/customer/cargo-items/${id}/`);
-      
+      const itemResponse = await apiClient.get<BackendCargoItem>(
+        `/api/cargo/customer/cargo-items/${id}/`
+      );
+
       // Get container information if available
       let container: BackendCargoContainer | undefined;
       if (itemResponse.data.container) {
         try {
-          const containerResponse = await apiClient.get<BackendCargoContainer>(`/api/cargo/customer/containers/${itemResponse.data.container}/`);
+          const containerResponse = await apiClient.get<BackendCargoContainer>(
+            `/api/cargo/customer/containers/${itemResponse.data.container}/`
+          );
           container = containerResponse.data;
         } catch (error) {
-          console.warn('Could not fetch container details:', error);
+          console.warn("Could not fetch container details:", error);
         }
       }
 
@@ -224,10 +291,10 @@ export const customerShipmentsService = {
       const shipment: CustomerShipment = {
         id: itemResponse.data.id,
         tracking_id: itemResponse.data.tracking_id,
-        type: container?.cargo_type === 'air' ? 'Air Cargo' : 'Sea Cargo',
+        type: container?.cargo_type === "air" ? "Air Cargo" : "Sea Cargo",
         status: itemResponse.data.status,
-        origin: 'China',
-        destination: 'Ghana',
+        origin: "China",
+        destination: "Ghana",
         date: itemResponse.data.created_at,
         eta: container?.eta,
         delivered_date: itemResponse.data.delivered_date,
@@ -238,14 +305,16 @@ export const customerShipmentsService = {
         value: itemResponse.data.total_value,
         container_id: itemResponse.data.container,
         shipping_mark: itemResponse.data.client_shipping_mark,
-        container_info: container ? {
-          container_id: container.container_id,
-          cargo_type: container.cargo_type,
-          route: container.route,
-          load_date: container.load_date,
-          eta: container.eta,
-          status: container.status,
-        } : undefined,
+        container_info: container
+          ? {
+              container_id: container.container_id,
+              cargo_type: container.cargo_type,
+              route: container.route,
+              load_date: container.load_date,
+              eta: container.eta,
+              status: container.status,
+            }
+          : undefined,
       };
 
       return {
@@ -253,13 +322,15 @@ export const customerShipmentsService = {
         success: true,
       };
     } catch (error) {
-      console.error('Error fetching shipment details:', error);
+      console.error("Error fetching shipment details:", error);
       throw error;
     }
   },
 
   // Search shipments
-  async searchShipments(query: string): Promise<ApiResponse<CustomerShipment[]>> {
+  async searchShipments(
+    query: string
+  ): Promise<ApiResponse<CustomerShipment[]>> {
     const response = await this.getShipments({ search: query, page_size: 50 });
     return {
       data: response.data.results,
