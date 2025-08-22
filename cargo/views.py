@@ -172,14 +172,14 @@ class CargoItemViewSet(viewsets.ModelViewSet):
         summary.update_totals()
 
 
-class CustomerUserViewSet(viewsets.ReadOnlyModelViewSet):
+class CustomerUserViewSet(viewsets.ModelViewSet):
     """ViewSet for accessing customer/client information"""
     queryset = CustomerUser.objects.filter(user_role='CUSTOMER')
     permission_classes = [IsAuthenticated]
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
-        if self.action == 'list' or self.action == 'retrieve':
+        if self.action in ['list', 'retrieve']:
             # For cargo item selection, use simplified serializer showing only shipping mark
             from .serializers import CustomerShippingMarkSerializer
             return CustomerShippingMarkSerializer
