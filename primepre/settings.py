@@ -36,8 +36,9 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='primepre-backend.herokuapp.com,localhost,127.0.0.1'
+    default='primepre-logistics-backend.herokuapp.com,localhost,127.0.0.1'
 ).split(',')
+
 
 
 
