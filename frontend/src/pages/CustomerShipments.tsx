@@ -1,11 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Ship, 
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Ship,
   Plane,
   Search,
   Filter,
@@ -13,17 +25,21 @@ import {
   Download,
   Plus,
   Loader2,
-  AlertCircle
-} from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { customerShipmentsService, CustomerShipment, ShipmentStats } from '@/services/customerShipmentsService';
-import { formatDate } from '@/lib/date';
+  AlertCircle,
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  customerShipmentsService,
+  CustomerShipment,
+  ShipmentStats,
+} from "@/services/customerShipmentsService";
+import { formatDate } from "@/lib/date";
 
 export default function CustomerShipments() {
   const { user } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [shipments, setShipments] = useState<CustomerShipment[]>([]);
   const [stats, setStats] = useState<ShipmentStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,40 +51,52 @@ export default function CustomerShipments() {
   });
 
   // Fetch shipments data
-  const fetchShipments = useCallback(async (page: number = 1) => {
-    try {
-      setLoading(true);
-      setError(null);
+  const fetchShipments = useCallback(
+    async (page: number = 1) => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const filters = {
-        search: searchTerm || undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
-        cargo_type: typeFilter !== 'all' ? (typeFilter === 'Sea Cargo' ? 'sea' : 'air') : undefined,
-        page,
-        page_size: 10,
-      };
+        const filters = {
+          search: searchTerm || undefined,
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          cargo_type:
+            typeFilter !== "all"
+              ? typeFilter === "Sea Cargo"
+                ? ("sea" as const)
+                : ("air" as const)
+              : undefined,
+          page,
+          page_size: 10,
+        };
 
-      const [shipmentsResponse, statsResponse] = await Promise.all([
-        customerShipmentsService.getShipments(filters),
-        customerShipmentsService.getShipmentStats(
-          typeFilter !== 'all' ? (typeFilter === 'Sea Cargo' ? 'sea' : 'air') : undefined
-        ),
-      ]);
+        const [shipmentsResponse, statsResponse] = await Promise.all([
+          customerShipmentsService.getShipments(filters),
+          customerShipmentsService.getShipmentStats(
+            typeFilter !== "all"
+              ? typeFilter === "Sea Cargo"
+                ? "sea"
+                : "air"
+              : undefined
+          ),
+        ]);
 
-      setShipments(shipmentsResponse.data.results);
-      setStats(statsResponse.data);
-      setPagination({
-        page,
-        totalPages: Math.ceil(shipmentsResponse.data.count / 10),
-        totalItems: shipmentsResponse.data.count,
-      });
-    } catch (err) {
-      console.error('Failed to fetch shipments:', err);
-      setError('Failed to load shipments. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [searchTerm, statusFilter, typeFilter]);
+        setShipments(shipmentsResponse.data.results);
+        setStats(statsResponse.data);
+        setPagination({
+          page,
+          totalPages: Math.ceil(shipmentsResponse.data.count / 10),
+          totalItems: shipmentsResponse.data.count,
+        });
+      } catch (err) {
+        console.error("Failed to fetch shipments:", err);
+        setError("Failed to load shipments. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [searchTerm, statusFilter, typeFilter]
+  );
 
   // Fetch data on component mount and when filters change
   useEffect(() => {
@@ -81,7 +109,7 @@ export default function CustomerShipments() {
       if (pagination.page === 1) {
         fetchShipments(1);
       } else {
-        setPagination(prev => ({ ...prev, page: 1 }));
+        setPagination((prev) => ({ ...prev, page: 1 }));
       }
     }, 300);
 
@@ -104,24 +132,38 @@ export default function CustomerShipments() {
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
         <p className="text-red-600 mb-4">{error}</p>
-        <Button onClick={() => fetchShipments()}>
-          Try Again
-        </Button>
+        <Button onClick={() => fetchShipments()}>Try Again</Button>
       </div>
     );
   }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'delivered':
-        return <Badge variant="default" className="bg-green-100 text-green-800">Delivered</Badge>;
-      case 'in_transit':
-        return <Badge variant="default" className="bg-blue-100 text-blue-800">In Transit</Badge>;
-      case 'pending':
-        return <Badge variant="default" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-      case 'processing':
-        return <Badge variant="default" className="bg-yellow-100 text-yellow-800">Processing</Badge>;
-      case 'delayed':
+      case "delivered":
+        return (
+          <Badge variant="default" className="bg-green-100 text-green-800">
+            Delivered
+          </Badge>
+        );
+      case "in_transit":
+        return (
+          <Badge variant="default" className="bg-blue-100 text-blue-800">
+            In Transit
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge variant="default" className="bg-yellow-100 text-yellow-800">
+            Pending
+          </Badge>
+        );
+      case "processing":
+        return (
+          <Badge variant="default" className="bg-yellow-100 text-yellow-800">
+            Processing
+          </Badge>
+        );
+      case "delayed":
         return <Badge variant="destructive">Delayed</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
@@ -129,16 +171,22 @@ export default function CustomerShipments() {
   };
 
   const getTypeIcon = (type: string) => {
-    return type === 'Sea Cargo' ? <Ship className="h-4 w-4" /> : <Plane className="h-4 w-4" />;
+    return type === "Sea Cargo" ? (
+      <Ship className="h-4 w-4" />
+    ) : (
+      <Plane className="h-4 w-4" />
+    );
   };
 
   const formatWeight = (weight?: number) => {
-    if (!weight) return 'N/A';
-    return weight >= 1000 ? `${(weight / 1000).toFixed(1)} tons` : `${weight} kg`;
+    if (!weight) return "N/A";
+    return weight >= 1000
+      ? `${(weight / 1000).toFixed(1)} tons`
+      : `${weight} kg`;
   };
 
   const formatValue = (value?: number) => {
-    if (!value) return 'N/A';
+    if (!value) return "N/A";
     return `$${value.toLocaleString()}`;
   };
 
@@ -149,7 +197,8 @@ export default function CustomerShipments() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Shipments</h1>
           <p className="text-muted-foreground">
-            Track and manage your shipments
+            Track and manage your shipments{" "}
+            {user?.shipping_mark && `(${user.shipping_mark})`}
           </p>
         </div>
         <Button>
@@ -163,7 +212,9 @@ export default function CustomerShipments() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Shipments</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total Shipments
+              </CardTitle>
               <Ship className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -180,7 +231,9 @@ export default function CustomerShipments() {
               <Ship className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.in_transit_shipments}</div>
+              <div className="text-2xl font-bold">
+                {stats.in_transit_shipments}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Currently shipping
               </p>
@@ -193,7 +246,9 @@ export default function CustomerShipments() {
               <Ship className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.delivered_shipments}</div>
+              <div className="text-2xl font-bold">
+                {stats.delivered_shipments}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Successfully delivered
               </p>
@@ -206,7 +261,9 @@ export default function CustomerShipments() {
               <Ship className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatValue(stats.total_value)}</div>
+              <div className="text-2xl font-bold">
+                {formatValue(stats.total_value)}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Combined shipment value
               </p>
@@ -276,7 +333,7 @@ export default function CustomerShipments() {
           <Card>
             <CardContent className="p-12 text-center">
               <p className="text-red-500 mb-4">{error}</p>
-              <Button onClick={fetchShipments} variant="outline">
+              <Button onClick={() => fetchShipments()} variant="outline">
                 Try Again
               </Button>
             </CardContent>
@@ -292,7 +349,9 @@ export default function CustomerShipments() {
                     <Ship className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p className="text-lg mb-2">No shipments found</p>
                     <p className="text-sm">
-                      {searchTerm || statusFilter !== "all" || typeFilter !== "all"
+                      {searchTerm ||
+                      statusFilter !== "all" ||
+                      typeFilter !== "all"
                         ? "Try adjusting your filters or search terms"
                         : "Start by creating your first shipment"}
                     </p>
@@ -306,40 +365,45 @@ export default function CustomerShipments() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className="flex items-center space-x-2">
-                          {getTypeIcon(shipment.cargo_type || 'Sea Cargo')}
+                          {getTypeIcon(shipment.type)}
                           <div>
                             <div className="font-semibold">
-                              {shipment.unique_id || `CGO-${shipment.id}`}
+                              {shipment.tracking_id || `CGO-${shipment.id}`}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {shipment.cargo_type || 'Standard'} • {shipment.description || 'No description'}
+                              {shipment.type} •{" "}
+                              {shipment.description || "No description"}
                             </div>
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-4">
                         <div className="text-right">
                           <div className="font-medium">
-                            {shipment.port_of_origin || 'N/A'} → {shipment.port_of_destination || 'N/A'}
+                            {shipment.origin || "N/A"} →{" "}
+                            {shipment.destination || "N/A"}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {formatWeight(shipment.total_weight)} • {formatValue(shipment.cargo_value)}
+                            {formatWeight(shipment.weight || undefined)} •{" "}
+                            {formatValue(shipment.value || undefined)}
                           </div>
                         </div>
-                        
+
                         <div className="text-right">
-                          {getStatusBadge(shipment.status || 'pending')}
+                          {getStatusBadge(shipment.status || "pending")}
                           <div className="text-sm text-muted-foreground mt-1">
-                            {shipment.status === 'delivered' && shipment.actual_delivery_date
-                              ? `Delivered: ${formatDate(shipment.actual_delivery_date)}`
-                              : shipment.estimated_delivery_date
-                              ? `ETA: ${formatDate(shipment.estimated_delivery_date)}`
-                              : `Created: ${formatDate(shipment.created_at)}`
-                            }
+                            {shipment.status === "delivered" &&
+                            shipment.delivered_date
+                              ? `Delivered: ${formatDate(
+                                  shipment.delivered_date
+                                )}`
+                              : shipment.eta
+                              ? `ETA: ${formatDate(shipment.eta)}`
+                              : `Created: ${formatDate(shipment.date)}`}
                           </div>
                         </div>
-                        
+
                         <div className="flex space-x-2">
                           <Button variant="outline" size="sm">
                             <Eye className="h-4 w-4" />
@@ -357,24 +421,25 @@ export default function CustomerShipments() {
           </div>
 
           {/* Pagination */}
-          {pagination && pagination.total > 10 && (
+          {pagination && pagination.totalItems > 10 && (
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between space-x-2">
                   <div className="text-sm text-muted-foreground">
-                    Showing {((pagination.current_page - 1) * 10) + 1} to {Math.min(pagination.current_page * 10, pagination.total)} of {pagination.total} shipments
+                    Showing {(pagination.page - 1) * 10 + 1} to{" "}
+                    {Math.min(pagination.page * 10, pagination.totalItems)} of{" "}
+                    {pagination.totalItems} shipments
                   </div>
                   <div className="flex space-x-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        if (pagination.current_page > 1) {
-                          // Implement page change logic here
-                          fetchShipments();
+                        if (pagination.page > 1) {
+                          fetchShipments(pagination.page - 1);
                         }
                       }}
-                      disabled={pagination.current_page <= 1}
+                      disabled={pagination.page <= 1}
                     >
                       Previous
                     </Button>
@@ -382,12 +447,11 @@ export default function CustomerShipments() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        if (pagination.current_page < pagination.total_pages) {
-                          // Implement page change logic here
-                          fetchShipments();
+                        if (pagination.page < pagination.totalPages) {
+                          fetchShipments(pagination.page + 1);
                         }
                       }}
-                      disabled={pagination.current_page >= pagination.total_pages}
+                      disabled={pagination.page >= pagination.totalPages}
                     >
                       Next
                     </Button>
@@ -400,4 +464,4 @@ export default function CustomerShipments() {
       )}
     </div>
   );
-} 
+}
