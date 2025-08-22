@@ -34,11 +34,10 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-fdwfgv_359rpn$jj7=j24
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config(
-    'ALLOWED_HOSTS',
-    default='primepre-logistics-backend.herokuapp.com,localhost,127.0.0.1'
-).split(',')
-
+ALLOWED_HOSTS = [h.strip() for h in config(
+    "ALLOWED_HOSTS",
+    default=".herokuapp.com,localhost,127.0.0.1"
+).split(",") if h.strip()]
 
 
 
@@ -208,16 +207,28 @@ SIMPLE_JWT = {
     'TOKEN_TYPE_CLAIM': 'token_type',
 }
 
+def csv_env(name: str, default: str):
+    return [x.strip() for x in os.getenv(name, default).split(",") if x.strip()]
+
 # CORS settings for frontend
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # React dev server
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",  # Vite dev server
-    "http://127.0.0.1:5173",
-    "https://dvs9g2wx-5173.uks1.devtunnels.ms",  # Dev tunnel frontend
-]
+CORS_ALLOWED_ORIGINS = csv_env(
+    "CORS_ALLOWED_ORIGINS",
+    "https://primepre-frontend-ba6f55cc48e5.herokuapp.com"
+)
 
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = csv_env(
+    "CSRF_TRUSTED_ORIGINS",
+    "https://primepre-frontend-ba6f55cc48e5.herokuapp.com,https://*.herokuapp.com"
+)
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
 
 # Custom user model
 AUTH_USER_MODEL = 'users.CustomerUser'
