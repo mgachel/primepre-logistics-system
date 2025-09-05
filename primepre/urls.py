@@ -17,14 +17,16 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from .admin import admin_site
+from .views import home_view
 
 urlpatterns = [
+    path('', home_view, name='home'),  # Root URL now has a proper handler
     path('admin/', admin_site.urls),  # Use our custom admin
     path('django-admin/', admin.site.urls),  # Keep default admin as backup
     path('api/auth/', include('users.urls')),
     path('api/cargo/', include('cargo.urls')),
     path('api/analytics/', include('analytics.urls')),
-    path('', include('GoodsRecieved.urls')),
+    path('', include('GoodsRecieved.urls')),  # This will handle all /api/goods/ paths
     path('api/rates/', include('rates.urls')),  # Rates endpoints
     path('api/notes/', include('notes.urls')),
     path('api/claims/', include('claims.urls')),  # Claims endpoints
