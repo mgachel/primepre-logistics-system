@@ -26,7 +26,7 @@ urlpatterns = [
     path('api/auth/', include('users.urls')),
     path('api/cargo/', include('cargo.urls')),
     path('api/analytics/', include('analytics.urls')),
-    path('', include('GoodsRecieved.urls')),  # This will handle all /api/goods/ paths
+    path('api/goods/', include('GoodsRecieved.urls')),  # This will handle all /api/goods/ paths
     path('api/rates/', include('rates.urls')),  # Rates endpoints
     path('api/notes/', include('notes.urls')),
     path('api/claims/', include('claims.urls')),  # Claims endpoints
