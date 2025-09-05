@@ -34,11 +34,11 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-fdwfgv_359rpn$jj7=j24
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
+
 ALLOWED_HOSTS = [h.strip() for h in config(
     "ALLOWED_HOSTS",
-    default="primepre-logistics-backend-fb2561752d16.herokuapp.com,localhost,127.0.0.1"
+    default="primepre-logistics-backend-fb2561752d16.herokuapp.com,primepre-logistics-backend.herokuapp.com,localhost,127.0.0.1" # Add the short name here
 ).split(",") if h.strip()]
-
 
 
 # Application definition
