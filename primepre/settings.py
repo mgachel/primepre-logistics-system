@@ -36,7 +36,7 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = [h.strip() for h in config(
     "ALLOWED_HOSTS",
-    default=".herokuapp.com,localhost,127.0.0.1"
+    default="primepre-logistics-backend-fb2561752d16.herokuapp.com,localhost,127.0.0.1"
 ).split(",") if h.strip()]
 
 
