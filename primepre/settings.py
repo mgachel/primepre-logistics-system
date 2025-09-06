@@ -211,9 +211,8 @@ def csv_env(name: str, default: str):
     return [x.strip() for x in os.getenv(name, default).split(",") if x.strip()]
 
 # CORS settings for frontend
-CORS_ALLOWED_ORIGINS = csv_env(
-    "CORS_ALLOWED_ORIGINS",
-    "https://primepre-frontend-ba6f55cc48e5.herokuapp.com"
+CORS_ALLOWED_ORIGINS =(
+    "https://primepre-frontend-ba6f55cc48e5.herokuapp.com",
 )
 
 CORS_ALLOW_CREDENTIALS = True
