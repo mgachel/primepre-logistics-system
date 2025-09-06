@@ -34,8 +34,12 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-fdwfgv_359rpn$jj7=j24
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-
-
+ALLOWED_HOSTS = [
+    "primepre-logistics-backend.herokuapp.com",
+    "primepre-logistics-backend-fb2561752d16.herokuapp.com", 
+    "localhost",
+    "127.0.0.1",
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -215,7 +219,7 @@ def csv_list(value: str):
 
 # CORS configuration - Fixed for Heroku production
 # Allow all origins temporarily to resolve immediate login blockage
-# CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_ALL_ORIGINS = True
 
 # Specific origins list (fallback when CORS_ALLOW_ALL_ORIGINS is False)
 CORS_ALLOWED_ORIGINS = [
@@ -259,13 +263,6 @@ CORS_ALLOW_METHODS = [
     'PUT',
 ]
 
-ALLOWED_HOSTS = [
-    "primepre-logistics-backend.herokuapp.com",
-    "primepre-logistics-backend-fb2561752d16.herokuapp.com",
-    "localhost",
-    "127.0.0.1",
-]
-
 
 # Cache preflight responses for 1 day
 CORS_PREFLIGHT_MAX_AGE = 86400
@@ -279,7 +276,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 
 CSRF_TRUSTED_ORIGINS = [
     "https://primepre-frontend-ba6f55cc48e5.herokuapp.com",
-    "https://primepre-logistics-backend.herokuapp.com", 
+    # "https://primepre-logistics-backend.herokuapp.com", 
     "https://primepre-logistics-backend-fb2561752d16.herokuapp.com",
     "https://*.herokuapp.com",
 ]
