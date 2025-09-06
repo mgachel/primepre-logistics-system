@@ -19,7 +19,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 from decouple import config
-from corsheaders.defaults import default_headers, default_methods
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -218,48 +217,61 @@ def csv_env(name: str, default: str):
 def csv_list(value: str):
     return [v.strip() for v in value.split(',') if v.strip()]
 
-"""CORS configuration
+# CORS configuration - Fixed for Heroku production
+# Allow all origins temporarily to resolve immediate login blockage
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
 
-Strategy:
-1. Default to allowing all origins temporarily to immediately resolve production login blockage.
-2. If you set CORS_ALLOW_ALL_ORIGINS=False in env, we fall back to an explicit allow-list from CORS_ALLOWED_ORIGINS.
-3. Headers & methods extend library defaults for forward compatibility.
-4. Long preflight cache to cut latency.
-"""
+# Specific origins list (fallback when CORS_ALLOW_ALL_ORIGINS is False)
+CORS_ALLOWED_ORIGINS = [
+    'https://primepre-frontend-ba6f55cc48e5.herokuapp.com',
+    'https://primepre-logistics-backend.herokuapp.com',
+    'https://primepre-logistics-backend-fb2561752d16.herokuapp.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
 
-_allow_all = config('CORS_ALLOW_ALL_ORIGINS', default='true').lower() in ('1','true','yes','on')
-CORS_ALLOW_ALL_ORIGINS = _allow_all
-
-# Explicit list (used only if CORS_ALLOW_ALL_ORIGINS is False)
-CORS_ALLOWED_ORIGINS = csv_list(
-    config(
-        'CORS_ALLOWED_ORIGINS',
-        default='https://primepre-frontend-ba6f55cc48e5.herokuapp.com'
-    )
-)
-
-# Allow credentials (Authorization header) – safe because either all origins (temporary) or explicit list.
+# Allow credentials for authentication
 CORS_ALLOW_CREDENTIALS = True
 
-# Merge defaults with any custom headers
-EXTRA_CORS_HEADERS = [
+# Allow all common headers
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding', 
+    'accept-language',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
     'x-csrftoken',
     'x-requested-with',
-    'authorization',  # ensure explicit
+    'x-forwarded-for',
+    'x-forwarded-proto',
+    'cache-control',
+    'pragma',
 ]
-CORS_ALLOW_HEADERS = list(dict.fromkeys([h.lower() for h in (list(default_headers) + EXTRA_CORS_HEADERS)]))
 
-# Use default methods (GET, POST, etc.) ensuring OPTIONS present
-CORS_ALLOW_METHODS = list(dict.fromkeys(list(default_methods)))
+# Allow all common methods
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS', 
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
-# Cache preflight for 24h
+# Cache preflight responses for 1 day
 CORS_PREFLIGHT_MAX_AGE = 86400
 
-# Optional: allow private network requests (Chrome feature); harmless if ignored by older versions
-try:
-    CORS_ALLOW_PRIVATE_NETWORK = True  # noqa
-except Exception:
-    pass
+# Additional CORS settings for robustness
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.herokuapp\.com$",
+    r"^http://localhost:\d+$",
+    r"^http://127\.0\.0\.1:\d+$",
+]
 
 CSRF_TRUSTED_ORIGINS = csv_env(
     "CSRF_TRUSTED_ORIGINS",
