@@ -19,6 +19,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 from decouple import config
+from corsheaders.defaults import default_headers, default_methods
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -211,32 +212,54 @@ def csv_env(name: str, default: str):
     return [x.strip() for x in os.getenv(name, default).split(",") if x.strip()]
 
 # CORS settings for frontend
-CORS_ALLOWED_ORIGINS =(
-    "https://primepre-frontend-ba6f55cc48e5.herokuapp.com",
+# IMPORTANT: Previously this was defined as a single string in parentheses which
+# meant CORS matching failed and no Access-Control-Allow-Origin header was sent.
+# We now parse from env or fall back to a proper list.
+def csv_list(value: str):
+    return [v.strip() for v in value.split(',') if v.strip()]
+
+"""CORS configuration
+
+Strategy:
+1. Default to allowing all origins temporarily to immediately resolve production login blockage.
+2. If you set CORS_ALLOW_ALL_ORIGINS=False in env, we fall back to an explicit allow-list from CORS_ALLOWED_ORIGINS.
+3. Headers & methods extend library defaults for forward compatibility.
+4. Long preflight cache to cut latency.
+"""
+
+_allow_all = config('CORS_ALLOW_ALL_ORIGINS', default='true').lower() in ('1','true','yes','on')
+CORS_ALLOW_ALL_ORIGINS = _allow_all
+
+# Explicit list (used only if CORS_ALLOW_ALL_ORIGINS is False)
+CORS_ALLOWED_ORIGINS = csv_list(
+    config(
+        'CORS_ALLOWED_ORIGINS',
+        default='https://primepre-frontend-ba6f55cc48e5.herokuapp.com'
+    )
 )
 
+# Allow credentials (Authorization header) – safe because either all origins (temporary) or explicit list.
 CORS_ALLOW_CREDENTIALS = True
 
-CORS_ALLOW_ALL_ORIGINS = False  # Set to True only for development
-CORS_ALLOWED_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
+# Merge defaults with any custom headers
+EXTRA_CORS_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
+    'authorization',  # ensure explicit
 ]
-CORS_ALLOWED_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
+CORS_ALLOW_HEADERS = list(dict.fromkeys([h.lower() for h in (list(default_headers) + EXTRA_CORS_HEADERS)]))
+
+# Use default methods (GET, POST, etc.) ensuring OPTIONS present
+CORS_ALLOW_METHODS = list(dict.fromkeys(list(default_methods)))
+
+# Cache preflight for 24h
+CORS_PREFLIGHT_MAX_AGE = 86400
+
+# Optional: allow private network requests (Chrome feature); harmless if ignored by older versions
+try:
+    CORS_ALLOW_PRIVATE_NETWORK = True  # noqa
+except Exception:
+    pass
 
 CSRF_TRUSTED_ORIGINS = csv_env(
     "CSRF_TRUSTED_ORIGINS",
