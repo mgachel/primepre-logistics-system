@@ -7,7 +7,7 @@ from rest_framework_simplejwt.views import (
 from .views import (
     RegisterView, LoginView, PasswordResetView, ProfileView,
     PasswordResetRequestView, PasswordResetVerifyView, PasswordResetConfirmView,
-    UserViewSet, PasswordChangeView
+    UserViewSet, PasswordChangeView, TestView
 )
 
 # Create router for ViewSets
@@ -18,6 +18,7 @@ urlpatterns = [
     # Authentication endpoints
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
+    path('test/', TestView.as_view(), name='test'),
     
     # JWT token management
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

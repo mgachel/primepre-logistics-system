@@ -23,7 +23,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class TestView(APIView):
+    permission_classes = [AllowAny]
 
+    def get(self, request):
+        return Response({"message": "Test endpoint is working!"}, status=status.HTTP_200_OK)     
+    
+       
+    
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
