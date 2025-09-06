@@ -1,8 +1,7 @@
 // =============================
 // API Base Configuration
 // =============================
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://primepre-logistics-backend-fb2561752d16.herokuapp.com";
+const API_BASE_URL = "https://primepre-logistics-backend-fb2561752d16.herokuapp.com";
 
 // =============================
 // Common API response types
