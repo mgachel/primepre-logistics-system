@@ -35,10 +35,7 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-fdwfgv_359rpn$jj7=j24
 DEBUG = config('DEBUG', default=False, cast=bool)
 
 
-ALLOWED_HOSTS = [h.strip() for h in config(
-    "ALLOWED_HOSTS",
-    default="primepre-logistics-backend-fb2561752d16.herokuapp.com,primepre-logistics-backend.herokuapp.com,localhost,127.0.0.1" # Add the short name here
-).split(",") if h.strip()]
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -219,7 +216,7 @@ def csv_list(value: str):
 
 # CORS configuration - Fixed for Heroku production
 # Allow all origins temporarily to resolve immediate login blockage
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
+CORS_ORIGIN_ALLOW_ALL = True
 
 # Specific origins list (fallback when CORS_ALLOW_ALL_ORIGINS is False)
 CORS_ALLOWED_ORIGINS = [
