@@ -95,27 +95,41 @@ class NotificationsService {
       // Convert China alerts to notifications
       if (chinaResponse.data?.alerts) {
         chinaResponse.data.alerts.forEach((alert, index) => {
-          notifications.push(
-            this.convertAlertToNotification(alert, `china_${index}`, "china")
-          );
+          if (alert) {  // Only process non-null alerts
+            notifications.push(
+              this.convertAlertToNotification(alert, `china_${index}`, "china")
+            );
+          }
         });
       }
 
       // Convert Ghana alerts to notifications
       if (ghanaResponse.data?.alerts) {
         ghanaResponse.data.alerts.forEach((alert, index) => {
-          notifications.push(
-            this.convertAlertToNotification(alert, `ghana_${index}`, "ghana")
-          );
+          if (alert) {  // Only process non-null alerts
+            notifications.push(
+              this.convertAlertToNotification(alert, `ghana_${index}`, "ghana")
+            );
+          }
         });
       }
 
+      // Filter out any null notifications and ensure all notifications have required properties
+      const validNotifications = notifications.filter(
+        (notification) => 
+          notification && 
+          notification.id && 
+          notification.type && 
+          notification.title && 
+          notification.message
+      );
+
       // Apply filters
-      let filteredNotifications = notifications;
+      let filteredNotifications = validNotifications;
 
       if (filters.type && filters.type !== "all") {
         filteredNotifications = filteredNotifications.filter(
-          (n) => n.type === filters.type
+          (n) => n && n.type === filters.type
         );
       }
 
@@ -161,6 +175,7 @@ class NotificationsService {
       return {
         success: true,
         data: filteredNotifications,
+        message: "Notifications retrieved successfully",
       };
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -197,21 +212,22 @@ class NotificationsService {
           low: notifications.filter((n) => n.priority === "low").length,
         },
         by_type: {
-          shipment: notifications.filter((n) => n.type === "shipment").length,
-          system: notifications.filter((n) => n.type === "system").length,
-          user: notifications.filter((n) => n.type === "user").length,
-          alert: notifications.filter((n) => n.type === "alert").length,
-          capacity: notifications.filter((n) => n.type === "capacity").length,
-          quality: notifications.filter((n) => n.type === "quality").length,
-          efficiency: notifications.filter((n) => n.type === "efficiency")
+          shipment: notifications.filter((n) => n && n.type === "shipment").length,
+          system: notifications.filter((n) => n && n.type === "system").length,
+          user: notifications.filter((n) => n && n.type === "user").length,
+          alert: notifications.filter((n) => n && n.type === "alert").length,
+          capacity: notifications.filter((n) => n && n.type === "capacity").length,
+          quality: notifications.filter((n) => n && n.type === "quality").length,
+          efficiency: notifications.filter((n) => n && n.type === "efficiency")
             .length,
-          overdue: notifications.filter((n) => n.type === "overdue").length,
+          overdue: notifications.filter((n) => n && n.type === "overdue").length,
         },
       };
 
       return {
         success: true,
         data: stats,
+        message: "Notification statistics retrieved successfully",
       };
     } catch (error) {
       console.error("Error fetching notification stats:", error);
@@ -399,7 +415,7 @@ class NotificationsService {
     if (numberMatches && numberMatches.length > 0) {
       const firstNumber = parseInt(numberMatches[0]);
 
-      if (alert.type === "overdue" || alert.type === "quality") {
+      if ((alert.type === "overdue" || alert.type === "quality")) {
         metadata.item_count = firstNumber;
       } else if (alert.type === "capacity") {
         metadata.cbm_amount = firstNumber;
@@ -407,7 +423,7 @@ class NotificationsService {
     }
 
     // Extract threshold days from overdue alerts
-    if (alert.type === "overdue" && alert.message.includes("days")) {
+    if (alert.type === "overdue" && alert.message && alert.message.includes("days")) {
       const daysMatch = alert.message.match(/(\d+)\+?\s*days/);
       if (daysMatch) {
         metadata.threshold_days = parseInt(daysMatch[1]);
