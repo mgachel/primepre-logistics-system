@@ -148,12 +148,18 @@ class ApiClient {
     window.location.href = "/login";
   }
 
-  private extractErrorMessage(errorData: any, status: number): string {
+  private extractErrorMessage(errorData: unknown, status: number): string {
     if (errorData && typeof errorData === "object") {
-      if (typeof errorData.detail === "string") return errorData.detail;
+      // Type guard for detail property
+      if (
+        "detail" in errorData &&
+        typeof (errorData as { detail?: unknown }).detail === "string"
+      ) {
+        return (errorData as { detail: string }).detail;
+      }
 
       const parts: string[] = [];
-      for (const [key, val] of Object.entries(errorData)) {
+      for (const [key, val] of Object.entries(errorData as Record<string, unknown>)) {
         if (Array.isArray(val)) parts.push(`${key}: ${val.join(", ")}`);
         else if (typeof val === "string") parts.push(`${key}: ${val}`);
         else if (val && typeof val === "object")

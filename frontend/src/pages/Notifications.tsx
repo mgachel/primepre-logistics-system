@@ -128,10 +128,10 @@ export default function Notifications() {
       if (response.success) {
         setNotifications(
           notifications.map((notification) =>
-            notification.id === id
+            notification && notification.id === id
               ? { ...notification, read: true }
               : notification
-          )
+          ).filter(Boolean) // Remove any null/undefined items
         );
         toast({
           title: "Success",
@@ -154,10 +154,10 @@ export default function Notifications() {
       if (response.success) {
         setNotifications(
           notifications.map((notification) =>
-            notification.id === id
+            notification && notification.id === id
               ? { ...notification, read: false }
               : notification
-          )
+          ).filter(Boolean)
         );
         toast({
           title: "Success",
@@ -201,7 +201,7 @@ export default function Notifications() {
       const response = await notificationsService.markAllAsRead();
       if (response.success) {
         setNotifications(
-          notifications.map((notification) => ({ ...notification, read: true }))
+          notifications.filter(Boolean).map((notification) => ({ ...notification, read: true }))
         );
         toast({
           title: "Success",
@@ -599,7 +599,7 @@ export default function Notifications() {
               <span>Loading notifications...</span>
             </div>
           ) : allNotifications.length > 0 ? (
-            allNotifications.map((notification) => (
+            allNotifications.filter(Boolean).map((notification) => (
               <NotificationCard
                 key={notification.id}
                 notification={notification}
@@ -628,7 +628,7 @@ export default function Notifications() {
               <span>Loading notifications...</span>
             </div>
           ) : unreadNotifications.length > 0 ? (
-            unreadNotifications.map((notification) => (
+            unreadNotifications.filter(Boolean).map((notification) => (
               <NotificationCard
                 key={notification.id}
                 notification={notification}
@@ -656,7 +656,7 @@ export default function Notifications() {
               <span>Loading notifications...</span>
             </div>
           ) : readNotifications.length > 0 ? (
-            readNotifications.map((notification) => (
+            readNotifications.filter(Boolean).map((notification) => (
               <NotificationCard
                 key={notification.id}
                 notification={notification}
