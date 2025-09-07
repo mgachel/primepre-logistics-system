@@ -365,13 +365,13 @@ export default function CustomerShipments() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className="flex items-center space-x-2">
-                          {getTypeIcon(shipment.type)}
+                          {getTypeIcon(shipment?.type || 'Air Cargo')}
                           <div>
                             <div className="font-semibold">
                               {shipment.tracking_id || `CGO-${shipment.id}`}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {shipment.type} •{" "}
+                              {shipment?.type || 'Air Cargo'} •{" "}
                               {shipment.description || "No description"}
                             </div>
                           </div>

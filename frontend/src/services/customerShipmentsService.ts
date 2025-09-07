@@ -150,22 +150,28 @@ export const customerShipmentsService = {
     let allItems: Array<BackendCargoItem & { sourceType: "sea" | "air" }> = [];
 
     if (!filters.cargo_type || filters.cargo_type === "sea") {
-      const seaItems = (response.data.sea_cargo?.items || []).map((item) => ({
-        ...item,
-        sourceType: "sea" as const,
-      }));
+      const seaItems = (response.data.sea_cargo?.items || [])
+        .filter((item): item is BackendCargoItem => item != null)
+        .map((item) => ({
+          ...item,
+          sourceType: "sea" as const,
+        }));
       allItems = allItems.concat(seaItems);
     }
     if (!filters.cargo_type || filters.cargo_type === "air") {
-      const airItems = (response.data.air_cargo?.items || []).map((item) => ({
-        ...item,
-        sourceType: "air" as const,
-      }));
+      const airItems = (response.data.air_cargo?.items || [])
+        .filter((item): item is BackendCargoItem => item != null)
+        .map((item) => ({
+          ...item,
+          sourceType: "air" as const,
+        }));
       allItems = allItems.concat(airItems);
     }
 
     // Transform cargo items to customer shipments format
-    const shipments: CustomerShipment[] = allItems.map((item) => ({
+    const shipments: CustomerShipment[] = allItems
+      .filter((item): item is typeof item & { sourceType: "sea" | "air" } => item != null)
+      .map((item) => ({
       id: item.id,
       tracking_id: item.tracking_id,
       type: item.sourceType === "air" ? "Air Cargo" : "Sea Cargo",

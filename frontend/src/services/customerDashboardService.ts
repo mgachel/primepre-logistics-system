@@ -213,10 +213,11 @@ export const customerDashboardService = {
 
       // Transform cargo items to shipments format
       const recent_shipments: CustomerShipment[] = cargoItemsArray
+        .filter((item): item is BackendCargoItem => item != null) // Filter out null items
         .slice(0, 5)
         .map((item: BackendCargoItem) => {
           // Find the container for this item
-          const container = containersArray.find((c: BackendCargoContainer) => c.container_id === item.container);
+          const container = containersArray.find((c: BackendCargoContainer) => c && c.container_id === item.container);
           
           return {
             id: item.tracking_id || item.id,

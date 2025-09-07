@@ -176,14 +176,14 @@ export default function Dashboard() {
     const mapContainer =
       (type: "sea" | "air") => (c: BackendCargoContainer) => ({
         type,
-        container: c.container_id,
+        container: c?.container_id || '',
         client: "-",
-        route: c.route || "-",
-        eta: c.eta || "-",
+        route: c?.route || "-",
+        eta: c?.eta || "-",
         status: "in-transit" as const,
       });
-    const sea = (allInTransit?.sea || []).map(mapContainer("sea"));
-    const air = (allInTransit?.air || []).map(mapContainer("air"));
+    const sea = (allInTransit?.sea || []).filter(Boolean).map(mapContainer("sea"));
+    const air = (allInTransit?.air || []).filter(Boolean).map(mapContainer("air"));
     return [...sea, ...air];
   }, [allInTransit]);
 
@@ -296,12 +296,12 @@ export default function Dashboard() {
     status: "in-transit";
   };
 
-  const rows: Row[] = transitingCargo.map((c) => ({
-    type: c.type,
-    container: c.container,
-    client: c.client,
-    route: c.route,
-    eta: c.eta || null,
+  const rows: Row[] = transitingCargo.filter(Boolean).map((c) => ({
+    type: c?.type || 'sea',
+    container: c?.container || '',
+    client: c?.client || '-',
+    route: c?.route || '-',
+    eta: c?.eta || null,
     status: "in-transit",
   }));
 
