@@ -318,22 +318,26 @@ class NotificationsService {
   ): Notification {
     return {
       id,
-      type: this.mapAlertTypeToNotificationType(alert.type),
+      type: this.mapAlertTypeToNotificationType(alert?.type || 'system'),
       title: this.generateTitleFromAlert(alert),
-      message: alert.message,
-      timestamp: alert.timestamp || new Date().toISOString(),
+      message: alert?.message || 'No message available',
+      timestamp: alert?.timestamp || new Date().toISOString(),
       read: false, // All alerts are initially unread
-      priority: this.mapAlertLevelToPriority(alert.level),
-      action_required: alert.action_required,
-      endpoint: alert.endpoint,
+      priority: this.mapAlertLevelToPriority(alert?.level || 'low'),
+      action_required: alert?.action_required || false,
+      endpoint: alert?.endpoint || '',
       warehouse,
       metadata: this.extractMetadataFromAlert(alert),
     };
   }
 
   private mapAlertTypeToNotificationType(
-    alertType: string
+    alertType: string | null | undefined
   ): Notification["type"] {
+    if (!alertType) {
+      return "alert"; // Default fallback
+    }
+    
     const typeMap: Record<string, Notification["type"]> = {
       overdue: "overdue",
       capacity: "capacity",
@@ -348,18 +352,26 @@ class NotificationsService {
   }
 
   private mapAlertLevelToPriority(
-    level: SmartAlert["level"]
+    level: SmartAlert["level"] | null | undefined
   ): Notification["priority"] {
+    if (!level) {
+      return "low"; // Default fallback
+    }
+    
     const priorityMap: Record<SmartAlert["level"], Notification["priority"]> = {
       critical: "critical",
       warning: "high",
       info: "medium",
     };
 
-    return priorityMap[level];
+    return priorityMap[level] || "low";
   }
 
-  private generateTitleFromAlert(alert: SmartAlert): string {
+  private generateTitleFromAlert(alert: SmartAlert | null): string {
+    if (!alert || !alert.type) {
+      return "System Alert";
+    }
+    
     const titleMap: Record<string, string> = {
       overdue: "Overdue Items Alert",
       capacity: "Warehouse Capacity Alert",
@@ -374,8 +386,12 @@ class NotificationsService {
   }
 
   private extractMetadataFromAlert(
-    alert: SmartAlert
+    alert: SmartAlert | null
   ): Notification["metadata"] {
+    if (!alert || !alert.message) {
+      return {};
+    }
+    
     const metadata: Notification["metadata"] = {};
 
     // Extract numbers from message for metadata
