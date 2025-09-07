@@ -323,7 +323,7 @@ export default function Notifications() {
                 notification.read ? "bg-muted" : "bg-primary/10"
               }`}
             >
-              {getIcon(notification.type)}
+              {getIcon(notification?.type || 'system')}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -336,7 +336,7 @@ export default function Notifications() {
                 </h4>
                 <Badge
                   variant="outline"
-                  className={getPriorityColor(notification.priority)}
+                  className={getPriorityColor(notification?.priority || 'low')}
                 >
                   {notification.priority}
                 </Badge>
