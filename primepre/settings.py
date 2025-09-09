@@ -10,29 +10,31 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
-from pathlib import Path
 import os
+import dj_database_url
+from pathlib import Path
 from datetime import timedelta
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-
 from decouple import config
 
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
-
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-fdwfgv_359rpn$jj7=j24rtc=#3f)-0f7e=1r1fsz$v@#%h@ha')
+SECRET_KEY = config(
+    'SECRET_KEY', 
+    default='django-insecure-fdwfgv_359rpn$jj7=j24rtc=#3f)-0f7e=1r1fsz$v@#%h@ha'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
+
+# Security settings for production
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
 
 ALLOWED_HOSTS = [
     "primepre-logistics-backend.herokuapp.com",
@@ -102,16 +104,20 @@ WSGI_APPLICATION = 'primepre.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
-
-import dj_database_url
-
 DATABASES = {
     'default': dj_database_url.config(
         default=config('DATABASE_URL', default='sqlite:///db.sqlite3'),
         conn_max_age=600,
-        ssl_require=False
+        # Only apply SSL settings for PostgreSQL, not SQLite
+        conn_health_checks=True,
     )
 }
+
+# Apply SSL settings only for production PostgreSQL
+if not DEBUG and 'postgresql' in DATABASES['default']['ENGINE']:
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'require',
+    }
 
 
 
@@ -155,38 +161,56 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
 # Custom user model
 AUTH_USER_MODEL = 'users.CustomerUser'
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'Primepre <no-reply@primepre.com>'
+# Email configuration
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND', 
+    default='django.core.mail.backends.console.EmailBackend'
+)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Primepre <no-reply@primepre.com>')
+
+# Email settings for production
+if not DEBUG:
+    EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+    EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+    EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+    EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ] + (['rest_framework.renderers.BrowsableAPIRenderer'] if DEBUG else []),
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20
+    'PAGE_SIZE': 20,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/day'
+    }
 }
 
 # JWT settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60 if DEBUG else 15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -197,6 +221,7 @@ SIMPLE_JWT = {
     'VERIFYING_KEY': None,
     'AUDIENCE': None,
     'ISSUER': None,
+    'JTI_CLAIM': 'jti',
     
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
@@ -205,37 +230,37 @@ SIMPLE_JWT = {
     
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
+    
+    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
+    
+    'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
+    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
 
-def csv_env(name: str, default: str):
-    return [x.strip() for x in os.getenv(name, default).split(",") if x.strip()]
-
-# CORS settings for frontend
-# IMPORTANT: Previously this was defined as a single string in parentheses which
-# meant CORS matching failed and no Access-Control-Allow-Origin header was sent.
-# We now parse from env or fall back to a proper list.
-def csv_list(value: str):
+# CORS configuration
+def csv_list(value: str) -> list:
+    """Convert comma-separated string to list"""
     return [v.strip() for v in value.split(',') if v.strip()]
 
-# CORS configuration - Fixed for Heroku production
-# Allow all origins temporarily to resolve immediate login blockage
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS settings - Secure configuration
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=DEBUG, cast=bool)
 
-# Specific origins list (fallback when CORS_ALLOW_ALL_ORIGINS is False)
-CORS_ALLOWED_ORIGINS = [
-    'https://primepre-frontend-ba6f55cc48e5.herokuapp.com',
-    'https://primepre-logistics-backend.herokuapp.com',
-    'https://primepre-logistics-backend-fb2561752d16.herokuapp.com',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-]
+# Specific allowed origins for production
+CORS_ALLOWED_ORIGINS = csv_list(config(
+    'CORS_ALLOWED_ORIGINS',
+    default='https://primepre-frontend-ba6f55cc48e5.herokuapp.com,'
+            'https://primepre-logistics-backend-fb2561752d16.herokuapp.com,'
+            'http://localhost:3000,'
+            'http://127.0.0.1:3000,'
+            'http://localhost:5173,'
+            'http://127.0.0.1:5173'
+))
 
 # Allow credentials for authentication
 CORS_ALLOW_CREDENTIALS = True
 
-# Allow all common headers
+# CORS headers and methods configuration
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding', 
@@ -253,7 +278,6 @@ CORS_ALLOW_HEADERS = [
     'pragma',
 ]
 
-# Allow all common methods
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -262,7 +286,6 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
-
 
 # Cache preflight responses for 1 day
 CORS_PREFLIGHT_MAX_AGE = 86400
@@ -274,19 +297,78 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://127\.0\.0\.1:\d+$",
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://primepre-frontend-ba6f55cc48e5.herokuapp.com",
-    # "https://primepre-logistics-backend.herokuapp.com", 
-    "https://primepre-logistics-backend-fb2561752d16.herokuapp.com",
-    "https://*.herokuapp.com",
-]
+# CSRF and Security Configuration
+CSRF_TRUSTED_ORIGINS = csv_list(config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='https://primepre-frontend-ba6f55cc48e5.herokuapp.com,'
+            'https://primepre-logistics-backend-fb2561752d16.herokuapp.com,'
+            'https://*.herokuapp.com'
+))
 
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# SSL and security headers for production
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = "None"
+    CSRF_COOKIE_SAMESITE = "None"
 
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SAMESITE = "None"
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'django.log'),
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'] + (['file'] if not DEBUG else []),
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'users': {
+            'handlers': ['console'] + (['file'] if not DEBUG else []),
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
-# Custom user model
-AUTH_USER_MODEL = 'users.CustomerUser'
+# Cache configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache' if DEBUG else 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': config('REDIS_URL', default='redis://127.0.0.1:6379/1') if not DEBUG else '',
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,
+        }
+    }
+}
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
