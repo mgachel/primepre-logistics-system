@@ -38,16 +38,16 @@ class Rate(models.Model):
         verbose_name_plural = "Rates"
         ordering = ["category", "rate_type", "origin_country", "destination_country", "title"]
         constraints = [
-            # One title per route/type/category/office; adjust if you want title globally unique
+            # One title per route/type/category/office
             models.UniqueConstraint(
                 fields=["category", "rate_type", "origin_country", "destination_country", "office_name", "title"],
                 name="uniq_rate_by_route_office_title",
             ),
             
+            # One amount per route/type/category/office (without deferrable for SQLite compatibility)
             models.UniqueConstraint(
                 fields=["category", "rate_type", "origin_country", "destination_country", "office_name", "amount"],
                 name="uniq_rate_by_route_office_amount",
-                deferrable=models.Deferrable.DEFERRED,
             ),
         ]
         indexes = [
