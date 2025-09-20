@@ -60,6 +60,7 @@ export default function Claims() {
   const [success, setSuccess] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [shippingMarkFilter, setShippingMarkFilter] = useState('');
   const [selectedClaim, setSelectedClaim] = useState<AdminClaim | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
@@ -81,6 +82,7 @@ export default function Claims() {
         claimsService.getAllClaims({
           status: statusFilter && statusFilter !== 'all' ? statusFilter : undefined,
           search: searchTerm && searchTerm.trim() !== '' ? searchTerm : undefined,
+          shipping_mark: shippingMarkFilter && shippingMarkFilter.trim() !== '' ? shippingMarkFilter : undefined,
         }),
         claimsService.getClaimsSummary()
       ]);
@@ -99,10 +101,19 @@ export default function Claims() {
       console.log('claimsResponse.data exists:', !!claimsResponse.data);
       
       // Handle the response properly - check if the request was successful
+      console.log('=== CLAIMS DEBUGGING ===');
+      console.log('claimsResponse:', claimsResponse);
+      console.log('claimsResponse.success:', claimsResponse.success);
+      console.log('claimsResponse.data:', claimsResponse.data);
+      console.log('Type of claimsResponse.data:', typeof claimsResponse.data);
+      console.log('Is claimsResponse.data an array:', Array.isArray(claimsResponse.data));
+      console.log('claimsResponse.data length:', claimsResponse.data?.length);
+      
       if (claimsResponse.success && claimsResponse.data) {
         const claimsData = Array.isArray(claimsResponse.data) ? claimsResponse.data : [];
         console.log('Setting claims data:', claimsData);
         console.log('Claims data length:', claimsData.length);
+        console.log('Individual claims:', claimsData.map(c => ({ id: c.id, shipping_mark: c.shipping_mark, customer_name: c.customer_name })));
         setClaims(claimsData);
       } else {
         console.log('Claims response unsuccessful or no data, setting empty array');
@@ -123,7 +134,7 @@ export default function Claims() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter, searchTerm, shippingMarkFilter]);
 
   // Update claim status
   const handleStatusUpdate = async () => {
@@ -134,19 +145,20 @@ export default function Claims() {
       setError(null);
       setSuccess(null);
 
+      console.log('=== STATUS UPDATE DEBUG ===');
+      console.log('Updating claim:', selectedClaim.id, 'with status:', statusUpdate);
+
       const response = await claimsService.updateClaimStatus(selectedClaim.id, statusUpdate);
       
-      // Update the claim in the list
-      setClaims(prev => prev.map(claim => 
-        claim.id === selectedClaim.id ? response.data : claim
-      ));
+      console.log('Update response:', response);
+      console.log('Updated claim data:', response.data);
+      
+      // Instead of just updating the single claim, reload all claims to ensure data integrity
+      console.log('Reloading all claims after status update...');
+      await loadData();
       
       setSelectedClaim(response.data);
       setSuccess('Claim status updated successfully!');
-      
-      // Reload summary to get updated counts
-      const summaryResponse = await claimsService.getClaimsSummary();
-      setSummary(summaryResponse.data);
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
@@ -177,8 +189,21 @@ export default function Claims() {
     
     const matchesStatus = statusFilter === 'all' || statusFilter === '' || claim.status === statusFilter;
     
-    return matchesSearch && matchesStatus;
+    const matchesShippingMark = shippingMarkFilter === '' || 
+      claim.shipping_mark.toLowerCase().includes(shippingMarkFilter.toLowerCase());
+    
+    return matchesSearch && matchesStatus && matchesShippingMark;
   });
+
+  // Debug filtered claims
+  console.log('=== FILTERED CLAIMS DEBUG ===');
+  console.log('Total claims in state:', claims?.length || 0);
+  console.log('Filtered claims count:', filteredClaims.length);
+  console.log('Search term:', searchTerm);
+  console.log('Status filter:', statusFilter);
+  console.log('Shipping mark filter:', shippingMarkFilter);
+  console.log('All claims in state:', claims);
+  console.log('Filtered claims:', filteredClaims);
 
   // Get status icon
   const getStatusIcon = (status: string) => {
@@ -196,6 +221,12 @@ export default function Claims() {
       default:
         return <FileText className="h-4 w-4" />;
     }
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setShippingMarkFilter('');
   };
 
   // Open claim detail modal
@@ -260,7 +291,7 @@ export default function Claims() {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Claims</CardTitle>
@@ -268,6 +299,7 @@ export default function Claims() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{summary.total_claims}</div>
+              <p className="text-xs text-muted-foreground">All time</p>
             </CardContent>
           </Card>
           
@@ -278,6 +310,7 @@ export default function Claims() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">{summary.pending_claims}</div>
+              <p className="text-xs text-muted-foreground">Needs review</p>
             </CardContent>
           </Card>
           
@@ -288,6 +321,18 @@ export default function Claims() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">{summary.under_review}</div>
+              <p className="text-xs text-muted-foreground">In progress</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Approved</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{summary.status_breakdown.APPROVED}</div>
+              <p className="text-xs text-muted-foreground">Approved</p>
             </CardContent>
           </Card>
           
@@ -297,7 +342,8 @@ export default function Claims() {
               <CheckCircle className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{summary.resolved_claims}</div>
+              <div className="text-2xl font-bold text-green-600">{summary.status_breakdown.RESOLVED}</div>
+              <p className="text-xs text-muted-foreground">Completed</p>
             </CardContent>
           </Card>
           
@@ -308,6 +354,7 @@ export default function Claims() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{summary.recent_claims}</div>
+              <p className="text-xs text-muted-foreground">This week</p>
             </CardContent>
           </Card>
         </div>
@@ -316,8 +363,8 @@ export default function Claims() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex gap-4 items-center">
-            <div className="flex-1">
+          <div className="flex gap-4 items-center flex-wrap">
+            <div className="flex-1 min-w-[300px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -327,6 +374,13 @@ export default function Claims() {
                   className="pl-10"
                 />
               </div>
+            </div>
+            <div className="w-[180px]">
+              <Input
+                placeholder="Filter by shipping mark"
+                value={shippingMarkFilter}
+                onChange={(e) => setShippingMarkFilter(e.target.value)}
+              />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
@@ -342,6 +396,11 @@ export default function Claims() {
                 <SelectItem value="REJECTED">Rejected</SelectItem>
               </SelectContent>
             </Select>
+            {(searchTerm || statusFilter !== 'all' || shippingMarkFilter) && (
+              <Button variant="outline" onClick={clearFilters} size="sm">
+                Clear Filters
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -376,7 +435,8 @@ export default function Claims() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Claim #</TableHead>
-                    <TableHead>Customer</TableHead>
+                    <TableHead>Shipping Mark</TableHead>
+                    <TableHead>Customer Details</TableHead>
                     <TableHead>Tracking ID</TableHead>
                     <TableHead>Item</TableHead>
                     <TableHead>Status</TableHead>
@@ -385,50 +445,79 @@ export default function Claims() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredClaims.map((claim) => (
-                    <TableRow key={claim.id}>
-                      <TableCell className="font-medium">#{claim.id}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{claim.customer_name}</div>
-                          <div className="text-xs text-muted-foreground">{claim.shipping_mark}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{claim.tracking_id}</TableCell>
-                      <TableCell>
-                        <div className="max-w-[200px] truncate" title={claim.item_name}>
-                          {claim.item_name}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={claimsService.getStatusBadgeVariant(claim.status)} 
-                          className="flex items-center gap-1 w-fit"
-                        >
-                          {getStatusIcon(claim.status)}
-                          {claimsService.getStatusLabel(claim.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>{formatDate(claim.created_at)}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatRelative(claim.created_at)}
+                  {filteredClaims.map((claim, index) => {
+                    // Add safety checks for claim data but be less strict
+                    if (!claim) {
+                      console.warn('Null claim at index:', index);
+                      return null;
+                    }
+                    
+                    // Use index as fallback key if id is missing
+                    const claimKey = claim.id || `claim-${index}`;
+                    
+                    return (
+                      <TableRow key={claimKey}>
+                        <TableCell className="font-medium">#{claim.id || 'N/A'}</TableCell>
+                        <TableCell>
+                          <div className="font-mono text-lg font-semibold text-blue-600">
+                            {claim.shipping_mark || 'N/A'}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openClaimDetail(claim)}
-                        >
-                          <Eye className="h-3 w-3 mr-1" />
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{claim.customer_name || 'Unknown'}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {claim.customer_phone && (
+                                <div className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {claim.customer_phone}
+                                </div>
+                              )}
+                              {claim.customer_region && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {claim.customer_region}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{claim.tracking_id || 'N/A'}</TableCell>
+                        <TableCell>
+                          <div className="max-w-[200px] truncate" title={claim.item_name || ''}>
+                            {claim.item_name || 'N/A'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            className={`flex items-center gap-1 w-fit ${claimsService.getStatusBadgeColor(claim.status || 'PENDING')}`}
+                          >
+                            {getStatusIcon(claim.status || 'PENDING')}
+                            {claimsService.getStatusLabel(claim.status || 'PENDING')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{claim.created_at ? formatDate(claim.created_at) : 'N/A'}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {claim.created_at ? formatRelative(claim.created_at) : 'N/A'}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openClaimDetail(claim)}
+                            disabled={!claim.id}
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -438,7 +527,7 @@ export default function Claims() {
 
       {/* Claim Detail Modal */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Claim #{selectedClaim?.id} Details</DialogTitle>
             <DialogDescription>
@@ -446,41 +535,53 @@ export default function Claims() {
             </DialogDescription>
           </DialogHeader>
           {selectedClaim && (
-            <div className="space-y-6">
+            <div className="space-y-6 pr-2">{/* Added right padding for scrollbar space */}
               {/* Customer Information */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Customer</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <User className="h-4 w-4" />
-                    <span>{selectedClaim.customer_name}</span>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Shipping Mark</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Package className="h-4 w-4" />
-                    <span className="font-mono">{selectedClaim.shipping_mark}</span>
-                  </div>
-                </div>
-                {selectedClaim.customer_phone && (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-sm font-semibold mb-3 text-gray-700">Customer Information</h3>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">Customer Name</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <Phone className="h-4 w-4" />
-                      <span>{selectedClaim.customer_phone}</span>
+                      <User className="h-4 w-4" />
+                      <span className="font-medium">{selectedClaim.customer_name}</span>
                     </div>
                   </div>
-                )}
-                {selectedClaim.customer_email && (
                   <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">Shipping Mark</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <Mail className="h-4 w-4" />
-                      <span>{selectedClaim.customer_email}</span>
+                      <Package className="h-4 w-4" />
+                      <span className="font-mono text-lg font-semibold text-blue-600">{selectedClaim.shipping_mark}</span>
                     </div>
                   </div>
-                )}
+                  {selectedClaim.customer_phone && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Phone className="h-4 w-4" />
+                        <span>{selectedClaim.customer_phone}</span>
+                      </div>
+                    </div>
+                  )}
+                  {selectedClaim.customer_email && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Mail className="h-4 w-4" />
+                        <span>{selectedClaim.customer_email}</span>
+                      </div>
+                    </div>
+                  )}
+                  {selectedClaim.customer_region && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Region</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <MapPin className="h-4 w-4" />
+                        <span>{selectedClaim.customer_region.replace('_', ' ')}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Claim Information */}

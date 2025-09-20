@@ -1,4 +1,5 @@
 import { apiClient, ApiResponse } from './api';
+import { clearAllAuthCache } from '@/lib/auth-utils';
 
 export interface User {
   id: number;
@@ -57,9 +58,17 @@ export const authService = {
   // Login user
   async login(credentials: LoginCredentials): Promise<ApiResponse<LoginResponse>> {
     try {
+      console.log('🔐 AuthService: Starting login process...');
+      // Clear any cached authentication data before attempting login
+      this.clearAuthCache();
+      
+      console.log('📡 AuthService: Making login request to server...');
       const response = await apiClient.post<LoginResponse>('/api/auth/login/', credentials);
       
+      console.log('📥 AuthService: Received response:', response.success ? 'SUCCESS' : 'FAILED');
+      
       if (response.success && response.data.access) {
+        console.log('💾 AuthService: Storing authentication tokens...');
         localStorage.setItem('access_token', response.data.access);
         localStorage.setItem('refresh_token', response.data.refresh);
         localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -68,17 +77,38 @@ export const authService = {
         if (response.data.admin_info) {
           localStorage.setItem('admin_info', JSON.stringify(response.data.admin_info));
         }
+        
+        console.log('✅ AuthService: Login successful, tokens stored');
+      } else {
+        console.log('❌ AuthService: Login failed - no access token received');
       }
       
-      return response;
+      // Return the data in the format expected by authStore
+      return {
+        success: response.success,
+        data: response.data,
+        message: response.message,
+        tokens: {
+          access: response.data.access,
+          refresh: response.data.refresh
+        },
+        user: response.data.user
+      };
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ AuthService: Login error:', error);
+      // Clear auth cache on login failure
+      this.clearAuthCache();
       return {
         success: false,
         data: {} as LoginResponse,
         message: 'Login failed. Please check your credentials.',
       };
     }
+  },
+
+  // Clear authentication cache
+  clearAuthCache() {
+    clearAllAuthCache();
   },
 
   // Register user
@@ -111,10 +141,8 @@ export const authService = {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('admin_info');
+      // Clear all authentication data and cache
+      this.clearAuthCache();
     }
     
     return { success: true, data: undefined };

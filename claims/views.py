@@ -3,14 +3,18 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
+from django.db import transaction
+import logging
 from .models import Claim
 from .serializers import (
     ClaimSerializer, 
-    ClaimCreateSerializer, 
+    ClaimCreateSerializer,
     AdminClaimSerializer,
     ClaimStatusUpdateSerializer
 )
 from users.permissions import IsCustomer, IsAdminUser
+
+logger = logging.getLogger(__name__)
 
 
 class CustomerClaimListCreateView(generics.ListCreateAPIView):
@@ -20,13 +24,9 @@ class CustomerClaimListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        # Customers can only see their own claims
+        """Return claims for the authenticated customer."""
         queryset = Claim.objects.filter(customer=self.request.user)
-        print(f"Getting claims for user: {self.request.user}")
-        print(f"User role: {getattr(self.request.user, 'user_role', 'No role')}")
-        print(f"Claims found: {queryset.count()}")
-        for claim in queryset:
-            print(f"  - Claim {claim.id}: {claim.tracking_id} - {claim.status}")
+        logger.debug(f"Getting claims for user: {self.request.user} (role: {getattr(self.request.user, 'user_role', 'No role')}) - Found: {queryset.count()}")
         return queryset
     
     def get_serializer_class(self):
@@ -35,18 +35,18 @@ class CustomerClaimListCreateView(generics.ListCreateAPIView):
         return ClaimSerializer
     
     def list(self, request, *args, **kwargs):
-        """Override list to add debugging"""
+        """List claims for the authenticated customer."""
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
-        print(f"Serialized data: {serializer.data}")
+        logger.debug(f"Serialized data for user {request.user}: {serializer.data}")
         return Response(serializer.data)
     
     def perform_create(self, serializer):
-        # Automatically link the claim to the authenticated customer
-        print(f"Creating claim for user: {self.request.user}")
-        print(f"User role: {getattr(self.request.user, 'user_role', 'No role')}")
-        claim = serializer.save(customer=self.request.user)
-        print(f"Created claim: {claim.id} for customer: {claim.customer}")
+        """Create a claim and link to the authenticated customer. Uses atomic transaction."""
+        logger.info(f"Creating claim for user: {self.request.user} (role: {getattr(self.request.user, 'user_role', 'No role')})")
+        with transaction.atomic():
+            claim = serializer.save(customer=self.request.user)
+        logger.info(f"Created claim: {claim.id} for customer: {claim.customer}")
         return claim
 
 
@@ -70,26 +70,23 @@ class AdminClaimListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
     
     def get_queryset(self):
+        """Return all claims, with optional filters for admin users."""
         queryset = Claim.objects.select_related('customer').all()
-        print(f"Admin claims - Total claims in DB: {queryset.count()}")
-        
+        logger.debug(f"Admin claims - Total claims in DB: {queryset.count()}")
         # Filter by status if provided
         status_filter = self.request.query_params.get('status', None)
         if status_filter:
             queryset = queryset.filter(status=status_filter)
-            print(f"Admin claims - After status filter '{status_filter}': {queryset.count()}")
-        
+            logger.debug(f"Admin claims - After status filter '{status_filter}': {queryset.count()}")
         # Filter by shipping mark if provided
         shipping_mark = self.request.query_params.get('shipping_mark', None)
         if shipping_mark:
             queryset = queryset.filter(shipping_mark__icontains=shipping_mark)
-            print(f"Admin claims - After shipping_mark filter '{shipping_mark}': {queryset.count()}")
-        
+            logger.debug(f"Admin claims - After shipping_mark filter '{shipping_mark}': {queryset.count()}")
         # Filter by tracking ID if provided
         tracking_id = self.request.query_params.get('tracking_id', None)
         if tracking_id:
             queryset = queryset.filter(tracking_id__icontains=tracking_id)
-        
         # Search functionality
         search = self.request.query_params.get('search', None)
         if search:
@@ -99,12 +96,10 @@ class AdminClaimListView(generics.ListAPIView):
                 Q(tracking_id__icontains=search) |
                 Q(shipping_mark__icontains=search)
             )
-            print(f"Admin claims - After search filter '{search}': {queryset.count()}")
-        
-        print(f"Admin claims - Final queryset count: {queryset.count()}")
+            logger.debug(f"Admin claims - After search filter '{search}': {queryset.count()}")
+        logger.debug(f"Admin claims - Final queryset count: {queryset.count()}")
         for claim in queryset[:5]:  # Show first 5 claims
-            print(f"  - Claim {claim.id}: {claim.tracking_id} by {claim.customer}")
-        
+            logger.debug(f"  - Claim {claim.id}: {claim.tracking_id} by {claim.customer}")
         return queryset
 
 
@@ -116,6 +111,7 @@ class AdminClaimDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
     
     def get_serializer_class(self):
+        """Return appropriate serializer for admin claim detail/update."""
         if self.request.method in ['PUT', 'PATCH']:
             return ClaimStatusUpdateSerializer
         return AdminClaimSerializer

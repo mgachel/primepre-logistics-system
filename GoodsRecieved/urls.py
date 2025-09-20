@@ -21,13 +21,13 @@ customer_router.register(r'ghana', CustomerGoodsReceivedGhanaViewSet, basename='
 # URL patterns
 urlpatterns = [
     # Admin/Staff endpoints (existing)
-    path('api/goods/', include(router.urls)),
+    path('', include(router.urls)),
     
     # Customer-specific endpoints (new)
-    path('api/customer/goods/', include(customer_router.urls)),
+    path('customer/', include(customer_router.urls)),
     
     # Customer dashboard
-    path('api/customer/dashboard/', CustomerDashboardView.as_view(), name='customer-dashboard'),
+    path('customer/dashboard/', CustomerDashboardView.as_view(), name='customer-dashboard'),
 ]
 
 # This creates the following endpoints:

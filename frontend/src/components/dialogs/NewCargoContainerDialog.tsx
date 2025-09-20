@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cargoService } from "@/services/cargoService";
+import { ratesService, Rate } from "@/services/ratesService";
 
 type Props = {
   open: boolean;
@@ -17,6 +18,8 @@ type Props = {
 export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea', onCreated }: Props) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [rates, setRates] = useState<Rate[]>([]);
+  const [loadingRates, setLoadingRates] = useState(false);
   const [form, setForm] = useState({
     cargo_type: defaultType as 'sea' | 'air',
     container_id: "",
@@ -34,6 +37,37 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
     if (open) setForm((f)=>({ ...f, cargo_type: defaultType }));
   }, [open, defaultType]);
 
+  // Clear CBM and weight based on cargo type
+  React.useEffect(()=>{
+    if (form.cargo_type === 'air') {
+      setForm((f)=>({ ...f, cbm: "" }));
+    } else if (form.cargo_type === 'sea') {
+      setForm((f)=>({ ...f, weight: "", cbm: "" }));
+    }
+  }, [form.cargo_type]);
+
+  // Load rates based on cargo type
+  useEffect(() => {
+    const loadRates = async () => {
+      if (!open) return;
+      
+      setLoadingRates(true);
+      try {
+        const rateType = form.cargo_type === 'sea' ? 'SEA_RATES' : 'AIR_RATES';
+        const response = await ratesService.getRates({ rate_type: rateType });
+        if (response.success && response.data?.results) {
+          setRates(response.data.results);
+        }
+      } catch (error) {
+        console.error('Failed to load rates:', error);
+      } finally {
+        setLoadingRates(false);
+      }
+    };
+
+    loadRates();
+  }, [open, form.cargo_type]);
+
   const disabled = useMemo(()=>{
     return !form.container_id || !form.load_date || !form.eta || !form.route || !form.cargo_type;
   }, [form]);
@@ -46,8 +80,7 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
       const payload = {
         container_id: form.container_id.trim(),
         cargo_type: form.cargo_type,
-        weight: form.weight ? Number(form.weight) : null,
-        cbm: form.cbm ? Number(form.cbm) : null,
+        ...(form.cargo_type === 'air' && { weight: form.weight ? Number(form.weight) : null }),
         load_date: form.load_date,
         eta: form.eta,
         route: form.route.trim(),
@@ -112,18 +145,35 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
               <Input id="route" placeholder="China to Ghana" value={form.route} onChange={(e)=> setForm(f=> ({...f, route: e.target.value}))} required />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="cbm">CBM</Label>
-              <Input id="cbm" type="number" step="0.01" placeholder="0.00" value={form.cbm} onChange={(e)=> setForm(f=> ({...f, cbm: e.target.value}))} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="weight">Weight (kg)</Label>
-              <Input id="weight" type="number" step="0.01" placeholder="0.00" value={form.weight} onChange={(e)=> setForm(f=> ({...f, weight: e.target.value}))} />
-            </div>
+            {form.cargo_type === 'air' && (
+              <div className="space-y-2">
+                <Label htmlFor="weight">Weight (kg)</Label>
+                <Input id="weight" type="number" step="0.01" placeholder="0.00" value={form.weight} onChange={(e)=> setForm(f=> ({...f, weight: e.target.value}))} />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="rates">Rates (USD)</Label>
-              <Input id="rates" type="number" step="0.01" placeholder="0.00" value={form.rates} onChange={(e)=> setForm(f=> ({...f, rates: e.target.value}))} />
+              <Select value={form.rates} onValueChange={(v)=> setForm(f=> ({...f, rates: v}))}>
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingRates ? "Loading rates..." : "Select a rate"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingRates ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading rates...</div>
+                  ) : rates.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">No rates available</div>
+                  ) : (
+                    rates
+                      .filter(rate => rate.amount != null && rate.amount.toString() !== "")
+                      .map((rate) => (
+                        <SelectItem key={rate.id} value={rate.amount.toString()}>
+                          {rate.title} - ${rate.amount} ({rate.route})
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

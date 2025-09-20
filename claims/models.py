@@ -15,6 +15,11 @@ class Claim(models.Model):
         help_text="Customer who submitted this claim"
     )
     
+    shipping_mark = models.CharField(
+        max_length=50,
+        help_text="Customer's shipping mark (copied from customer record)"
+    )
+    
     # Core claim information
     tracking_id = models.CharField(
         max_length=100, 
@@ -42,12 +47,6 @@ class Claim(models.Model):
         choices=STATUS_CHOICES,
         default='PENDING',
         help_text="Current status of the claim"
-    )
-    
-    # Additional metadata
-    shipping_mark = models.CharField(
-        max_length=50,
-        help_text="Customer's shipping mark (copied from customer record)"
     )
     
     # Timestamps

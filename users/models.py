@@ -45,13 +45,35 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
         ('BUSINESS', 'Business'),
     ]
     
+    # Region Choices (16 Regions of Ghana)
+    REGION_CHOICES = [
+        ('GREATER_ACCRA', 'Greater Accra'),
+        ('ASHANTI', 'Ashanti'),
+        ('WESTERN', 'Western'),
+        ('CENTRAL', 'Central'),
+        ('VOLTA', 'Volta'),
+        ('EASTERN', 'Eastern'),
+        ('NORTHERN', 'Northern'),
+        ('UPPER_EAST', 'Upper East'),
+        ('UPPER_WEST', 'Upper West'),
+        ('BRONG_AHAFO', 'Brong Ahafo'),
+        ('WESTERN_NORTH', 'Western North'),
+        ('AHAFO', 'Ahafo'),
+        ('BONO', 'Bono'),
+        ('BONO_EAST', 'Bono East'),
+        ('OTI', 'Oti'),
+        ('NORTH_EAST', 'North East'),
+        ('SAVANNAH', 'Savannah'),
+    ]
+    
     # Basic Information
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
-    company_name = models.CharField(max_length=100, blank=True)
+    nickname = models.CharField(max_length=50, blank=True, help_text="Optional nickname or display name")
+    company_name = models.CharField(max_length=100, blank=True, help_text="Company or business name")
     email = models.EmailField(unique=True, blank=True, null=True)
     phone = models.CharField(max_length=15, unique=True)
-    region = models.CharField(max_length=50)
+    region = models.CharField(max_length=20, choices=REGION_CHOICES)
     shipping_mark = models.CharField(max_length=20, unique=True)
     
     # User Classification
@@ -97,11 +119,12 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
     # Warehouse Access
     accessible_warehouses = models.JSONField(
         default=list,
-        help_text="List of warehouses this user can access (e.g., ['china', 'ghana'])"
+        help_text="List of warehouses this user can access (e.g., ['accra', 'kumasi', 'tema'])"
     )
     
     # Status fields
     is_active = models.BooleanField(default=True)
+    is_verified = models.BooleanField(default=False, help_text="Phone number verified via SMS")
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
     last_login_ip = models.GenericIPAddressField(null=True, blank=True)
@@ -199,16 +222,184 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
             permissions.append("Admin Panel Access")
         return permissions
 
+    @classmethod
+    def generate_shipping_mark_suggestions(cls, first_name, last_name, company_name=None):
+        """
+        Generate 5 unique shipping mark suggestions with PM prefix.
+        Derived from user's details (name, company) ensuring uniqueness.
+        """
+        suggestions = []
+        first_name = first_name.strip().upper()
+        last_name = last_name.strip().upper()
+        
+        # Base patterns derived from name
+        base_patterns = [
+            f"PM-{first_name[:2]}{last_name[:2]}",      # PM-JODO (John Doe)
+            f"PM-{first_name[:1]}{last_name[:3]}",      # PM-JDOE
+            f"PM-{first_name[:3]}{last_name[:1]}",      # PM-JOHD
+            f"PM-{first_name[:2]}{last_name[:1]}",      # PM-JOD
+            f"PM-{first_name[:1]}{last_name[:2]}",      # PM-JDO
+        ]
+        
+        # Add company-based patterns if provided
+        if company_name and company_name.strip():
+            company_clean = ''.join(c.upper() for c in company_name if c.isalnum())
+            if len(company_clean) >= 2:
+                base_patterns.extend([
+                    f"PM-{company_clean[:3]}",              # PM-ABC (ABC Corp)
+                    f"PM-{first_name[:1]}{company_clean[:2]}", # PM-JAB (John @ ABC)
+                    f"PM-{company_clean[:2]}{first_name[:1]}", # PM-ABJ
+                ])
+        
+        # Additional creative patterns
+        initials = f"{first_name[:1]}{last_name[:1]}"
+        base_patterns.extend([
+            f"PM-{initials}",                           # PM-JD
+            f"PM-{initials}{len(first_name + last_name):02d}", # PM-JD07
+        ])
+        
+        # Generate unique suggestions from patterns
+        for pattern in base_patterns:
+            if len(suggestions) >= 5:
+                break
+                
+            # Try base pattern first
+            candidate = pattern
+            if not cls.objects.filter(shipping_mark=candidate).exists():
+                suggestions.append(candidate)
+                continue
+            
+            # Add sequential numbers if base exists
+            for i in range(1, 100):
+                candidate = f"{pattern}{i:02d}"
+                if not cls.objects.filter(shipping_mark=candidate).exists():
+                    suggestions.append(candidate)
+                    break
+        
+        # Ensure we have exactly 5 unique suggestions using random generation
+        while len(suggestions) < 5:
+            # Generate random but deterministic suggestions
+            import hashlib
+            seed = f"{first_name}{last_name}{len(suggestions)}"
+            hash_obj = hashlib.md5(seed.encode())
+            random_suffix = hash_obj.hexdigest()[:3].upper()
+            
+            candidate = f"PM-{random_suffix}"
+            if not cls.objects.filter(shipping_mark=candidate).exists() and candidate not in suggestions:
+                suggestions.append(candidate)
+        
+        return suggestions[:5]
+    
+    @classmethod
+    def refresh_shipping_mark_suggestions(cls, first_name, last_name, company_name=None, exclude_taken=None):
+        """
+        Generate fresh shipping mark suggestions, excluding already taken ones.
+        Used when user's selection is no longer available.
+        """
+        if exclude_taken is None:
+            exclude_taken = []
+            
+        suggestions = []
+        attempt = 0
+        max_attempts = 20
+        
+        while len(suggestions) < 5 and attempt < max_attempts:
+            new_suggestions = cls.generate_shipping_mark_suggestions(
+                first_name, last_name, company_name
+            )
+            
+            for suggestion in new_suggestions:
+                if (suggestion not in exclude_taken and 
+                    suggestion not in suggestions and 
+                    not cls.objects.filter(shipping_mark=suggestion).exists()):
+                    suggestions.append(suggestion)
+                    
+                if len(suggestions) >= 5:
+                    break
+            
+            attempt += 1
+            
+            # Add more creative patterns if needed
+            if len(suggestions) < 5:
+                for i in range(attempt * 5, (attempt + 1) * 5):
+                    candidate = f"PM-{secrets.token_hex(2).upper()}{i:02d}"
+                    if (candidate not in exclude_taken and 
+                        candidate not in suggestions and 
+                        not cls.objects.filter(shipping_mark=candidate).exists()):
+                        suggestions.append(candidate)
+                        
+                    if len(suggestions) >= 5:
+                        break
+        
+        return suggestions[:5]
+
+    @classmethod
+    def auto_generate_shipping_mark(cls, first_name, region, country="Ghana"):
+        """
+        Auto-generate shipping mark based on settings configuration.
+        Format: {default_prefix}{regional_rule}{name_based_unique_identifier}
+        Example: PM1ACHEL01 (PM + 1 + ACHEL + 01)
+        """
+        from settings.models import CompanySettings, ShippingMarkFormattingRule
+        
+        # Get default prefix from company settings
+        try:
+            company_settings = CompanySettings.objects.first()
+            default_prefix = company_settings.shipping_mark_prefix if company_settings else "PM"
+        except:
+            default_prefix = "PM"
+        
+        # Get regional rule for the user's region
+        try:
+            rule = ShippingMarkFormattingRule.get_rule_for_client(country=country, region=region)
+            regional_prefix = rule.prefix_value if rule else "1"  # Default to "1" if no rule found
+        except:
+            regional_prefix = "1"
+        
+        # Clean and format name (take first 6 characters, uppercase, alphanumeric only)
+        clean_name = ''.join(c.upper() for c in first_name if c.isalnum())[:6]
+        if len(clean_name) < 2:
+            clean_name = clean_name.ljust(2, 'X')  # Pad with X if name too short
+        
+        # Generate base shipping mark
+        base_mark = f"{default_prefix}{regional_prefix}{clean_name}"
+        
+        # Ensure uniqueness by adding counter if needed
+        shipping_mark = base_mark
+        counter = 1
+        
+        while cls.objects.filter(shipping_mark=shipping_mark).exists():
+            shipping_mark = f"{base_mark}{counter:02d}"
+            counter += 1
+            
+            # Safety check to prevent infinite loop
+            if counter > 999:
+                # Fallback to random generation
+                import secrets
+                random_suffix = secrets.token_hex(2).upper()
+                shipping_mark = f"{default_prefix}{regional_prefix}{random_suffix}"
+                break
+        
+        return shipping_mark
+
     def save(self, *args, **kwargs):
         # Auto-generate shipping mark if not provided
         if not self.shipping_mark:
-            base = f"PM{self.first_name.upper()}"
-            shipping_mark = base
-            counter = 1
-            while CustomerUser.objects.filter(shipping_mark=shipping_mark).exists():
-                shipping_mark = f"{base}{counter:02d}"
-                counter += 1
-            self.shipping_mark = shipping_mark
+            if self.first_name and self.region:
+                # Use new auto-generation method based on settings
+                self.shipping_mark = self.auto_generate_shipping_mark(
+                    first_name=self.first_name, 
+                    region=self.region
+                )
+            else:
+                # Fallback to old method if data missing
+                base = f"PM{self.first_name.upper() if self.first_name else 'USER'}"
+                shipping_mark = base
+                counter = 1
+                while CustomerUser.objects.filter(shipping_mark=shipping_mark).exists():
+                    shipping_mark = f"{base}{counter:02d}"
+                    counter += 1
+                self.shipping_mark = shipping_mark
         
         # Set staff status based on role
         if self.user_role in ['ADMIN', 'MANAGER', 'SUPER_ADMIN']:
@@ -223,7 +414,7 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
             self.can_manage_rates = True
             self.can_view_analytics = True
             self.can_manage_admins = True
-            self.accessible_warehouses = ['china', 'ghana']  # Super admin has access to all
+            self.accessible_warehouses = ['accra', 'kumasi', 'tema', 'takoradi']  # Super admin has access to all
         
         # Auto-set permissions based on role
         elif self.user_role == 'MANAGER':
@@ -232,14 +423,14 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
             self.can_manage_rates = True
             self.can_view_analytics = True
             if not self.accessible_warehouses:
-                self.accessible_warehouses = ['china', 'ghana']
+                self.accessible_warehouses = ['accra', 'kumasi', 'tema']
         
         elif self.user_role == 'ADMIN':
             self.can_manage_inventory = True
             self.can_manage_rates = True
             self.can_view_analytics = True
             if not self.accessible_warehouses:
-                self.accessible_warehouses = ['china']  # Default to china
+                self.accessible_warehouses = ['accra']  # Default to main Accra warehouse
         
         super().save(*args, **kwargs)
     
@@ -252,13 +443,121 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
             raise ValidationError({'phone': 'Phone number must contain only digits, +, -, and spaces'})
         
         # Validate warehouse access
-        valid_warehouses = ['china', 'ghana']
+        valid_warehouses = ['accra', 'kumasi', 'tema', 'takoradi', 'ho', 'cape_coast']
         if self.accessible_warehouses:
             invalid_warehouses = [w for w in self.accessible_warehouses if w not in valid_warehouses]
             if invalid_warehouses:
                 raise ValidationError({
                     'accessible_warehouses': f'Invalid warehouses: {invalid_warehouses}. Valid options: {valid_warehouses}'
                 })
+
+
+class VerificationPin(models.Model):
+    """Model to handle phone verification PINs during signup"""
+    user = models.ForeignKey(CustomerUser, on_delete=models.CASCADE)
+    pin = models.CharField(max_length=6)  # 6-digit code
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    attempts = models.IntegerField(default=0)  # Track failed attempts
+    
+    class Meta:
+        verbose_name = "Verification PIN"
+        verbose_name_plural = "Verification PINs"
+        ordering = ['-created_at']
+    
+    def save(self, *args, **kwargs):
+        if not self.pin:
+            # Generate 6-digit code
+            self.pin = str(random.randint(100000, 999999))
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(minutes=10)  # 10 minutes expiry
+        super().save(*args, **kwargs)
+    
+    def is_valid(self):
+        """Check if PIN is still valid"""
+        return not self.is_used and timezone.now() <= self.expires_at and self.attempts < 3
+    
+    def mark_used(self):
+        """Mark PIN as used"""
+        self.is_used = True
+        self.save(update_fields=['is_used'])
+    
+    def increment_attempts(self):
+        """Increment failed attempts"""
+        self.attempts += 1
+        self.save(update_fields=['attempts'])
+    
+    @classmethod
+    def cleanup_expired(cls):
+        """Remove expired PINs"""
+        expired_pins = cls.objects.filter(expires_at__lt=timezone.now())
+        count = expired_pins.count()
+        expired_pins.delete()
+        return count
+    
+    @classmethod
+    def create_for_user(cls, user):
+        """Create a new verification PIN for user (invalidate existing ones)"""
+        # Remove existing unused PINs for this user
+        cls.objects.filter(user=user, is_used=False).delete()
+        
+        # Create new PIN
+        return cls.objects.create(user=user)
+
+
+class ResetPin(models.Model):
+    """Model to handle secure password reset PINs"""
+    user = models.ForeignKey(CustomerUser, on_delete=models.CASCADE)
+    pin = models.CharField(max_length=6)  # 6-digit code
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    attempts = models.IntegerField(default=0)  # Track failed attempts
+    
+    class Meta:
+        verbose_name = "Password Reset PIN"
+        verbose_name_plural = "Password Reset PINs"
+        ordering = ['-created_at']
+    
+    def save(self, *args, **kwargs):
+        if not self.pin:
+            # Generate 6-digit code
+            self.pin = str(random.randint(100000, 999999))
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(minutes=10)  # 10 minutes expiry
+        super().save(*args, **kwargs)
+    
+    def is_valid(self):
+        """Check if PIN is still valid"""
+        return not self.is_used and timezone.now() <= self.expires_at and self.attempts < 3
+    
+    def mark_used(self):
+        """Mark PIN as used"""
+        self.is_used = True
+        self.save(update_fields=['is_used'])
+    
+    def increment_attempts(self):
+        """Increment failed attempts"""
+        self.attempts += 1
+        self.save(update_fields=['attempts'])
+    
+    @classmethod
+    def cleanup_expired(cls):
+        """Remove expired PINs"""
+        expired_pins = cls.objects.filter(expires_at__lt=timezone.now())
+        count = expired_pins.count()
+        expired_pins.delete()
+        return count
+    
+    @classmethod
+    def create_for_user(cls, user):
+        """Create a new reset PIN for user (invalidate existing ones)"""
+        # Remove existing unused PINs for this user
+        cls.objects.filter(user=user, is_used=False).delete()
+        
+        # Create new PIN
+        return cls.objects.create(user=user)
 
 
 class PasswordResetToken(models.Model):

@@ -1,315 +1,168 @@
+# cargo/customer_shipments_views.py
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
 from django.db.models import Q, Count, Sum
-from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
 
-from .models import CargoItem
-from GoodsRecieved.models import GoodsReceivedChina, GoodsReceivedGhana
-from users.models import CustomerUser
-from .serializers import CargoItemSerializer
-from GoodsRecieved.serializers import GoodsReceivedChinaSerializer, GoodsReceivedGhanaSerializer
+from .models import CargoContainer, CargoItem
+from .serializers import CargoContainerSerializer, CargoItemSerializer
 
 
 class CustomerShipmentsView(APIView):
     """
-    Customer Shipments Page - Shows all items linked to a customer's shipping mark
-    Categories: Goods Received (China), Goods Received (Ghana), Sea Cargo, Air Cargo
+    API view for customer to view their shipments
     """
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        # Get shipping mark - either from query parameter (admin access) or user's shipping mark
-        query_shipping_mark = request.query_params.get('shipping_mark')
+        user = request.user
         
-        if query_shipping_mark:
-            # Admin access - allow querying any shipping mark
-            if not request.user.is_staff and request.user.user_role not in ['ADMIN', 'STAFF']:
-                return Response(
-                    {'error': 'Permission denied'}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            shipping_mark = query_shipping_mark
-        else:
-            # Customer access - use their own shipping mark
-            customer = request.user
-            if not hasattr(customer, 'shipping_mark') or not customer.shipping_mark:
-                return Response(
-                    {'error': 'No shipping mark found for this customer'}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            shipping_mark = customer.shipping_mark
+        # Get customer's containers based on their shipping mark
+        containers = CargoContainer.objects.filter(
+            Q(customer_user=user) | Q(shipping_mark=user.shipping_mark)
+        ).order_by('-created_at')
         
-        # Query parameters for filtering
-        status_filter = request.query_params.get('status')
-        search = request.query_params.get('search', '')
+        # Get customer's cargo items
+        cargo_items = CargoItem.objects.filter(
+            Q(customer_user=user) | Q(shipping_mark=user.shipping_mark)
+        ).order_by('-created_at')
         
-        # 1. Goods Received (China)
-        china_goods_query = GoodsReceivedChina.objects.filter(
-            shipping_mark=shipping_mark
-        )
-        if status_filter:
-            china_goods_query = china_goods_query.filter(status=status_filter)
-        if search:
-            china_goods_query = china_goods_query.filter(
-                Q(description__icontains=search) |
-                Q(supply_tracking__icontains=search) |
-                Q(item_id__icontains=search)
-            )
+        # Serialize the data
+        container_serializer = CargoContainerSerializer(containers, many=True)
+        cargo_serializer = CargoItemSerializer(cargo_items, many=True)
         
-        # 2. Goods Received (Ghana)
-        ghana_goods_query = GoodsReceivedGhana.objects.filter(
-            shipping_mark=shipping_mark
-        )
-        if status_filter:
-            ghana_goods_query = ghana_goods_query.filter(status=status_filter)
-        if search:
-            ghana_goods_query = ghana_goods_query.filter(
-                Q(description__icontains=search) |
-                Q(supply_tracking__icontains=search) |
-                Q(item_id__icontains=search)
-            )
-        
-        # 3. Sea Cargo
-        sea_cargo_query = CargoItem.objects.filter(
-            client__shipping_mark=shipping_mark,
-            container__cargo_type='sea'
-        )
-        if status_filter:
-            sea_cargo_query = sea_cargo_query.filter(status=status_filter)
-        if search:
-            sea_cargo_query = sea_cargo_query.filter(
-                Q(item_description__icontains=search) |
-                Q(tracking_id__icontains=search) |
-                Q(container__container_id__icontains=search)
-            )
-        
-        # 4. Air Cargo
-        air_cargo_query = CargoItem.objects.filter(
-            client__shipping_mark=shipping_mark,
-            container__cargo_type='air'
-        )
-        if status_filter:
-            air_cargo_query = air_cargo_query.filter(status=status_filter)
-        if search:
-            air_cargo_query = air_cargo_query.filter(
-                Q(item_description__icontains=search) |
-                Q(tracking_id__icontains=search) |
-                Q(container__container_id__icontains=search)
-            )
-        
-        # Serialize data
-        china_goods = GoodsReceivedChinaSerializer(china_goods_query, many=True).data
-        ghana_goods = GoodsReceivedGhanaSerializer(ghana_goods_query, many=True).data
-        sea_cargo = CargoItemSerializer(sea_cargo_query, many=True).data
-        air_cargo = CargoItemSerializer(air_cargo_query, many=True).data
-        
-        # Calculate summaries
-        # Try to get customer info for display
-        try:
-            if query_shipping_mark:
-                # For admin queries, try to find the customer
-                customer_obj = CustomerUser.objects.filter(shipping_mark=shipping_mark).first()
-                customer_name = customer_obj.get_full_name() if customer_obj else 'Unknown Customer'
-                company_name = customer_obj.company_name if customer_obj else ''
-            else:
-                # For user queries, use the authenticated user
-                customer_name = request.user.get_full_name()
-                company_name = request.user.company_name or ''
-        except:
-            customer_name = 'Unknown Customer'
-            company_name = ''
-            
-        summary_data = {
-            'customer_info': {
-                'shipping_mark': shipping_mark,
-                'customer_name': customer_name,
-                'company_name': company_name,
-            },
-            'goods_received_china': {
-                'count': china_goods_query.count(),
-                'total_cbm': china_goods_query.aggregate(Sum('cbm'))['cbm__sum'] or 0,
-                'total_quantity': china_goods_query.aggregate(Sum('quantity'))['quantity__sum'] or 0,
-                'items': china_goods
-            },
-            'goods_received_ghana': {
-                'count': ghana_goods_query.count(),
-                'total_cbm': ghana_goods_query.aggregate(Sum('cbm'))['cbm__sum'] or 0,
-                'total_quantity': ghana_goods_query.aggregate(Sum('quantity'))['quantity__sum'] or 0,
-                'items': ghana_goods
-            },
-            'sea_cargo': {
-                'count': sea_cargo_query.count(),
-                'total_cbm': sea_cargo_query.aggregate(Sum('cbm'))['cbm__sum'] or 0,
-                'total_quantity': sea_cargo_query.aggregate(Sum('quantity'))['quantity__sum'] or 0,
-                'items': sea_cargo
-            },
-            'air_cargo': {
-                'count': air_cargo_query.count(),
-                'total_cbm': air_cargo_query.aggregate(Sum('cbm'))['cbm__sum'] or 0,
-                'total_quantity': air_cargo_query.aggregate(Sum('quantity'))['quantity__sum'] or 0,
-                'items': air_cargo
-            }
-        }
-        
-        return Response(summary_data)
+        return Response({
+            'containers': container_serializer.data,
+            'cargo_items': cargo_serializer.data,
+            'total_containers': containers.count(),
+            'total_cargo_items': cargo_items.count(),
+        })
 
 
 class CustomerShipmentStatsView(APIView):
     """
-    Quick stats for customer shipments dashboard
+    API view for customer shipment statistics
     """
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        customer = request.user
-        if not hasattr(customer, 'shipping_mark') or not customer.shipping_mark:
-            return Response(
-                {'error': 'No shipping mark found for this customer'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        user = request.user
         
-        shipping_mark = customer.shipping_mark
+        # Get containers stats
+        containers = CargoContainer.objects.filter(
+            Q(customer_user=user) | Q(shipping_mark=user.shipping_mark)
+        )
         
-        # Count items by category and status
-        china_stats = self._get_warehouse_stats(GoodsReceivedChina, shipping_mark)
-        ghana_stats = self._get_warehouse_stats(GoodsReceivedGhana, shipping_mark)
-        sea_cargo_stats = self._get_cargo_stats(shipping_mark, 'sea')
-        air_cargo_stats = self._get_cargo_stats(shipping_mark, 'air')
+        cargo_items = CargoItem.objects.filter(
+            Q(customer_user=user) | Q(shipping_mark=user.shipping_mark)
+        )
+        
+        # Calculate statistics
+        container_stats = containers.aggregate(
+            total_containers=Count('id'),
+            pending_containers=Count('id', filter=Q(status='PENDING')),
+            in_transit_containers=Count('id', filter=Q(status='IN_TRANSIT')),
+            delivered_containers=Count('id', filter=Q(status='DELIVERED')),
+        )
+        
+        cargo_stats = cargo_items.aggregate(
+            total_items=Count('id'),
+            total_quantity=Sum('quantity'),
+            pending_items=Count('id', filter=Q(status='PENDING')),
+            in_transit_items=Count('id', filter=Q(status='IN_TRANSIT')),
+            delivered_items=Count('id', filter=Q(status='DELIVERED')),
+        )
+        
+        # Status distribution for charts
+        container_status_dist = list(
+            containers.values('status')
+            .annotate(count=Count('id'))
+            .order_by('status')
+        )
+        
+        cargo_status_dist = list(
+            cargo_items.values('status')
+            .annotate(count=Count('id'))
+            .order_by('status')
+        )
         
         return Response({
-            'customer_info': {
-                'shipping_mark': shipping_mark,
-                'customer_name': customer.get_full_name(),
-            },
-            'categories': {
-                'goods_received_china': china_stats,
-                'goods_received_ghana': ghana_stats,
-                'sea_cargo': sea_cargo_stats,
-                'air_cargo': air_cargo_stats
-            },
-            'totals': {
-                'total_items': (
-                    china_stats['total'] + 
-                    ghana_stats['total'] + 
-                    sea_cargo_stats['total'] + 
-                    air_cargo_stats['total']
-                ),
-                'total_pending': (
-                    china_stats['pending'] + 
-                    ghana_stats['pending'] + 
-                    sea_cargo_stats['pending'] + 
-                    air_cargo_stats['pending']
-                )
-            }
+            'container_stats': container_stats,
+            'cargo_stats': cargo_stats,
+            'container_status_distribution': container_status_dist,
+            'cargo_status_distribution': cargo_status_dist,
         })
-    
-    def _get_warehouse_stats(self, model, shipping_mark):
-        """Get statistics for warehouse goods"""
-        queryset = model.objects.filter(shipping_mark=shipping_mark)
-        total = queryset.count()
-        pending = queryset.filter(status='PENDING').count()
-        ready = queryset.filter(status__in=['READY_FOR_SHIPPING', 'READY_FOR_DELIVERY']).count()
-        shipped = queryset.filter(status__in=['SHIPPED', 'DELIVERED']).count()
-        flagged = queryset.filter(status='FLAGGED').count()
-        
-        return {
-            'total': total,
-            'pending': pending,
-            'ready': ready,
-            'shipped': shipped,
-            'flagged': flagged
-        }
-    
-    def _get_cargo_stats(self, shipping_mark, cargo_type):
-        """Get statistics for cargo items"""
-        queryset = CargoItem.objects.filter(
-            client__shipping_mark=shipping_mark,
-            container__cargo_type=cargo_type
-        )
-        total = queryset.count()
-        pending = queryset.filter(status='pending').count()
-        in_transit = queryset.filter(status='in_transit').count()
-        delivered = queryset.filter(status='delivered').count()
-        delayed = queryset.filter(status='delayed').count()
-        
-        return {
-            'total': total,
-            'pending': pending,
-            'in_transit': in_transit,
-            'delivered': delivered,
-            'delayed': delayed
-        }
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@login_required
 def customer_shipment_tracking(request, tracking_id):
     """
-    Track a specific item by tracking ID across all categories
+    Function-based view for tracking a specific shipment
     """
-    customer = request.user
-    shipping_mark = customer.shipping_mark if hasattr(customer, 'shipping_mark') else None
+    user = request.user
     
-    if not shipping_mark:
-        return Response(
-            {'error': 'No shipping mark found for this customer'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Search across all categories
-    result = {
-        'tracking_id': tracking_id,
-        'found': False,
-        'category': None,
-        'item': None
-    }
-    
-    # Check China goods
+    # Try to find the tracking ID in containers first
     try:
-        china_item = GoodsReceivedChina.objects.get(
-            Q(supply_tracking=tracking_id) | Q(item_id=tracking_id),
-            shipping_mark=shipping_mark
+        container = CargoContainer.objects.get(
+            Q(container_id=tracking_id) | Q(tracking_number=tracking_id),
+            Q(customer_user=user) | Q(shipping_mark=user.shipping_mark)
         )
-        result.update({
-            'found': True,
-            'category': 'goods_received_china',
-            'item': GoodsReceivedChinaSerializer(china_item).data
+        
+        # Return container tracking info
+        return JsonResponse({
+            'type': 'container',
+            'tracking_id': tracking_id,
+            'status': container.status,
+            'shipping_mark': container.shipping_mark,
+            'container_type': container.container_type,
+            'departure_port': container.departure_port,
+            'arrival_port': container.arrival_port,
+            'departure_date': container.departure_date,
+            'estimated_arrival': container.estimated_arrival,
+            'actual_arrival': container.actual_arrival,
+            'created_at': container.created_at,
+            'updated_at': container.updated_at,
         })
-        return Response(result)
-    except GoodsReceivedChina.DoesNotExist:
+        
+    except CargoContainer.DoesNotExist:
         pass
     
-    # Check Ghana goods
-    try:
-        ghana_item = GoodsReceivedGhana.objects.get(
-            Q(supply_tracking=tracking_id) | Q(item_id=tracking_id),
-            shipping_mark=shipping_mark
-        )
-        result.update({
-            'found': True,
-            'category': 'goods_received_ghana',
-            'item': GoodsReceivedGhanaSerializer(ghana_item).data
-        })
-        return Response(result)
-    except GoodsReceivedGhana.DoesNotExist:
-        pass
-    
-    # Check Cargo items
+    # Try to find the tracking ID in cargo items
     try:
         cargo_item = CargoItem.objects.get(
-            tracking_id=tracking_id,
-            client__shipping_mark=shipping_mark
+            Q(item_id=tracking_id) | Q(tracking_number=tracking_id),
+            Q(customer_user=user) | Q(shipping_mark=user.shipping_mark)
         )
-        category = f"{cargo_item.container.cargo_type}_cargo"
-        result.update({
-            'found': True,
-            'category': category,
-            'item': CargoItemSerializer(cargo_item).data
+        
+        # Return cargo item tracking info
+        return JsonResponse({
+            'type': 'cargo_item',
+            'tracking_id': tracking_id,
+            'status': cargo_item.status,
+            'shipping_mark': cargo_item.shipping_mark,
+            'item_name': cargo_item.item_name,
+            'quantity': cargo_item.quantity,
+            'weight': cargo_item.weight,
+            'dimensions': cargo_item.dimensions,
+            'departure_port': cargo_item.departure_port,
+            'arrival_port': cargo_item.arrival_port,
+            'departure_date': cargo_item.departure_date,
+            'estimated_arrival': cargo_item.estimated_arrival,
+            'actual_arrival': cargo_item.actual_arrival,
+            'container': cargo_item.container.container_id if cargo_item.container else None,
+            'created_at': cargo_item.created_at,
+            'updated_at': cargo_item.updated_at,
         })
-        return Response(result)
+        
     except CargoItem.DoesNotExist:
         pass
     
-    return Response(result)
+    # If not found, return 404
+    return JsonResponse({
+        'error': 'Tracking ID not found or you do not have permission to view this shipment.'
+    }, status=404)

@@ -84,7 +84,6 @@ const ShippingRates = () => {
         setStats(statsResponse.data);
       }
     } catch (error) {
-      console.error("Error fetching rates:", error);
       setError(error instanceof Error ? error.message : "Failed to load rates");
       toast({
         title: "Error",

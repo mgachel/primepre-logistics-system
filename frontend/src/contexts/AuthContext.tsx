@@ -1,5 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { authService, User } from "@/services/authService";
+import { 
+  getDashboardUrl, 
+  getWelcomeMessage, 
+  getQuickAccessLinks,
+  canAccessRoute,
+  getUnauthorizedRedirectUrl
+} from '@/lib/auth-utils';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -26,6 +33,12 @@ interface AuthContextType {
   isSuperAdmin: () => boolean;
   hasPermission: (permission: string) => boolean;
   canAccessWarehouse: (warehouse: string) => boolean;
+  // New dashboard redirect utilities
+  getDashboardUrl: () => string;
+  getWelcomeMessage: () => string;
+  getQuickAccessLinks: () => Record<string, string>;
+  canAccessRoute: (route: string) => boolean;
+  getUnauthorizedRedirectUrl: () => string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -53,9 +66,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log('🔍 AuthContext: Checking authentication status...');
         if (authService.isAuthenticated()) {
+          console.log('✅ AuthContext: User is authenticated, loading user data...');
           const storedUser = authService.getStoredUser();
           if (storedUser) {
+            console.log('👤 AuthContext: Found stored user:', storedUser.user_role);
             setIsAuthenticated(true);
             setUser(storedUser);
 
@@ -140,13 +156,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Role helpers
-  const isAdmin = () => user?.user_role === "ADMIN";
-  const isCustomer = () => user?.user_role === "CUSTOMER";
+  const isAdmin = () => {
+    const result = user ? ['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(user.user_role) : false;
+    console.log('🔍 isAdmin check:', { userRole: user?.user_role, result });
+    return result;
+  };
+  const isCustomer = () => {
+    const result = user?.user_role === "CUSTOMER";
+    console.log('🔍 isCustomer check:', { userRole: user?.user_role, result });
+    return result;
+  };
   const isStaff = () => user?.user_role === "STAFF";
   const isManager = () => user?.user_role === "MANAGER";
   const isSuperAdmin = () => user?.user_role === "SUPER_ADMIN";
 
-  const hasPermission = (permission: string) => {
+  const hasPermission = (_permission: string) => {
     if (!user) return false;
     if (user.user_role === "SUPER_ADMIN") return true;
     // your role/permission checks here
@@ -176,6 +200,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isSuperAdmin,
         hasPermission,
         canAccessWarehouse,
+        // New dashboard redirect utilities
+        getDashboardUrl: () => getDashboardUrl(user),
+        getWelcomeMessage: () => getWelcomeMessage(user),
+        getQuickAccessLinks: (): Record<string, string> => getQuickAccessLinks(user),
+        canAccessRoute: (route: string) => canAccessRoute(user, route),
+        getUnauthorizedRedirectUrl: () => getUnauthorizedRedirectUrl(user),
       }}
     >
       {children}

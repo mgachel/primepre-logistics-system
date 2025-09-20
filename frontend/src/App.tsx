@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,9 +8,16 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { RoleBasedRoute } from "@/components/RoleBasedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useAuthStore } from "@/stores/authStore";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import SimplifiedSignup from "./pages/SimplifiedSignup";
+import SignupStep2 from "./pages/SignupStep2";
+import SignupStep3 from "./pages/SignupStep3";
+import SignupStep4 from "./pages/SignupStep4";
+import SignupVerify from "./pages/SignupVerify";
 import ForgotPassword from "./pages/ForgotPassword";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import Clients from "./pages/Clients";
@@ -18,10 +25,17 @@ import SeaCargo from "./pages/SeaCargo";
 import AirCargo from "./pages/AirCargo";
 import ChinaWarehouse from "./pages/ChinaWarehouse";
 import GhanaWarehouse from "./pages/GhanaWarehouse";
+import GoodsReceivedChinaSea from "./pages/GoodsReceivedChinaSea";
+import GoodsReceivedChinaAir from "./pages/GoodsReceivedChinaAir";
+import GoodsReceivedGhanaSea from "./pages/GoodsReceivedGhanaSea";
+import GoodsReceivedGhanaAir from "./pages/GoodsReceivedGhanaAir";
 import Claims from "./pages/Claims";
 import CustomerShipments from "./pages/CustomerShipments";
 import CustomerClaims from "./pages/CustomerClaims";
 import CustomerNotes from "./pages/CustomerNotes";
+import CustomerProfile from "./pages/customer/CustomerProfile";
+import CustomerAddresses from "./pages/CustomerAddresses";
+import Notes from "./pages/Notes";
 import Admins from "./pages/Admins";
 import Settings from "./pages/Settings";
 import ShippingRates from "./pages/ShippingRates";
@@ -33,22 +47,42 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Auth initialization component
+function AuthInitializer({ children }: { children: React.ReactNode }) {
+  const { initializeAuth } = useAuthStore();
+
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
+  return <>{children}</>;
+}
+
 const App = () => (
-  <AuthProvider>
+  <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true,
-          }}
-        >
+        <AuthProvider>
+          <AuthInitializer>
+            <BrowserRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true,
+              }}
+            >
           <Routes>
             {/* Public auth routes */}
             <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
+            {/* New simplified signup */}
+            <Route path="/signup" element={<SimplifiedSignup />} />
+            {/* Legacy multi-step signup routes (keep for backward compatibility) */}
+            <Route path="/signup/legacy" element={<Signup />} />
+            <Route path="/signup/shipping-mark" element={<SignupStep2 />} />
+            <Route path="/signup/contact" element={<SignupStep3 />} />
+            <Route path="/signup/password" element={<SignupStep4 />} />
+            <Route path="/signup/verify" element={<SignupVerify />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             {/* Dashboard - Role-based */}
             <Route
@@ -70,6 +104,9 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+
+            {/* Dashboard alias - redirect /dashboard to / */}
+            <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
             {/* Admin-only routes */}
             <Route
@@ -133,6 +170,36 @@ const App = () => (
               }
             />
             <Route
+              path="/goods/china/sea"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={
+                      <AppLayout>
+                        <GoodsReceivedChinaSea />
+                      </AppLayout>
+                    }
+                    customerComponent={<Navigate to="/" replace />}
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/goods/china/air"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={
+                      <AppLayout>
+                        <GoodsReceivedChinaAir />
+                      </AppLayout>
+                    }
+                    customerComponent={<Navigate to="/" replace />}
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/goods/ghana"
               element={
                 <ProtectedRoute>
@@ -140,6 +207,36 @@ const App = () => (
                     adminComponent={
                       <AppLayout>
                         <GhanaWarehouse />
+                      </AppLayout>
+                    }
+                    customerComponent={<Navigate to="/" replace />}
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/goods/ghana/sea"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={
+                      <AppLayout>
+                        <GoodsReceivedGhanaSea />
+                      </AppLayout>
+                    }
+                    customerComponent={<Navigate to="/" replace />}
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/goods/ghana/air"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={
+                      <AppLayout>
+                        <GoodsReceivedGhanaAir />
                       </AppLayout>
                     }
                     customerComponent={<Navigate to="/" replace />}
@@ -192,6 +289,21 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/notes"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={
+                      <AppLayout>
+                        <Notes />
+                      </AppLayout>
+                    }
+                    customerComponent={<Navigate to="/" replace />}
+                  />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Customer-only routes */}
             <Route
@@ -233,6 +345,36 @@ const App = () => (
                     customerComponent={
                       <AppLayout>
                         <CustomerNotes />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-profile"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <CustomerProfile />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-addresses"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <CustomerAddresses />
                       </AppLayout>
                     }
                   />
@@ -301,9 +443,11 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+          </AuthInitializer>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
-  </AuthProvider>
+  </ErrorBoundary>
 );
 
 export default App;

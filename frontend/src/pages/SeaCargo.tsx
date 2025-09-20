@@ -4,7 +4,6 @@ import {
   Search,
   Plus,
   Ship,
-  MapPin,
   Calendar,
   Package,
   RefreshCcw,
@@ -81,14 +80,14 @@ export default function SeaCargo() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
-  const [selectedContainer, setSelectedContainer] =
+  const [selectedContainer, _setSelectedContainer] =
     useState<SeaCargoItem | null>(null);
   const [showContainerDetails, setShowContainerDetails] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
     "all" | "in-transit" | "pending" | "delivered"
   >("all");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   const [containers, setContainers] = useState<BackendCargoContainer[]>([]);
   const [dashboard, setDashboard] = useState<CargoDashboardStats | null>(null);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
@@ -208,16 +207,8 @@ export default function SeaCargo() {
     },
     {
       id: "select",
-      header: (
-        <input aria-label="Select all" type="checkbox" className="rounded" />
-      ),
-      accessor: (c) => (
-        <input
-          aria-label={`Select ${c.container_id}`}
-          type="checkbox"
-          className="rounded"
-        />
-      ),
+      header: "",
+      accessor: () => null, // DataTable handles this internally for 'select' columns
       width: "48px",
       sticky: true,
     },

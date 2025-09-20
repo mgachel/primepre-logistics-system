@@ -10,7 +10,8 @@ export interface Notification {
     | "capacity"
     | "quality"
     | "efficiency"
-    | "overdue";
+    | "overdue"
+    | "message";
   title: string;
   message: string;
   timestamp: string;
@@ -19,12 +20,56 @@ export interface Notification {
   action_required?: boolean;
   endpoint?: string;
   warehouse?: "china" | "ghana" | "all";
+  sender?: string;
+  recipient?: string;
   metadata?: {
     item_count?: number;
     cbm_amount?: number;
     value?: number;
     threshold_days?: number;
+    sender_name?: string;
+    recipient_name?: string;
+    shipping_mark?: string;
   };
+}
+
+// Interface for admin messaging
+export interface AdminMessage {
+  id?: number;
+  title: string;
+  message: string;
+  priority: "low" | "medium" | "high" | "critical";
+  recipients: string[] | "all";
+  shipping_marks?: string[];
+  sender: string;
+  created_at?: string;
+  read_count?: number;
+  total_recipients?: number;
+}
+
+// Request interface for creating admin messages
+export interface CreateAdminMessageRequest {
+  title: string;
+  message: string;
+  priority: "low" | "medium" | "high" | "critical";
+  recipients: string; // "all" or comma-separated client IDs like "1,2,3"
+  shipping_marks?: string[];
+}
+
+// Interface for client notifications from backend
+export interface ClientNotification {
+  id: number;
+  title: string;
+  message: string;
+  priority: "low" | "medium" | "high" | "critical";
+  notification_type: "admin_message" | "system_alert" | "shipment_update" | "warehouse_notification";
+  warehouse?: string;
+  metadata?: Record<string, any>;
+  read: boolean;
+  action_required: boolean;
+  timestamp: string;
+  admin_message_title?: string;
+  sender_name?: string;
 }
 
 export interface NotificationStats {
@@ -45,27 +90,8 @@ export interface NotificationStats {
     quality: number;
     efficiency: number;
     overdue: number;
+    message: number;
   };
-}
-
-export interface SmartAlert {
-  level: "critical" | "warning" | "info";
-  type: string;
-  message: string;
-  action_required: boolean;
-  endpoint?: string;
-  timestamp: string;
-  warehouse: "china" | "ghana";
-}
-
-export interface AlertsSummary {
-  alerts: SmartAlert[];
-  summary: {
-    critical: number;
-    warnings: number;
-    info: number;
-  };
-  last_updated: string;
 }
 
 export interface NotificationFilters {
@@ -79,57 +105,103 @@ export interface NotificationFilters {
 }
 
 class NotificationsService {
-  // Get all notifications (from smart alerts + generated notifications)
-  async getNotifications(
-    filters: NotificationFilters = {}
-  ): Promise<ApiResponse<Notification[]>> {
+  // Get client notifications for customers (simplified)
+  async getClientNotifications(): Promise<ApiResponse<ClientNotification[]>> {
     try {
-      // Get smart alerts from both warehouses
-      const [chinaResponse, ghanaResponse] = await Promise.all([
-        apiClient.get<AlertsSummary>("/api/goods/china/smart_alerts/"),
-        apiClient.get<AlertsSummary>("/api/goods/ghana/smart_alerts/"),
-      ]);
+      const response = await apiClient.get<ClientNotification[]>('/api/settings/client-notifications/');
+      return response;
+    } catch (error) {
+      console.error('Error fetching client notifications:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to fetch client notifications",
+        data: [],
+      };
+    }
+  }
 
-      const notifications: Notification[] = [];
+  // Send admin message
+  async sendAdminMessage(data: CreateAdminMessageRequest): Promise<ApiResponse<AdminMessage>> {
+    try {
+      const response = await apiClient.post<AdminMessage>('/api/settings/admin-messages/', data);
+      return response;
+    } catch (error) {
+      console.error('Error sending admin message:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to send message",
+        data: {} as AdminMessage,
+      };
+    }
+  }
 
-      // Convert China alerts to notifications
-      if (chinaResponse.data?.alerts) {
-        chinaResponse.data.alerts.forEach((alert, index) => {
-          if (alert) {  // Only process non-null alerts
-            notifications.push(
-              this.convertAlertToNotification(alert, `china_${index}`, "china")
-            );
-          }
-        });
+  // Get all admin messages (for admin view)
+  async getAdminMessages(): Promise<ApiResponse<AdminMessage[] | any>> {
+    try {
+      const response = await apiClient.get<AdminMessage[] | any>('/api/settings/admin-messages/');
+      return response;
+    } catch (error) {
+      console.error('Error fetching admin messages:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to fetch admin messages",
+        data: [],
+      };
+    }
+  }
+
+  // Mark a specific notification as read
+  async markAsRead(notificationId: number): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.post<any>(`/api/settings/client-notifications/${notificationId}/mark-read/`);
+      return response;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to mark notification as read",
+        data: {},
+      };
+    }
+  }
+
+  // Legacy function - Get notifications (for backward compatibility)
+  async getNotifications(filters: NotificationFilters = {}): Promise<ApiResponse<Notification[]>> {
+    try {
+      const response = await apiClient.get<ClientNotification[]>("/api/settings/client-notifications/");
+      
+      if (!response.success || !response.data) {
+        return {
+          success: false,
+          message: "Failed to fetch notifications",
+          data: [],
+        };
       }
 
-      // Convert Ghana alerts to notifications
-      if (ghanaResponse.data?.alerts) {
-        ghanaResponse.data.alerts.forEach((alert, index) => {
-          if (alert) {  // Only process non-null alerts
-            notifications.push(
-              this.convertAlertToNotification(alert, `ghana_${index}`, "ghana")
-            );
-          }
-        });
-      }
-
-      // Filter out any null notifications and ensure all notifications have required properties
-      const validNotifications = notifications.filter(
-        (notification) => 
-          notification && 
-          notification.id && 
-          notification.type && 
-          notification.title && 
-          notification.message
-      );
+      // Convert ClientNotification to Notification format
+      const notifications: Notification[] = response.data.map((clientNotification) => ({
+        id: clientNotification.id.toString(),
+        type: clientNotification.notification_type === 'admin_message' ? 'message' : 'system',
+        title: clientNotification.title,
+        message: clientNotification.message,
+        timestamp: clientNotification.timestamp,
+        read: clientNotification.read,
+        priority: clientNotification.priority,
+        action_required: clientNotification.action_required,
+        warehouse: clientNotification.warehouse as "china" | "ghana" | "all" | undefined,
+        sender: clientNotification.sender_name,
+        metadata: {
+          ...clientNotification.metadata,
+          sender_name: clientNotification.sender_name,
+        },
+      }));
 
       // Apply filters
-      let filteredNotifications = validNotifications;
+      let filteredNotifications = notifications;
 
       if (filters.type && filters.type !== "all") {
         filteredNotifications = filteredNotifications.filter(
-          (n) => n && n.type === filters.type
+          (n) => n.type === filters.type
         );
       }
 
@@ -141,7 +213,7 @@ class NotificationsService {
 
       if (filters.warehouse && filters.warehouse !== "all") {
         filteredNotifications = filteredNotifications.filter(
-          (n) => n.warehouse === filters.warehouse
+          (n) => n.warehouse === filters.warehouse || !n.warehouse
         );
       }
 
@@ -188,249 +260,6 @@ class NotificationsService {
         data: [],
       };
     }
-  }
-
-  // Get notification statistics
-  async getNotificationStats(): Promise<ApiResponse<NotificationStats>> {
-    try {
-      const notificationsResponse = await this.getNotifications();
-
-      if (!notificationsResponse.success || !notificationsResponse.data) {
-        throw new Error("Failed to get notifications for stats");
-      }
-
-      const notifications = notificationsResponse.data;
-
-      const stats: NotificationStats = {
-        total: notifications.length,
-        unread: notifications.filter((n) => !n.read).length,
-        by_priority: {
-          critical: notifications.filter((n) => n.priority === "critical")
-            .length,
-          high: notifications.filter((n) => n.priority === "high").length,
-          medium: notifications.filter((n) => n.priority === "medium").length,
-          low: notifications.filter((n) => n.priority === "low").length,
-        },
-        by_type: {
-          shipment: notifications.filter((n) => n && n.type === "shipment").length,
-          system: notifications.filter((n) => n && n.type === "system").length,
-          user: notifications.filter((n) => n && n.type === "user").length,
-          alert: notifications.filter((n) => n && n.type === "alert").length,
-          capacity: notifications.filter((n) => n && n.type === "capacity").length,
-          quality: notifications.filter((n) => n && n.type === "quality").length,
-          efficiency: notifications.filter((n) => n && n.type === "efficiency")
-            .length,
-          overdue: notifications.filter((n) => n && n.type === "overdue").length,
-        },
-      };
-
-      return {
-        success: true,
-        data: stats,
-        message: "Notification statistics retrieved successfully",
-      };
-    } catch (error) {
-      console.error("Error fetching notification stats:", error);
-      return {
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch notification stats",
-        data: {
-          total: 0,
-          unread: 0,
-          by_priority: { critical: 0, high: 0, medium: 0, low: 0 },
-          by_type: {
-            shipment: 0,
-            system: 0,
-            user: 0,
-            alert: 0,
-            capacity: 0,
-            quality: 0,
-            efficiency: 0,
-            overdue: 0,
-          },
-        },
-      };
-    }
-  }
-
-  // Mark notification as read (simulated - we don't have persistent notifications yet)
-  async markAsRead(id: string): Promise<ApiResponse<void>> {
-    try {
-      // In a real implementation, this would make an API call
-      // For now, we'll simulate success
-      return {
-        success: true,
-        message: "Notification marked as read",
-        data: undefined,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: "Failed to mark notification as read",
-        data: undefined,
-      };
-    }
-  }
-
-  // Mark notification as unread (simulated)
-  async markAsUnread(id: string): Promise<ApiResponse<void>> {
-    try {
-      return {
-        success: true,
-        message: "Notification marked as unread",
-        data: undefined,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: "Failed to mark notification as unread",
-        data: undefined,
-      };
-    }
-  }
-
-  // Delete notification (simulated)
-  async deleteNotification(id: string): Promise<ApiResponse<void>> {
-    try {
-      return {
-        success: true,
-        message: "Notification deleted",
-        data: undefined,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: "Failed to delete notification",
-        data: undefined,
-      };
-    }
-  }
-
-  // Mark all notifications as read (simulated)
-  async markAllAsRead(): Promise<ApiResponse<void>> {
-    try {
-      return {
-        success: true,
-        message: "All notifications marked as read",
-        data: undefined,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: "Failed to mark all notifications as read",
-        data: undefined,
-      };
-    }
-  }
-
-  // Helper method to convert smart alerts to notifications
-  private convertAlertToNotification(
-    alert: SmartAlert,
-    id: string,
-    warehouse: "china" | "ghana"
-  ): Notification {
-    return {
-      id,
-      type: this.mapAlertTypeToNotificationType(alert?.type || 'system'),
-      title: this.generateTitleFromAlert(alert),
-      message: alert?.message || 'No message available',
-      timestamp: alert?.timestamp || new Date().toISOString(),
-      read: false, // All alerts are initially unread
-      priority: this.mapAlertLevelToPriority(alert?.level || 'low'),
-      action_required: alert?.action_required || false,
-      endpoint: alert?.endpoint || '',
-      warehouse,
-      metadata: this.extractMetadataFromAlert(alert),
-    };
-  }
-
-  private mapAlertTypeToNotificationType(
-    alertType: string | null | undefined
-  ): Notification["type"] {
-    if (!alertType) {
-      return "alert"; // Default fallback
-    }
-    
-    const typeMap: Record<string, Notification["type"]> = {
-      overdue: "overdue",
-      capacity: "capacity",
-      quality: "quality",
-      efficiency: "efficiency",
-      shipment: "shipment",
-      system: "system",
-      user: "user",
-    };
-
-    return typeMap[alertType] || "alert";
-  }
-
-  private mapAlertLevelToPriority(
-    level: SmartAlert["level"] | null | undefined
-  ): Notification["priority"] {
-    if (!level) {
-      return "low"; // Default fallback
-    }
-    
-    const priorityMap: Record<SmartAlert["level"], Notification["priority"]> = {
-      critical: "critical",
-      warning: "high",
-      info: "medium",
-    };
-
-    return priorityMap[level] || "low";
-  }
-
-  private generateTitleFromAlert(alert: SmartAlert | null): string {
-    if (!alert || !alert.type) {
-      return "System Alert";
-    }
-    
-    const titleMap: Record<string, string> = {
-      overdue: "Overdue Items Alert",
-      capacity: "Warehouse Capacity Alert",
-      quality: "Quality Issues Detected",
-      efficiency: "Processing Efficiency Notice",
-      shipment: "Shipment Update",
-      system: "System Notification",
-      user: "User Activity",
-    };
-
-    return titleMap[alert.type] || "System Alert";
-  }
-
-  private extractMetadataFromAlert(
-    alert: SmartAlert | null
-  ): Notification["metadata"] {
-    if (!alert || !alert.message) {
-      return {};
-    }
-    
-    const metadata: Notification["metadata"] = {};
-
-    // Extract numbers from message for metadata
-    const numberMatches = alert.message.match(/\d+/g);
-    if (numberMatches && numberMatches.length > 0) {
-      const firstNumber = parseInt(numberMatches[0]);
-
-      if ((alert.type === "overdue" || alert.type === "quality")) {
-        metadata.item_count = firstNumber;
-      } else if (alert.type === "capacity") {
-        metadata.cbm_amount = firstNumber;
-      }
-    }
-
-    // Extract threshold days from overdue alerts
-    if (alert.type === "overdue" && alert.message && alert.message.includes("days")) {
-      const daysMatch = alert.message.match(/(\d+)\+?\s*days/);
-      if (daysMatch) {
-        metadata.threshold_days = parseInt(daysMatch[1]);
-      }
-    }
-
-    return metadata;
   }
 }
 

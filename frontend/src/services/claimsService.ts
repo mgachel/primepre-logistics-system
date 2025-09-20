@@ -48,6 +48,13 @@ export interface ClaimsSummary {
   };
 }
 
+export interface PaginatedClaimsResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: AdminClaim[];
+}
+
 class ClaimsService {
   // Customer endpoints
   async getCustomerClaims(): Promise<{ success: boolean; data: Claim[] }> {
@@ -111,7 +118,7 @@ class ClaimsService {
 
       const url = `/api/claims/admin/claims/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
       console.log('ClaimsService: Making admin claims API call to:', url);
-      const response = await apiClient.get<AdminClaim[]>(url);
+      const response = await apiClient.get<AdminClaim[] | PaginatedClaimsResponse>(url);
       console.log('ClaimsService: Admin claims raw response:', response);
       console.log('ClaimsService: Admin claims data:', response.data);
       console.log('ClaimsService: Admin claims data type:', typeof response.data);
@@ -119,9 +126,24 @@ class ClaimsService {
       console.log('ClaimsService: Response success flag:', response.success);
       console.log('ClaimsService: Response keys:', Object.keys(response));
       
+      // Handle paginated response - check if data has 'results' field
+      let claimsData: AdminClaim[] = [];
+      if (response.success && response.data) {
+        if (Array.isArray(response.data)) {
+          // Direct array response
+          claimsData = response.data;
+        } else if (response.data.results && Array.isArray(response.data.results)) {
+          // Paginated response with results field
+          claimsData = response.data.results;
+        }
+      }
+      
+      console.log('ClaimsService: Final claims data:', claimsData);
+      console.log('ClaimsService: Final claims count:', claimsData.length);
+      
       return {
         success: response.success,
-        data: response.data || []
+        data: claimsData
       };
     } catch (error) {
       console.error('Failed to fetch all claims:', error);

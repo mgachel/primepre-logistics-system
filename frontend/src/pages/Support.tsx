@@ -80,7 +80,7 @@ export default function Support() {
 
   const handleTicketSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Ticket submitted:", ticketForm);
+    // TODO: Implement actual ticket submission API call
     // Reset form
     setTicketForm({
       subject: "",

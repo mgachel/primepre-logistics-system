@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/stores/authStore';
 
 interface RoleBasedRouteProps {
   adminComponent: React.ReactNode;
@@ -7,17 +7,33 @@ interface RoleBasedRouteProps {
 }
 
 export function RoleBasedRoute({ adminComponent, customerComponent }: RoleBasedRouteProps) {
-  const { user, isCustomer } = useAuth();
+  const { user } = useAuthStore();
 
-  // Check if user has admin-level access (ADMIN, MANAGER, STAFF, SUPER_ADMIN)
-  const hasAdminAccess = user && ['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(user.user_role);
+  // Debug logging
+  console.log('🔍 RoleBasedRoute - AuthStore user:', {
+    user,
+    userRole: user?.user_role,
+  });
 
-  if (hasAdminAccess) {
+  // Use authStore for consistency with sidebar
+  const isAdminFromStore = user && user.user_role && ['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(user.user_role);
+  const isCustomerFromStore = user?.user_role === 'CUSTOMER';
+
+  console.log('🔍 RoleBasedRoute - Role check:', {
+    isAdminFromStore,
+    isCustomerFromStore
+  });
+
+  // Use the store-based logic to match the sidebar
+  if (isAdminFromStore) {
+    console.log('✅ Routing to ADMIN dashboard (using authStore)');
     return <>{adminComponent}</>;
-  } else if (isCustomer()) {
+  } else if (isCustomerFromStore) {
+    console.log('✅ Routing to CUSTOMER dashboard (using authStore)');
     return <>{customerComponent}</>;
   }
 
-  // Default fallback - show admin component (this shouldn't happen with proper auth)
-  return <>{adminComponent}</>;
+  // Default fallback - show customer component for authenticated users
+  console.log('⚠️ Fallback to customer dashboard');
+  return <>{customerComponent}</>;
 } 

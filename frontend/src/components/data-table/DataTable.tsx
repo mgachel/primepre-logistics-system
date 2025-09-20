@@ -31,9 +31,20 @@ interface DataTableProps<T> {
 }
 
 export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, rowActions, renderBulkBar, defaultSort }: DataTableProps<T>) {
-  const [visible, setVisible] = useState<Record<string, boolean>>(() => persistGet(`dt:${id}:cols`, Object.fromEntries(columns.map(c => [c.id, true]))));
-  const [sortBy, setSortBy] = useState<string | null>(() => persistGet(`dt:${id}:sortBy`, defaultSort?.column || null));
-  const [sortDir, setSortDir] = useState<"asc" | "desc">(() => persistGet(`dt:${id}:sortDir`, defaultSort?.direction || "asc"));
+  // Initialize hooks first - always call hooks in the same order
+  const [visible, setVisible] = useState<Record<string, boolean>>(() => {
+    if (!columns || columns.length === 0) return {};
+    const saved = persistGet(`dt:${id}:cols`) as Record<string, boolean> | null;
+    return saved || Object.fromEntries(columns.map(c => [c.id, true]));
+  });
+  const [sortBy, setSortBy] = useState<string | null>(() => {
+    const saved = persistGet(`dt:${id}:sortBy`) as string | null;
+    return saved || defaultSort?.column || null;
+  });
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(() => {
+    const saved = persistGet(`dt:${id}:sortDir`) as "asc" | "desc" | null;
+    return saved || defaultSort?.direction || "asc";
+  });
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   useEffect(() => { persistSet(`dt:${id}:cols`, visible); }, [id, visible]);
@@ -41,13 +52,22 @@ export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, ro
   useEffect(() => { persistSet(`dt:${id}:sortDir`, sortDir); }, [id, sortDir]);
 
   const ordered = useMemo(() => {
-    if (!sortBy) return rows;
+    if (!sortBy || !columns) return rows;
     const col = columns.find(c => c.id === sortBy);
     if (!col || !col.sort) return rows;
     const copied = [...rows];
-    copied.sort((a, b) => col.sort!(a, b));
+    copied.sort((a, b) => col.sort(a, b));
     return sortDir === "asc" ? copied : copied.reverse();
   }, [rows, columns, sortBy, sortDir]);
+
+  // Safety check for columns - after hooks are initialized
+  if (!columns || columns.length === 0) {
+    return (
+      <div className="p-4 text-center text-muted-foreground">
+        No columns defined for table
+      </div>
+    );
+  }
 
   const header = (
     <TableHeader className="sticky top-0 bg-background z-10">

@@ -86,17 +86,17 @@ export function ExcelUploadDialog({
   const getColumnSpecs = () => {
     if (uploadType === 'goods_received') {
       return {
-        title: 'Goods Received Column Specifications',
-        description: 'Column order is CRITICAL - header text is ignored, only position matters.',
+        title: 'Goods Received Column Specifications (A,B,C,D,E,G,H)',
+        description: 'Column position is CRITICAL - follows Excel columns A,B,C,D,E,G,H exactly.',
         columns: [
-          { index: 0, name: 'Shipping Mark', required: true, description: 'Customer unique identifier' },
-          { index: 1, name: 'Date of Receipt', required: true, description: 'Date goods received in warehouse' },
-          { index: 2, name: 'Date of Loading', required: false, description: 'Date goods loaded for shipping' },
-          { index: 3, name: 'Description', required: false, description: 'Description of goods' },
-          { index: 4, name: 'Quantity', required: false, description: 'Number of items/pieces (default: 0)' },
-          { index: 5, name: 'Specifications', required: false, description: '⚠️ SKIP - This column is completely ignored' },
-          { index: 6, name: 'CBM', required: false, description: 'Cubic meters (default: 0)' },
-          { index: 7, name: 'Supplier Tracking Number', required: false, description: 'Supplier tracking number' }
+          { index: 0, name: 'Shipping Mark/Client (A)', required: true, description: 'Customer unique identifier' },
+          { index: 1, name: 'Date of Receipt (B)', required: true, description: 'Date goods received in warehouse (DD/MM/YYYY)' },
+          { index: 2, name: 'Date of Loading (C)', required: false, description: 'Date goods loaded for shipping (DD/MM/YYYY)' },
+          { index: 3, name: 'Description (D)', required: true, description: 'Description of goods' },
+          { index: 4, name: 'CTNS/Quantity (E)', required: true, description: 'Number of cartons/pieces' },
+          { index: 5, name: 'Specifications (F)', required: false, description: '⚠️ SKIP - This column is ignored' },
+          { index: 6, name: 'CBM (G)', required: true, description: 'Cubic meters (required for Ghana warehouse)' },
+          { index: 7, name: 'Suppliers Tracking No (H)', required: true, description: 'Supplier tracking number' }
         ]
       };
     } else if (containerId) {

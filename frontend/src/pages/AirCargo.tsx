@@ -125,13 +125,22 @@ export default function AirCargo() {
       setLoading(true);
       setError(null);
       try {
-        const [containersRes, dashRes] = await Promise.all([
+        const [containersRes, dashRes, itemsRes] = await Promise.all([
           cargoService.getContainers({ cargo_type: "air" }),
           cargoService.getDashboard("air"),
+          cargoService.getCargoItems(), // Fetch all cargo items
         ]);
         if (!ignore) {
           const airContainers = containersRes.data?.results || [];
+          const allItems = itemsRes.data?.results || [];
+          
+          // Filter items that belong to air containers
+          const airItems = allItems.filter(item => 
+            airContainers.some(container => container.container_id === item.container)
+          );
+          
           setContainers(airContainers);
+          setItems(airItems);
           setDashboard(dashRes.data || null);
         }
       } catch (e: unknown) {
@@ -150,11 +159,22 @@ export default function AirCargo() {
   // Reload data function
   const reloadData = async () => {
     try {
-      const [containersRes, dashRes] = await Promise.all([
+      const [containersRes, dashRes, itemsRes] = await Promise.all([
         cargoService.getContainers({ cargo_type: "air" }),
         cargoService.getDashboard("air"),
+        cargoService.getCargoItems(), // Fetch all cargo items
       ]);
-      setContainers(containersRes.data?.results || []);
+      
+      const airContainers = containersRes.data?.results || [];
+      const allItems = itemsRes.data?.results || [];
+      
+      // Filter items that belong to air containers
+      const airItems = allItems.filter(item => 
+        airContainers.some(container => container.container_id === item.container)
+      );
+      
+      setContainers(airContainers);
+      setItems(airItems);
       setDashboard(dashRes.data || null);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to reload air cargo";
@@ -237,7 +257,7 @@ export default function AirCargo() {
     loading_date: string;
     eta: string | null;
     rate: number | null;
-    total_cbm: number | null;
+    total_weight: number | null;
     status: "in-transit" | "delivered" | "pending" | "delayed";
     clients: number;
     created_at: string;
@@ -253,6 +273,13 @@ export default function AirCargo() {
             : container.status === "demurrage"
             ? "delayed"
             : (container.status as Row["status"]);
+            
+        // Calculate total weight by summing weights of all cargo items in this container
+        const containerItems = items.filter(item => item.container === container.container_id);
+        const totalWeight = containerItems.reduce((sum, item) => {
+          return sum + (item.weight || 0);
+        }, 0);
+        
         return {
           id: container.container_id,
           container_id: container.container_id,
@@ -261,14 +288,14 @@ export default function AirCargo() {
             : "-",
           eta: container.eta ?? null,
           rate: container.rates ? Number(container.rates) : null,
-          total_cbm: container.cbm ?? null,
+          total_weight: totalWeight > 0 ? totalWeight : null,
           status,
           clients: container.total_clients,
           created_at: container.created_at,
           _raw: container,
         };
       }),
-    [filtered]
+    [filtered, items]
   );
 
   // Helper function to check if a date is overdue (in the past)
@@ -371,15 +398,15 @@ export default function AirCargo() {
       align: "right",
     },
     {
-      id: "total_cbm",
-      header: "Total CBM",
+      id: "total_weight",
+      header: "Total Weight",
       accessor: (r) => {
-        if (r.total_cbm === null || r.total_cbm === undefined) {
+        if (r.total_weight === null || r.total_weight === undefined) {
           return <span className="text-sm text-muted-foreground">-</span>;
         }
-        return <span className="text-sm">{r.total_cbm} m³</span>;
+        return <span className="text-sm">{r.total_weight} kg</span>;
       },
-      sort: (a, b) => (a.total_cbm || 0) - (b.total_cbm || 0),
+      sort: (a, b) => (a.total_weight || 0) - (b.total_weight || 0),
       align: "right",
     },
     {
@@ -871,7 +898,7 @@ export default function AirCargo() {
               </div>
 
               {/* Capacity & Weight */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">
                     Weight (kg)
@@ -880,14 +907,6 @@ export default function AirCargo() {
                     {viewContainer.weight
                       ? `${viewContainer.weight.toLocaleString()} kg`
                       : "Not set"}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    CBM
-                  </label>
-                  <p className="text-sm">
-                    {viewContainer.cbm ? `${viewContainer.cbm} m³` : "Not set"}
                   </p>
                 </div>
               </div>
