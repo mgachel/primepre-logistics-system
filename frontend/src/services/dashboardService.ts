@@ -71,16 +71,14 @@ export interface AdminDashboardStats {
 }
 
 export const dashboardService = {
-  // Get customer dashboard data
-  async getCustomerDashboard(): Promise<ApiResponse<CustomerDashboardData>> {
-    return apiClient.get<CustomerDashboardData>('/api/customer/dashboard/');
-  },
 
-  // Get admin/staff dashboard (for users with appropriate permissions)
-  async getAdminDashboard(): Promise<ApiResponse<AdminDashboardStats>> {
-    // This would depend on having admin dashboard endpoints in the backend
-    // For now, we'll use the cargo dashboard as a fallback
-    return apiClient.get<AdminDashboardStats>('/api/cargo/dashboard/');
+  // Get dashboard data based on user role
+  async getDashboard(userRole: string): Promise<ApiResponse<CustomerDashboardData | AdminDashboardStats>> {
+    if (userRole === 'CUSTOMER') {
+      return apiClient.get<CustomerDashboardData>('/api/cargo/customer/dashboard/');
+    } else {
+      return apiClient.get<AdminDashboardStats>('/api/cargo/dashboard/');
+    }
   },
 
   // Get warehouse summary (combining China and Ghana stats)
@@ -117,31 +115,50 @@ export const dashboardService = {
     recent_cargo: (CargoContainer | CargoItem)[];
     flagged_count: number;
   }>> {
-    const [chinaItems, ghanaItems, containers, cargoItems] = await Promise.all([
-      apiClient.get<PaginatedResponse<WarehouseItem>>('/api/customer/goods/china/?limit=5&ordering=-created_at'),
-      apiClient.get<PaginatedResponse<WarehouseItem>>('/api/customer/goods/ghana/?limit=5&ordering=-created_at'),
-      apiClient.get<PaginatedResponse<CargoContainer>>('/api/cargo/customer/containers/?limit=3&ordering=-created_at'),
-      apiClient.get<PaginatedResponse<CargoItem>>('/api/cargo/customer/cargo-items/?limit=3&ordering=-created_at')
-    ]);
+    try {
+      const [chinaItemsResult, ghanaItemsResult, containersResult, cargoItemsResult] = await Promise.allSettled([
+        apiClient.get<PaginatedResponse<WarehouseItem>>('/api/goods/customer/china/?limit=5&ordering=-created_at'),
+        apiClient.get<PaginatedResponse<WarehouseItem>>('/api/goods/customer/ghana/?limit=5&ordering=-created_at'),
+        apiClient.get<PaginatedResponse<CargoContainer>>('/api/cargo/customer/containers/?limit=3&ordering=-created_at'),
+        apiClient.get<PaginatedResponse<CargoItem>>('/api/cargo/customer/cargo-items/?limit=3&ordering=-created_at')
+      ]);
+      
+      // Safely extract data from settled promises
+      const chinaItems = chinaItemsResult.status === 'fulfilled' ? chinaItemsResult.value.data?.results || [] : [];
+      const ghanaItems = ghanaItemsResult.status === 'fulfilled' ? ghanaItemsResult.value.data?.results || [] : [];
+      const containers = containersResult.status === 'fulfilled' ? containersResult.value.data?.results || [] : [];
+      const cargoItems = cargoItemsResult.status === 'fulfilled' ? cargoItemsResult.value.data?.results || [] : [];
+      
+      const recentItems = [
+        ...chinaItems,
+        ...ghanaItems
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10);
     
-    const recentItems = [
-      ...(chinaItems.data?.results || []),
-      ...(ghanaItems.data?.results || [])
-    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10);
+      const recentCargo = [
+        ...containers,
+        ...cargoItems
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
     
-    const recentCargo = [
-      ...(containers.data?.results || []),
-      ...(cargoItems.data?.results || [])
-    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
-    
-    return {
-      data: {
-        recent_items: recentItems,
-        recent_cargo: recentCargo,
-        flagged_count: recentItems.filter(item => item.status === 'FLAGGED').length
-      },
-      success: true,
-      message: 'Recent activity retrieved successfully'
-    };
+      return {
+        data: {
+          recent_items: recentItems,
+          recent_cargo: recentCargo,
+          flagged_count: recentItems.filter(item => item.status === 'FLAGGED').length
+        },
+        success: true,
+        message: 'Recent activity retrieved successfully'
+      };
+    } catch (error) {
+      console.error('Error fetching recent activity:', error);
+      return {
+        data: {
+          recent_items: [],
+          recent_cargo: [],
+          flagged_count: 0
+        },
+        success: false,
+        message: 'Failed to retrieve recent activity'
+      };
+    }
   }
-}; 
+};

@@ -1,14 +1,12 @@
 import {
   Package,
   Truck,
-  Users,
   Ship,
   Plane,
   TrendingUp,
   Calendar,
   Plus,
   Upload,
-  RefreshCcw,
   AlertTriangle,
 } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
@@ -18,22 +16,15 @@ import { Link } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { adminService, UserStats } from "@/services/adminService";
+import { adminService } from "@/services/adminService";
 import { apiClient } from "@/services/api";
-import type { ApiResponse, PaginatedResponse } from "@/services/api";
-import type { User } from "@/services/authService";
 import { DataTable, Column } from "@/components/data-table/DataTable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
-import { cargoService, BackendCargoContainer } from "@/services/cargoService";
+import { cargoService } from "@/services/cargoService";
 import { dashboardService } from "@/services/dashboardService";
 import { claimsService } from "@/services/claimsService";
-import { useAuth } from "@/contexts/AuthContext";
-import type { WarehouseItem } from "@/services/warehouseService";
-import type {
-  CargoContainer as LegacyCargoContainer,
-  CargoItem as LegacyCargoItem,
-} from "@/services/cargoService";
+import { useAuthStore } from "@/stores/authStore";
 
 type GoodsStats = { total_cbm?: number };
 type CargoContainer = {
@@ -42,250 +33,216 @@ type CargoContainer = {
   route?: string;
   eta?: string;
   client_summaries?: Array<{ client_name?: string }>;
-};
-type CargoDashboard = {
-  containers_in_transit?: number;
-  total_cargo_items?: number;
-  recent_containers?: CargoContainer[];
+  cargo_type?: string;
+  container_number?: string;
+  client_name?: string;
+  customer_name?: string;
 };
 
 export default function Dashboard() {
   const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
   const queryClient = useQueryClient();
-  const { isCustomer } = useAuth();
+  const { user } = useAuthStore();
 
-  // Customer Claims (only for customers)
-  const { data: customerClaims, isLoading: loadingClaims } = useQuery({
-    queryKey: ["customer-claims"],
-    queryFn: () => claimsService.getCustomerClaims(),
-    enabled: isCustomer(), // Only fetch if user is a customer
+  // Helper functions for role checking (matching authStore logic)
+  const isCustomer = useMemo(() => user?.user_role === 'CUSTOMER', [user?.user_role]);
+  const isAdmin = useMemo(() => user && user.user_role && ['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(user.user_role), [user]);
+  const isManager = useMemo(() => user?.user_role === 'MANAGER', [user?.user_role]);
+
+  console.log('🔍 Dashboard Debug:', {
+    user: user,
+    userRole: user?.user_role,
+    isAdmin: isAdmin,
+    isCustomer: isCustomer
   });
 
-  // Admin/user stats
+  // Single unified dashboard query based on user role
+  const { data: dashboardData } = useQuery({
+    queryKey: ["dashboard-data", user?.user_role, user?.id], // Include user ID to prevent cross-user caching
+    queryFn: () => {
+      console.log('📊 Fetching dashboard data for role:', user?.user_role);
+      return dashboardService.getDashboard(user?.user_role || "CUSTOMER");
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    refetchOnWindowFocus: false,
+  });
+
+  console.log('📊 Dashboard data received:', dashboardData);
+
+  // Customer-specific claims (only load for customers)
+  const { data: customerClaims, isLoading: loadingClaims } = useQuery({
+    queryKey: ["customer-claims", user?.id], // Include user ID to prevent cross-user caching
+    queryFn: () => claimsService.getCustomerClaims(),
+    enabled: isCustomer && !!user,
+    staleTime: 10 * 60 * 1000, // Cache longer for claims
+  });
+
+  // Admin-only user stats (only load for admin/manager roles)
   const { data: userStats, isLoading: loadingUsers } = useQuery({
     queryKey: ["admin-user-stats"],
     queryFn: () => adminService.getUserStats(),
+    enabled: (isAdmin || isManager) && !!user,
+    staleTime: 15 * 60 * 1000, // Cache longer for admin stats
   });
 
-  // Goods statistics (admin endpoints for admins, customer endpoints for customers)
-  const { data: chinaStats, isLoading: loadingChina } = useQuery({
-    queryKey: ["goods-stats", "china", isCustomer() ? "customer" : "admin"],
-    queryFn: () => isCustomer() 
-      ? apiClient.get<GoodsStats>("/api/customer/goods/china/my_statistics/")
-      : apiClient.get<GoodsStats>("/api/goods/china/statistics/"),
-  });
-  const { data: ghanaStats, isLoading: loadingGhana } = useQuery({
-    queryKey: ["goods-stats", "ghana", isCustomer() ? "customer" : "admin"],
-    queryFn: () => isCustomer()
-      ? apiClient.get<GoodsStats>("/api/customer/goods/ghana/my_statistics/")
-      : apiClient.get<GoodsStats>("/api/goods/ghana/statistics/"),
-  });
-
-  // In-transit containers (sea and air) - use customer endpoints for customers
-  const { data: seaInTransit, isLoading: loadingSea } = useQuery<ApiResponse<PaginatedResponse<any>>>({
-    queryKey: ["containers", "sea", "in_transit", isCustomer() ? "customer" : "admin"],
-    queryFn: () => isCustomer()
-      ? cargoService.getCustomerContainers({ status: "in_transit" })
-      : cargoService.getContainers({ cargo_type: "sea", status: "in_transit" }),
-  });
-  const { data: airInTransit, isLoading: loadingAir } = useQuery<ApiResponse<PaginatedResponse<any>>>({
-    queryKey: ["containers", "air", "in_transit", isCustomer() ? "customer" : "admin"],
-    queryFn: () => isCustomer()
-      ? cargoService.getCustomerContainers({ status: "in_transit" })
-      : cargoService.getContainers({ cargo_type: "air", status: "in_transit" }),
-  });
-
-  // Fetch ALL in-transit containers across pagination for table completeness
-  type Page<T> = {
-    count: number;
-    next?: string | null;
-    previous?: string | null;
-    results: T[];
-  };
-  const { data: allInTransit, isLoading: loadingAllTransit } = useQuery({
-    queryKey: ["containers", "in_transit", "all"],
+  // Role-based goods statistics - single query instead of separate china/ghana
+  const { data: goodsStats, isLoading: loadingGoods } = useQuery({
+    queryKey: ["goods-stats", user?.user_role, user?.id], // Include user ID for customer personal stats
     queryFn: async () => {
-      const fetchAll = async (
-        type: "sea" | "air"
-      ): Promise<BackendCargoContainer[]> => {
-        let page = 1;
-        const acc: BackendCargoContainer[] = [];
-        for (;;) {
-          const resp = await cargoService.getContainers({
-            cargo_type: type,
-            status: "in_transit",
-            page,
-          });
-          const data = resp.data as unknown as Page<BackendCargoContainer>;
-          acc.push(...(data?.results || []));
-          if (!data?.next) break;
-          page += 1;
-        }
-        return acc;
-      };
-      const [sea, air] = await Promise.all([fetchAll("sea"), fetchAll("air")]);
-      return { sea, air };
+      if (isCustomer) {
+        // For customers: China = personal stats, Ghana = all warehouse stats (since customers can see all Ghana goods)
+        const [china, ghana] = await Promise.all([
+          apiClient.get<GoodsStats>("/api/customer/goods/china/my_statistics/"),
+          apiClient.get<GoodsStats>("/api/customer/goods/ghana/statistics/") // Use general stats since customers see all Ghana goods
+        ]);
+        return { china: china.data, ghana: ghana.data };
+      } else {
+        // For admin/staff, get overall stats
+        const [china, ghana] = await Promise.all([
+          apiClient.get<GoodsStats>("/api/goods/china/statistics/"),
+          apiClient.get<GoodsStats>("/api/goods/ghana/statistics/")
+        ]);
+        return { china: china.data, ghana: ghana.data };
+      }
     },
+    enabled: !!user,
+    staleTime: 10 * 60 * 1000,
   });
 
-  // Cargo items in transit count
-  const { data: itemsInTransit } = useQuery({
-    queryKey: ["cargo-items", "in_transit", "count"],
-    queryFn: () => cargoService.getCargoItems({ status: "in_transit" }),
+  // Simplified container query - only load what's needed for the role
+  const { data: containerData, isLoading: loadingContainers } = useQuery({
+    queryKey: ["containers-summary", user?.user_role],
+    queryFn: async () => {
+      if (isCustomer) {
+        // Customers only see their own containers
+        const containers = await cargoService.getCustomerContainers({ 
+          status: "in_transit",
+          page_size: 10 // Limit to first 10 for performance
+        });
+        return {
+          inTransit: containers.data?.results || [],
+          seaCount: containers.data?.results?.filter((c: CargoContainer) => c.cargo_type === 'sea').length || 0,
+          airCount: containers.data?.results?.filter((c: CargoContainer) => c.cargo_type === 'air').length || 0,
+          total: containers.data?.count || 0
+        };
+      } else {
+        // Admin/staff get actual transit containers with limited count
+        const [sea, air] = await Promise.all([
+          cargoService.getContainers({ cargo_type: "sea", status: "in_transit", page_size: 10 }),
+          cargoService.getContainers({ cargo_type: "air", status: "in_transit", page_size: 10 })
+        ]);
+        
+        // Combine the actual container data for display
+        const seaContainers = sea.data?.results || [];
+        const airContainers = air.data?.results || [];
+        const allTransitContainers = [...seaContainers, ...airContainers];
+        
+        return {
+          inTransit: allTransitContainers, // Load actual containers for display
+          seaCount: sea.data?.count || 0,
+          airCount: air.data?.count || 0,
+          total: (sea.data?.count || 0) + (air.data?.count || 0)
+        };
+      }
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Recent activity across warehouses and cargo
+  // Recent activity (lighter query, only for admin/staff)
   const { data: recentActivity, isLoading: loadingRecent } = useQuery({
     queryKey: ["recent-activity"],
     queryFn: () => dashboardService.getRecentActivity(),
+    enabled: !isCustomer && !!user,
+    staleTime: 5 * 60 * 1000,
   });
 
   const stats = useMemo(() => {
+    // Use the optimized goodsStats instead of separate china/ghana queries
     const cbmInWarehouse =
-      (chinaStats?.data?.total_cbm || 0) + (ghanaStats?.data?.total_cbm || 0);
-    // Some query return shapes may place counts on the root or inside a `data` object.
-    // Coerce to any and check both possibilities to avoid type mismatch from the react-query generic.
-    const activeShipments =
-      (((seaInTransit as any)?.data?.count ?? (seaInTransit as any)?.count) || 0) +
-      (((airInTransit as any)?.data?.count ?? (airInTransit as any)?.count) || 0);
-    const totalCargoItems = ((itemsInTransit as any)?.data?.count ?? (itemsInTransit as any)?.count) || 0; // only items currently in transit
-    const activeClients =
-      (userStats as ApiResponse<UserStats> | undefined)?.data?.active_users ??
-      0;
+      (goodsStats?.china?.total_cbm || 0) + (goodsStats?.ghana?.total_cbm || 0);
     
+    // Use the optimized containerData instead of separate sea/air queries
+    const activeShipments = containerData?.total || 0;
+    
+    // For customers, get items from dashboard data; for admins, use separate query if needed
+    const totalCargoItems = dashboardData?.data?.cargo_items_count || 0;
+    
+    const activeClients = userStats?.data?.active_users ?? 0;
+
+    // Delayed/Demurrage containers from the limited container data
+    const delayedContainers = containerData?.inTransit?.filter(c => {
+      if (!c.eta) return false;
+      const etaDate = new Date(c.eta);
+      return isOverdue(etaDate);
+    }).length || 0;
+
     // Calculate pending claims for customers
-    const pendingClaims = isCustomer() 
+    const pendingClaims = isCustomer 
       ? (customerClaims?.success && customerClaims.data 
           ? customerClaims.data.filter(claim => claim.status === 'PENDING').length 
           : 0)
       : 0;
-    
-    return { cbmInWarehouse, activeShipments, totalCargoItems, activeClients, pendingClaims };
+
+    return { cbmInWarehouse, activeShipments, totalCargoItems, activeClients, pendingClaims, delayedContainers };
   }, [
-    chinaStats,
-    ghanaStats,
-    seaInTransit,
-    airInTransit,
-    itemsInTransit,
+    goodsStats,
+    containerData,
+    dashboardData,
     userStats,
     customerClaims,
     isCustomer,
   ]);
 
+  // Simplified loading states
+  const loadingStats = loadingGoods || loadingContainers || loadingUsers || (isCustomer && loadingClaims);
+  const loadingTransiting = loadingContainers;
+
+  // Combine container data for the transiting cargo table
   const transitingCargo = useMemo(() => {
-    const mapContainer =
-      (type: "sea" | "air") => (c: BackendCargoContainer) => ({
-        type,
-        container: c?.container_id || '',
-        client: "-",
-        route: c?.route || "-",
-        eta: c?.eta || "-",
-        status: "in-transit" as const,
-      });
-    const sea = (allInTransit?.sea || []).filter(Boolean).map(mapContainer("sea"));
-    const air = (allInTransit?.air || []).filter(Boolean).map(mapContainer("air"));
-    return [...sea, ...air];
-  }, [allInTransit]);
-
-  const recentEvents = useMemo(() => {
-    const items = (
-      (recentActivity?.data?.recent_items ?? []) as WarehouseItem[]
-    ).map((it) => {
-      // Some backends may provide an external identifier using different keys;
-      // safely attempt to read those without assuming the typed model contains them.
-      const meta = it as unknown as Record<string, unknown>;
-      const externalId =
-        (meta["primepre_id"] ?? meta["primepreId"]) as string | undefined;
-      const externalIdStr = externalId ? String(externalId) : undefined;
-
+    console.log('🚚 Processing transit cargo data:', containerData);
+    
+    if (!containerData?.inTransit) {
+      console.log('⚠️ No inTransit data available');
+      return [];
+    }
+    
+    console.log('🚚 InTransit containers:', containerData.inTransit);
+    
+    return containerData.inTransit.map((container: CargoContainer) => {
+      const containerNumber = container.container_number || 
+                              container.container_id || 
+                              container.awb_number || 
+                              container.tracking_number ||
+                              container.number ||
+                              container.id || 
+                              'N/A';
+      
       return {
-        id: externalIdStr ?? String(it.id),
-        when: it.created_at || it.updated_at,
-        title: `Warehouse item ${externalIdStr ? `#${externalIdStr}` : ""}`.trim(),
-        detail:
-          (meta["warehouse_location"] as string) ||
-          (meta["warehouseLocation"] as string) ||
-          (meta["warehouse"] as string) ||
-          "Warehouse",
-        status:
-          String(it.status || "").toLowerCase() === "flagged"
-            ? ("risk" as const)
-            : String(it.status || "").toLowerCase() === "delivered"
-            ? ("delivered" as const)
-            : ("pending" as const),
+        type: container.cargo_type || 'sea',
+        container: containerNumber,
+        client: container.client_name || container.customer_name || container.client || '-',
+        route: container.route || container.origin_destination || '-',
+        eta: container.eta || container.estimated_arrival || null,
       };
     });
+  }, [containerData]);
 
-    const cargoList = (
-      (recentActivity?.data?.recent_cargo ?? []) as Array<
-        LegacyCargoContainer | LegacyCargoItem
-      >
-    ).map((c) => {
-      const when =
-        (c as LegacyCargoContainer).created_at ??
-        (c as LegacyCargoItem).created_at;
-      const updated =
-        (c as LegacyCargoContainer).updated_at ??
-        (c as LegacyCargoItem).updated_at;
-      const whenVal = when || updated;
-      const statusRaw = String(
-        ((c as LegacyCargoContainer).status ?? (c as LegacyCargoItem).status) ||
-          ""
-      );
-      const status =
-        statusRaw.toLowerCase() === "in_transit"
-          ? ("in-transit" as const)
-          : statusRaw.toLowerCase() === "delivered"
-          ? ("delivered" as const)
-          : ("pending" as const);
-
-      if ((c as LegacyCargoContainer).container_number !== undefined) {
-        const cc = c as LegacyCargoContainer;
-        return {
-          id: cc.container_number,
-          when: whenVal,
-          title: `Container ${cc.container_number}`,
-          detail:
-            `${cc.origin_port ?? ""}${cc.origin_port ? " → " : ""}${
-              cc.destination_port ?? ""
-            }` || "Cargo",
-          status,
-        };
-      } else {
-        const ci = c as LegacyCargoItem;
-        return {
-          id: String(ci.id),
-          when: whenVal,
-          title: ci.awb_number ? `AWB ${ci.awb_number}` : `Cargo item updated`,
-          detail: ci.description || "Cargo item",
-          status,
-        };
-      }
-    });
-
-    // Users joined events
-        const userJoins = (((userStats?.data as any)?.recent_users ?? []) as User[]).map(
-          (u) => ({
-            id: String(u.id),
-            when: (u as User).date_joined as unknown as string,
-            title: u.full_name
-              ? `${u.full_name} joined`
-              : `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() + " joined",
-            detail: u.email || "New user registration",
-            status: u.is_active ? ("active" as const) : ("inactive" as const),
-          })
-        );
-
-    const combined = [...items, ...cargoList, ...userJoins].sort(
-      (a, b) =>
-        new Date(b.when || 0).getTime() - new Date(a.when || 0).getTime()
-    );
-    return combined.slice(0, 7);
-  }, [recentActivity, userStats]);
-
-  const loadingStats =
-    loadingChina || loadingGhana || loadingSea || loadingAir || loadingUsers || (isCustomer() && loadingClaims);
-  const loadingTransiting = loadingAllTransit;
+  // Transform recent activity data for the UI
+  const recentEvents = useMemo(() => {
+    if (!recentActivity?.data) return [];
+    
+    // Assuming recentActivity.data is an array of activity items
+    const activities = Array.isArray(recentActivity.data) ? recentActivity.data : [];
+    
+    return activities.map((activity: Record<string, unknown>) => ({
+      title: activity.title as string || activity.description as string || 'Activity',
+      detail: activity.detail as string || activity.message as string || '',
+      when: activity.timestamp as string || activity.created_at as string || activity.date as string,
+      status: activity.status as string || 'completed',
+    }));
+  }, [recentActivity]);
 
   type Row = {
     type: "sea" | "air";
@@ -396,7 +353,7 @@ export default function Dashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {loadingStats ? (
-          Array.from({ length: isCustomer() ? 4 : 4 }).map((_, i) => (
+          Array.from({ length: isCustomer ? 4 : 4 }).map((_, i) => (
             <div key={i} className="logistics-card p-6">
               <Skeleton className="h-4 w-24 mb-4" />
               <Skeleton className="h-8 w-32" />
@@ -404,7 +361,7 @@ export default function Dashboard() {
           ))
         ) : (
           <>
-            {isCustomer() ? (
+            {isCustomer ? (
               // Customer Dashboard Cards
               <>
                 <MetricCard
@@ -441,28 +398,28 @@ export default function Dashboard() {
               // Admin Dashboard Cards
               <>
                 <MetricCard
-                  title="CBM in Warehouse"
-                  value={stats.cbmInWarehouse.toString()}
+                  title="Total Containers"
+                  value={stats.activeShipments.toString()}
                   icon={Package}
                   change={{ value: "+2.1%", type: "increase" }}
                 />
                 <MetricCard
-                  title="Active Shipments"
+                  title="In Transit"
                   value={stats.activeShipments.toString()}
                   icon={Truck}
                   change={{ value: "-1.3%", type: "decrease" }}
                 />
                 <MetricCard
-                  title="Total Cargo Items"
-                  value={stats.totalCargoItems.toString()}
+                  title="Total CBM"
+                  value={Number(stats.cbmInWarehouse).toFixed(4)}
                   icon={TrendingUp}
                   change={{ value: "+0.4%", type: "increase" }}
                 />
                 <MetricCard
                   title="Active Clients"
                   value={stats.activeClients.toString()}
-                  icon={Users}
-                  change={{ value: "0%", type: "neutral" }}
+                  icon={AlertTriangle}
+                  change={{ value: "+12.5%", type: "increase" }}
                 />
               </>
             )}
@@ -544,51 +501,88 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Recent Activity */}
-        <div>
-          <div className="logistics-card">
-            <div className="p-6 border-b border-border">
-              <h3 className="text-lg font-semibold">Recent Activity</h3>
-            </div>
-            <div className="p-6">
-              {loadingRecent ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <Skeleton className="w-2 h-2 rounded-full mt-2" />
-                      <div className="flex-1">
-                        <Skeleton className="h-4 w-40 mb-2" />
-                        <Skeleton className="h-3 w-24" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {recentEvents.map((e, index) => (
-                    <div key={index} className="flex items-start gap-3">
-                      <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{e.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {e.detail}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-muted-foreground">
-                            {e.when
-                              ? new Date(e.when).toLocaleDateString()
-                              : ""}
-                          </span>
-                          <StatusBadge status={e.status} />
+        {/* Recent Activity - Only show for admin/manager users */}
+        {!isCustomer && (
+          <div>
+            <div className="logistics-card">
+              <div className="p-6 border-b border-border">
+                <h3 className="text-lg font-semibold">Recent Activity</h3>
+              </div>
+              <div className="p-6">
+                {loadingRecent ? (
+                  <div className="space-y-3">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <Skeleton className="w-2 h-2 rounded-full mt-2" />
+                        <div className="flex-1">
+                          <Skeleton className="h-4 w-40 mb-2" />
+                          <Skeleton className="h-3 w-24" />
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recentEvents.length > 0 ? recentEvents.map((e, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{e.title}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {e.detail}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-muted-foreground">
+                              {e.when  
+                                ? new Date(e.when).toLocaleDateString()
+                                : ""}
+                            </span>
+                            <StatusBadge status={e.status === 'completed' ? 'completed' : 'pending'} />
+                          </div>
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="text-center text-muted-foreground">
+                        No recent activity
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
+        
+        {/* Customer-specific quick actions */}
+        {isCustomer && (
+          <div>
+            <div className="logistics-card">
+              <div className="p-6 border-b border-border">
+                <h3 className="text-lg font-semibold">Quick Actions</h3>
+              </div>
+              <div className="p-6 space-y-3">
+                <Link to="/track" className="block">
+                  <Button variant="outline" className="w-full justify-start">
+                    <Package className="h-4 w-4 mr-2" />
+                    Track Shipment
+                  </Button>
+                </Link>
+                <Link to="/my-claims" className="block">
+                  <Button variant="outline" className="w-full justify-start">
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    File Claim
+                  </Button>
+                </Link>
+                <Link to="/cargo/upload" className="block">
+                  <Button variant="outline" className="w-full justify-start">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Documents
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <NewCargoContainerDialog
@@ -596,24 +590,22 @@ export default function Dashboard() {
         onOpenChange={(o) => {
           setShowNewCargoDialog(o);
           if (!o) {
-            // refresh after closing if created
+            // Refresh the optimized queries after closing if created
             queryClient.invalidateQueries({
-              queryKey: ["containers", "sea", "in_transit"],
+              queryKey: ["dashboard-data"],
             });
             queryClient.invalidateQueries({
-              queryKey: ["containers", "air", "in_transit"],
+              queryKey: ["goods-stats"],
             });
             queryClient.invalidateQueries({
-              queryKey: ["cargo-items", "in_transit", "count"],
+              queryKey: ["containers-summary"],
             });
-            queryClient.invalidateQueries({
-              queryKey: ["goods-stats", "china"],
+            queryClient.invalidateQueries({ 
+              queryKey: ["admin-user-stats"] 
             });
-            queryClient.invalidateQueries({
-              queryKey: ["goods-stats", "ghana"],
+            queryClient.invalidateQueries({ 
+              queryKey: ["recent-activity"] 
             });
-            queryClient.invalidateQueries({ queryKey: ["admin-user-stats"] });
-            queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
           }
         }}
       />

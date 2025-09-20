@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { adminService, CreateAdminRequest } from "@/services/adminService";
 
@@ -42,13 +41,13 @@ export function NewAdminDialog({
     region: "",
     user_role: "STAFF",
     user_type: "INDIVIDUAL",
-    accessible_warehouses: ["china"],
+    password: "",
+    confirm_password: "",
+    accessible_warehouses: ["china", "ghana"],
     can_create_users: false,
     can_manage_inventory: false,
     can_view_analytics: false,
     can_manage_admins: false,
-    password: "",
-    confirm_password: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,7 +75,22 @@ export function NewAdminDialog({
     try {
       setLoading(true);
 
-      const response = await adminService.createAdminUser(formData);
+      // Add default values for removed fields
+      const adminData: CreateAdminRequest = {
+        ...formData,
+        accessible_warehouses: ["china", "ghana"], // Default warehouse access
+        can_create_users: false,
+        can_manage_inventory: false,
+        can_view_analytics: false,
+        can_manage_admins: false,
+      };
+
+      // Remove empty email to avoid unique constraint issues
+      if (!adminData.email || adminData.email.trim() === '') {
+        delete adminData.email;
+      }
+
+      const response = await adminService.createAdminUser(adminData);
 
       if (response.success) {
         toast({
@@ -94,13 +108,13 @@ export function NewAdminDialog({
           region: "",
           user_role: "STAFF",
           user_type: "INDIVIDUAL",
-          accessible_warehouses: ["china"],
+          password: "",
+          confirm_password: "",
+          accessible_warehouses: ["china", "ghana"],
           can_create_users: false,
           can_manage_inventory: false,
           can_view_analytics: false,
           can_manage_admins: false,
-          password: "",
-          confirm_password: "",
         });
 
         onOpenChange(false);
@@ -121,15 +135,6 @@ export function NewAdminDialog({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleWarehouseChange = (warehouse: string, checked: boolean) => {
-    setFormData((prev) => ({
-      ...prev,
-      accessible_warehouses: checked
-        ? [...prev.accessible_warehouses, warehouse]
-        : prev.accessible_warehouses.filter((w) => w !== warehouse),
-    }));
   };
 
   return (
@@ -201,15 +206,35 @@ export function NewAdminDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="region">Region *</Label>
-                <Input
-                  id="region"
+                <Select
                   value={formData.region}
-                  onChange={(e) =>
-                    setFormData({ ...formData, region: e.target.value })
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, region: value })
                   }
-                  placeholder="Greater Accra"
-                  required
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select region" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="GREATER_ACCRA">Greater Accra</SelectItem>
+                    <SelectItem value="ASHANTI">Ashanti</SelectItem>
+                    <SelectItem value="WESTERN">Western</SelectItem>
+                    <SelectItem value="CENTRAL">Central</SelectItem>
+                    <SelectItem value="VOLTA">Volta</SelectItem>
+                    <SelectItem value="EASTERN">Eastern</SelectItem>
+                    <SelectItem value="NORTHERN">Northern</SelectItem>
+                    <SelectItem value="UPPER_EAST">Upper East</SelectItem>
+                    <SelectItem value="UPPER_WEST">Upper West</SelectItem>
+                    <SelectItem value="BRONG_AHAFO">Brong Ahafo</SelectItem>
+                    <SelectItem value="WESTERN_NORTH">Western North</SelectItem>
+                    <SelectItem value="AHAFO">Ahafo</SelectItem>
+                    <SelectItem value="BONO">Bono</SelectItem>
+                    <SelectItem value="BONO_EAST">Bono East</SelectItem>
+                    <SelectItem value="OTI">Oti</SelectItem>
+                    <SelectItem value="NORTH_EAST">North East</SelectItem>
+                    <SelectItem value="SAVANNAH">Savannah</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
@@ -272,85 +297,6 @@ export function NewAdminDialog({
                     <SelectItem value="BUSINESS">Business</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* Warehouse Access */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium">Warehouse Access</h4>
-            <div className="flex gap-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="china"
-                  checked={formData.accessible_warehouses.includes("china")}
-                  onCheckedChange={(checked) =>
-                    handleWarehouseChange("china", !!checked)
-                  }
-                />
-                <Label htmlFor="china">China Warehouse</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="ghana"
-                  checked={formData.accessible_warehouses.includes("ghana")}
-                  onCheckedChange={(checked) =>
-                    handleWarehouseChange("ghana", !!checked)
-                  }
-                />
-                <Label htmlFor="ghana">Ghana Warehouse</Label>
-              </div>
-            </div>
-          </div>
-
-          {/* Permissions */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium">Permissions</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="can_create_users"
-                  checked={formData.can_create_users}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, can_create_users: !!checked })
-                  }
-                />
-                <Label htmlFor="can_create_users">Can Create Users</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="can_manage_inventory"
-                  checked={formData.can_manage_inventory}
-                  onCheckedChange={(checked) =>
-                    setFormData({
-                      ...formData,
-                      can_manage_inventory: !!checked,
-                    })
-                  }
-                />
-                <Label htmlFor="can_manage_inventory">
-                  Can Manage Inventory
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="can_view_analytics"
-                  checked={formData.can_view_analytics}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, can_view_analytics: !!checked })
-                  }
-                />
-                <Label htmlFor="can_view_analytics">Can View Analytics</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="can_manage_admins"
-                  checked={formData.can_manage_admins}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, can_manage_admins: !!checked })
-                  }
-                />
-                <Label htmlFor="can_manage_admins">Can Manage Admins</Label>
               </div>
             </div>
           </div>

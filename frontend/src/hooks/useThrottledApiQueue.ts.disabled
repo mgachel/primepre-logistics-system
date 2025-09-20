@@ -1,0 +1,238 @@
+/**
+ * useThrottledApiQueue Hook (Updated)
+ *
+ * React hook for integrating with the throttled API queue
+ * Provides status updates, request spacing, and 429 handling
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { throttledApiQueue, QueueStatus, RateLimitInfo } from '@/services/throttledApiQueue';
+import { ApiResponse } from '@/services/api';
+import { customerDashboardService } from '@/services/customerDashboardService';
+
+export interface UseThrottledApiQueueReturn {
+  // Status
+  status: QueueStatus;
+  isLoading: boolean;
+  isRateLimited: boolean;
+
+  // Request methods
+  enqueueRequest: (
+    requestFn: () => Promise<ApiResponse<any>>,
+    options?: {
+      priority?: 'high' | 'medium' | 'low';
+      cacheKey?: string;
+      maxRetries?: number;
+      id?: string;
+    }
+  ) => Promise<ApiResponse<any>>;
+
+  // Cache management
+  clearCache: (key?: string) => void;
+
+  // Queue management
+  resetQueue: () => void;
+
+  // Rate limit info
+  rateLimitInfo: RateLimitInfo;
+}
+
+/**
+ * Hook for using the throttled API queue
+ */
+export function useThrottledApiQueue(): UseThrottledApiQueueReturn {
+  const [status, setStatus] = useState<QueueStatus>(() => {
+    const initialStatus = throttledApiQueue.getStatus();
+    // Ensure all required properties are present
+    return {
+      isProcessing: initialStatus.isProcessing || false,
+      queueLength: initialStatus.queueLength || 0,
+      rateLimitInfo: initialStatus.rateLimitInfo || { isActive: false }
+    };
+  });
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  // Subscribe to status changes
+  useEffect(() => {
+    const safeSetStatus = (newStatus: QueueStatus) => {
+      // Ensure all required properties are present
+      setStatus({
+        isProcessing: newStatus.isProcessing || false,
+        queueLength: newStatus.queueLength || 0,
+        rateLimitInfo: newStatus.rateLimitInfo || { isActive: false }
+      });
+    };
+    
+    unsubscribeRef.current = throttledApiQueue.onStatusChange(safeSetStatus);
+    return () => unsubscribeRef.current?.();
+  }, []);
+
+  // Enqueue request wrapper with 2-second delay + 429 retry handling
+  const enqueueRequest = useCallback(async (
+    requestFn: () => Promise<ApiResponse<any>>,
+    options?: {
+      priority?: 'high' | 'medium' | 'low';
+      cacheKey?: string;
+      maxRetries?: number;
+      id?: string;
+    }
+  ): Promise<ApiResponse<any>> => {
+    const runWithDelay = async () => {
+      // Ensure 2-second gap between every request
+      await new Promise(res => setTimeout(res, 2000));
+
+      try {
+        return await requestFn();
+      } catch (err: any) {
+        // Handle 429 Too Many Requests
+        if (err?.status === 429) {
+          const retryAfter = parseInt(
+            err.headers?.['retry-after'] ?? '60',
+            10
+          ) * 1000;
+          console.warn(`Rate limited. Retrying after ${retryAfter / 1000}s`);
+          await new Promise(res => setTimeout(res, retryAfter));
+          return requestFn(); // retry once after wait
+        }
+        throw err;
+      }
+    };
+
+    return throttledApiQueue.enqueue(runWithDelay, options);
+  }, []);
+
+  const clearCache = useCallback((key?: string) => {
+    throttledApiQueue.clearCache(key);
+  }, []);
+
+  const resetQueue = useCallback(() => {
+    throttledApiQueue.reset();
+  }, []);
+
+  return {
+    status,
+    isLoading: status.isProcessing || status.queueLength > 0,
+    isRateLimited: status.rateLimitInfo.isActive,
+    enqueueRequest,
+    clearCache,
+    resetQueue,
+    rateLimitInfo: status.rateLimitInfo,
+  };
+}
+
+/**
+ * Hook specifically for dashboard data loading
+ * Provides higher-level abstraction for common dashboard operations
+ */
+export interface UseDashboardApiReturn extends UseThrottledApiQueueReturn {
+  loadDashboardData: () => Promise<void>;
+  dashboardData: any;
+  dashboardError: string | null;
+  isDashboardLoading: boolean;
+}
+
+export function useDashboardApi(): UseDashboardApiReturn {
+  // Only extract the stable functions we need from the throttled queue.
+  // `enqueueRequest` is memoized in the hook and will remain stable across
+  // status updates so callbacks that depend on it won't be re-created on
+  // every status change. This prevents effects that depend on those
+  // callbacks from re-running excessively.
+  const { enqueueRequest, clearCache: queueClearCache, resetQueue: queueReset, status, isLoading, isRateLimited, rateLimitInfo } = useThrottledApiQueue();
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+
+  const tryLoadCachedDashboard = useCallback(async (): Promise<any> => {
+    try {
+      const cached = localStorage.getItem('api_cache_dashboard_cargo');
+      if (!cached) return null;
+      const parsed = JSON.parse(cached);
+      return parsed?.data?.data ?? null; // Safe parse
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const loadAdditionalDashboardData = useCallback(async () => {
+    try {
+      // TODO: Implement these service methods in customerDashboardService if needed:
+      // getCustomerContainers, getCustomerCargoItems, getChinaWarehouseStats
+      // await apiQueue.enqueueRequest(
+      //   () => customerDashboardService.getCustomerContainers(),
+      //   { priority: 'medium', cacheKey: 'dashboard_containers', id: 'dashboard_containers' }
+      // );
+      // await apiQueue.enqueueRequest(
+      //   () => customerDashboardService.getCustomerCargoItems(),
+      //   { priority: 'medium', cacheKey: 'dashboard_cargo_items', id: 'dashboard_cargo_items' }
+      // );
+      // await apiQueue.enqueueRequest(
+      //   () => customerDashboardService.getChinaWarehouseStats(),
+      //   { priority: 'low', cacheKey: 'dashboard_china_stats', id: 'dashboard_china_stats' }
+      // );
+      console.log('📊 Additional dashboard data queued sequentially (TODO: implement service methods)');
+    } catch (error) {
+      console.warn('⚠️ Additional dashboard data loading failed:', error);
+    }
+  }, [enqueueRequest]);
+
+  const loadDashboardData = useCallback(async () => {
+    setIsDashboardLoading(true);
+    setDashboardError(null);
+
+    try {
+      console.log('Starting sequential dashboard data load...');
+      const dashboardResult = await enqueueRequest(
+        async () => {
+          const result = await customerDashboardService.getFullDashboard();
+          // Wrap result in ApiResponse shape
+          return {
+            data: result,
+            success: true,
+            message: '',
+          };
+        },
+        { priority: 'high', cacheKey: 'dashboard_cargo', id: 'dashboard_main' }
+      );
+
+      if (dashboardResult.success) {
+        setDashboardData(dashboardResult.data);
+        console.log(' Dashboard main data loaded');
+        loadAdditionalDashboardData();
+      } else {
+        setDashboardError(dashboardResult.message || 'Failed to load dashboard');
+
+        const cached = await tryLoadCachedDashboard();
+        if (cached) {
+          setDashboardData(cached);
+          setDashboardError('Showing cached data - may be outdated');
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setDashboardError(errorMessage);
+      console.error('❌ Dashboard loading failed:', error);
+
+      const cached = await tryLoadCachedDashboard();
+      if (cached) {
+        setDashboardData(cached);
+        setDashboardError('Network error - showing cached data');
+      }
+    } finally {
+      setIsDashboardLoading(false);
+    }
+  }, [enqueueRequest, loadAdditionalDashboardData, tryLoadCachedDashboard]);
+
+  return {
+    status,
+    isLoading,
+    isRateLimited,
+    enqueueRequest,
+    clearCache: queueClearCache,
+    resetQueue: queueReset,
+    rateLimitInfo,
+    loadDashboardData,
+    dashboardData,
+    dashboardError,
+    isDashboardLoading,
+  };
+}

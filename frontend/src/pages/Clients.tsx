@@ -162,27 +162,27 @@ export default function Clients() {
       allClients.map((u) => {
         const name = u.full_name || `${u.first_name} ${u.last_name}`.trim();
         const lastActivity = formatDate(u.date_joined);
-        // Placeholders until shipment aggregation is wired
-        const totalShipments =
-          (u as unknown as { total_shipments?: number })?.total_shipments ?? 0;
-        const activeShipments =
-          (u as unknown as { active_shipments?: number })?.active_shipments ??
-          0;
-        const totalValueNum = (u as unknown as { total_value?: number })
-          ?.total_value;
-        const totalValue =
-          typeof totalValueNum === "number" ? `$${totalValueNum}` : "-";
+        // Convert region from backend format (e.g., "GREATER_ACCRA") to readable format
+        const region = u.region 
+          ? u.region.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+          : "-";
+        // Convert user type to readable format
+        const userType = u.user_type 
+          ? u.user_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+          : "-";
+        
         return {
           id: u.id,
           name,
           email: u.email || "-",
           phone: u.phone || "-",
-          region: u.region || "-",
+          region,
+          company_name: u.company_name || "-",
+          shipping_mark: u.shipping_mark || "-",
+          user_type: userType,
           status: u.is_active ? ("active" as const) : ("inactive" as const),
           lastActivity,
-          totalShipments,
-          activeShipments,
-          totalValue,
+          is_verified: u.is_verified ? "Verified" : "Unverified",
           _raw: u,
         };
       }),
@@ -239,37 +239,46 @@ export default function Clients() {
       sort: (a, b) => (a.phone || "").localeCompare(b.phone || ""),
     },
     {
+      id: "company",
+      header: "Company",
+      accessor: (c) => (
+        <div className="text-sm">
+          <div>{c.company_name}</div>
+          <div className="text-xs text-muted-foreground capitalize">{c.user_type.toLowerCase()}</div>
+        </div>
+      ),
+      sort: (a, b) => (a.company_name || "").localeCompare(b.company_name || ""),
+    },
+    {
+      id: "shipping_mark",
+      header: "Shipping Mark",
+      accessor: (c) => (
+        <div className="font-mono text-sm bg-muted px-2 py-1 rounded">
+          {c.shipping_mark}
+        </div>
+      ),
+      sort: (a, b) => (a.shipping_mark || "").localeCompare(b.shipping_mark || ""),
+    },
+    {
       id: "region",
       header: "Region",
       accessor: (c) => <div className="text-sm">{c.region}</div>,
       sort: (a, b) => (a.region || "").localeCompare(b.region || ""),
     },
     {
-      id: "shipments",
-      header: "Shipments",
+      id: "verification",
+      header: "Verification",
       accessor: (c) => (
-        <div>
-          <div className="font-medium text-right">{c.totalShipments}</div>
-          <div className="text-xs text-muted-foreground text-right">
-            {c.activeShipments} active
-          </div>
+        <div className="flex items-center gap-1">
+          {c.is_verified === "Verified" ? (
+            <ShieldCheck className="h-4 w-4 text-green-600" />
+          ) : (
+            <ShieldX className="h-4 w-4 text-red-600" />
+          )}
+          <span className="text-sm">{c.is_verified}</span>
         </div>
       ),
-      sort: (a, b) => a.totalShipments - b.totalShipments,
-      align: "right",
-      width: "120px",
-    },
-    {
-      id: "value",
-      header: "Total Value",
-      accessor: (c) => (
-        <div className="font-medium text-right">{c.totalValue}</div>
-      ),
-      sort: (a, b) =>
-        (parseFloat((a.totalValue || "").replace(/[^0-9.]/g, "")) || 0) -
-        (parseFloat((b.totalValue || "").replace(/[^0-9.]/g, "")) || 0),
-      align: "right",
-      width: "140px",
+      sort: (a, b) => a.is_verified.localeCompare(b.is_verified),
     },
     {
       id: "status",
@@ -278,7 +287,7 @@ export default function Clients() {
     },
     {
       id: "last",
-      header: "Last Activity",
+      header: "Date Joined",
       accessor: (c) => (
         <div className="text-sm text-muted-foreground">{c.lastActivity}</div>
       ),

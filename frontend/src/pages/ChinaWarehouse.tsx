@@ -141,12 +141,8 @@ export default function ChinaWarehouse() {
   const cols: Column<WarehouseItem>[] = [
     {
       id: "select",
-      header: (
-        <input aria-label="Select all" type="checkbox" className="rounded" />
-      ),
-      accessor: () => (
-        <input aria-label="Select row" type="checkbox" className="rounded" />
-      ),
+      header: "",
+      accessor: () => null, // DataTable handles this internally for 'select' columns
       width: "48px",
       sticky: true,
     },

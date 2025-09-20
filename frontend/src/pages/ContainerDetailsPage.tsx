@@ -139,7 +139,10 @@ export default function ContainerDetailsPage() {
   // Calculate statistics
   const stats = useMemo(() => {
     const totalItems = cargoItems.length;
-    const totalCBM = cargoItems.reduce((sum, item) => sum + (item.cbm || 0), 0);
+    // For sea cargo, use the container's calculated CBM; for air cargo, calculate from items (should be 0)
+    const totalCBM = container?.cargo_type === 'sea' 
+      ? (container.cbm || 0) 
+      : cargoItems.reduce((sum, item) => sum + (item.cbm || 0), 0);
     const totalWeight = cargoItems.reduce(
       (sum, item) => sum + (item.weight || 0),
       0
@@ -161,7 +164,7 @@ export default function ContainerDetailsPage() {
         .length,
       delayed: cargoItems.filter((item) => item.status === "delayed").length,
     };
-  }, [cargoItems]);
+  }, [cargoItems, container]);
 
   const handleDeleteItem = async (itemId: string) => {
     if (
@@ -245,8 +248,8 @@ export default function ContainerDetailsPage() {
       header: "Dimensions",
       accessor: (item) => (
         <div className="text-sm">
-          <div>CBM: {item.cbm}</div>
-          {item.weight && <div>Weight: {item.weight} kg</div>}
+          {container?.cargo_type === 'sea' && <div>CBM: {item.cbm}</div>}
+          {container?.cargo_type === 'air' && item.weight && <div>Weight: {item.weight} kg</div>}
         </div>
       ),
       align: "right",
@@ -449,15 +452,17 @@ export default function ContainerDetailsPage() {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="logistics-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-muted-foreground">Total CBM</div>
-              <div className="text-lg font-semibold">{stats.totalCBM}</div>
+        {container?.cargo_type === 'sea' && (
+          <div className="logistics-card p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-muted-foreground">Total CBM</div>
+                <div className="text-lg font-semibold">{stats.totalCBM}</div>
+              </div>
+              <Box className="h-8 w-8 text-primary/60" />
             </div>
-            <Box className="h-8 w-8 text-primary/60" />
           </div>
-        </div>
+        )}
         <div className="logistics-card p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -609,6 +614,7 @@ export default function ContainerDetailsPage() {
         open={showAddItemDialog}
         onOpenChange={setShowAddItemDialog}
         containerId={containerId!}
+        cargoType={container?.cargo_type}
         onSuccess={() => {
           // Reload data after successful addition
           reloadData();

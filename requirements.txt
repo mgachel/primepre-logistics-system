@@ -28,5 +28,8 @@ tzdata==2025.2
 # Security and HTTP
 requests>=2.31.0
 
+# SMS and Communication
+twilio>=8.0.0
+
 # Development tools
 setuptools

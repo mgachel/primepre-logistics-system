@@ -1,7 +1,49 @@
 // =============================
 // API Base Configuration
 // =============================
-const API_BASE_URL = "https://primepre-logistics-backend-fb2561752d16.herokuapp.com";
+import { config } from '@/lib/config';
+
+const API_BASE_URL = config.apiBaseUrl;
+
+// =============================
+// Auth Types
+// =============================
+export interface User {
+  id: number;
+  username?: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  nickname?: string;
+  phone?: string;
+  company_name?: string;
+  shipping_mark?: string;
+  region?: string;
+  user_role?: string;
+  user_type?: string;
+  is_active?: boolean;
+  is_verified?: boolean;
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  is_admin_user?: boolean;
+  date_joined?: string;
+  accessible_warehouses?: string[];
+  permissions_summary?: string;
+}
+
+export interface AuthTokens {
+  access: string;
+  refresh: string;
+}
+
+export interface LoginResponse {
+  user: User;
+  tokens: {
+    access: string;
+    refresh: string;
+  };
+}
 
 // =============================
 // Common API response types
@@ -216,3 +258,227 @@ class ApiClient {
 // Export instance
 // =============================
 export const apiClient = new ApiClient(API_BASE_URL);
+
+// =============================
+// Authentication API Service
+// =============================
+class AuthApiService {
+  private api = apiClient;
+
+  // Token management
+  setTokens(tokens: { access: string; refresh: string }): void {
+    localStorage.setItem('access_token', tokens.access);
+    localStorage.setItem('refresh_token', tokens.refresh);
+  }
+
+  clearTokens(): void {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+  }
+
+  getToken(): string | null {
+    return localStorage.getItem('access_token');
+  }
+
+  isAuthenticated(): boolean {
+    return !!this.getToken();
+  }
+
+  // Authentication endpoints
+  async login(credentials: { phone: string; password: string }): Promise<LoginResponse> {
+    const response = await this.api.post<LoginResponse>('/api/auth/login/', credentials);
+    if (response.success && response.data) {
+      this.setTokens({
+        access: response.data.tokens.access,
+        refresh: response.data.tokens.refresh,
+      });
+    }
+    return response.data;
+  }
+
+  async logout(): Promise<void> {
+    try {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        await this.api.post('/api/auth/logout/', { refresh: refreshToken });
+      }
+    } catch (error) {
+      // Ignore logout errors
+    } finally {
+      this.clearTokens();
+    }
+  }
+
+  // Signup flow - new consolidated method
+  async signup(data: {
+    name: string;
+    company_name?: string;
+    shipping_mark: string;
+    phone: string;
+    region: string;
+    password: string;
+  }): Promise<{ message: string; user_id?: number }> {
+    const response = await this.api.post<{ message: string; user_id?: number }>('/api/auth/signup/', data);
+    return response.data;
+  }
+
+  // Phone verification
+  async verifyPhone(data: { phone: string; pin: string }): Promise<LoginResponse> {
+    const response = await this.api.post<LoginResponse>('/api/auth/verify-phone/', data);
+    if (response.success && response.data) {
+      this.setTokens({
+        access: response.data.tokens.access,
+        refresh: response.data.tokens.refresh,
+      });
+    }
+    return response.data;
+  }
+
+  async resendVerificationCode(phone: string): Promise<{ message: string }> {
+    const response = await this.api.post<{ message: string }>('/api/auth/resend-verification/', { phone });
+    return response.data;
+  }
+
+  // Signup flow (old multi-step methods - kept for compatibility)
+  async signupStep1(data: {
+    first_name: string;
+    last_name: string;
+    company_name?: string;
+    email: string;
+  }): Promise<{ shipping_mark_suggestions: string[] }> {
+    const response = await this.api.post<{ shipping_mark_suggestions: string[] }>('/api/auth/signup/step1/', data);
+    return response.data;
+  }
+
+  async signupStep2(data: { shipping_mark: string }): Promise<{ message: string }> {
+    const response = await this.api.post<{ message: string }>('/api/auth/signup/step2/', data);
+    return response.data;
+  }
+
+  async signupStep3(data: { phone: string; region: string }): Promise<{ message: string }> {
+    const response = await this.api.post<{ message: string }>('/api/auth/signup/step3/', data);
+    return response.data;
+  }
+
+  async signupComplete(data: {
+    password: string;
+    confirm_password: string;
+  }): Promise<{ message: string; user_id?: number }> {
+    const response = await this.api.post<{ message: string; user_id?: number }>('/api/auth/signup/complete/', data);
+    return response.data;
+  }
+
+  // Verification
+  async verifyPin(data: { pin: string }): Promise<LoginResponse> {
+    const response = await this.api.post<LoginResponse>('/api/auth/verify/', data);
+    if (response.success && response.data) {
+      this.setTokens({
+        access: response.data.tokens.access,
+        refresh: response.data.tokens.refresh,
+      });
+    }
+    return response.data;
+  }
+
+  async resendPin(): Promise<{ message: string }> {
+    const response = await this.api.post<{ message: string }>('/api/auth/resend-pin/');
+    return response.data;
+  }
+
+  // Password reset
+  async forgotPassword(data: { phone: string }): Promise<{ message: string }> {
+    const response = await this.api.post<{ message: string }>('/api/auth/forgot-password/', data);
+    return response.data;
+  }
+
+  async resetPassword(data: {
+    pin: string;
+    new_password: string;
+    confirm_password: string;
+  }): Promise<{ message: string }> {
+    const response = await this.api.post<{ message: string }>('/api/auth/reset-password/', data);
+    return response.data;
+  }
+
+  // Profile
+  async getProfile(): Promise<User> {
+    const response = await this.api.get<User>('/api/auth/profile/');
+    return response.data;
+  }
+}
+
+export const authService = new AuthApiService();
+
+// Region options (matching backend)
+export const REGION_OPTIONS = [
+  // US States
+  { value: 'US-AL', label: 'Alabama' },
+  { value: 'US-AK', label: 'Alaska' },
+  { value: 'US-AZ', label: 'Arizona' },
+  { value: 'US-AR', label: 'Arkansas' },
+  { value: 'US-CA', label: 'California' },
+  { value: 'US-CO', label: 'Colorado' },
+  { value: 'US-CT', label: 'Connecticut' },
+  { value: 'US-DE', label: 'Delaware' },
+  { value: 'US-FL', label: 'Florida' },
+  { value: 'US-GA', label: 'Georgia' },
+  { value: 'US-HI', label: 'Hawaii' },
+  { value: 'US-ID', label: 'Idaho' },
+  { value: 'US-IL', label: 'Illinois' },
+  { value: 'US-IN', label: 'Indiana' },
+  { value: 'US-IA', label: 'Iowa' },
+  { value: 'US-KS', label: 'Kansas' },
+  { value: 'US-KY', label: 'Kentucky' },
+  { value: 'US-LA', label: 'Louisiana' },
+  { value: 'US-ME', label: 'Maine' },
+  { value: 'US-MD', label: 'Maryland' },
+  { value: 'US-MA', label: 'Massachusetts' },
+  { value: 'US-MI', label: 'Michigan' },
+  { value: 'US-MN', label: 'Minnesota' },
+  { value: 'US-MS', label: 'Mississippi' },
+  { value: 'US-MO', label: 'Missouri' },
+  { value: 'US-MT', label: 'Montana' },
+  { value: 'US-NE', label: 'Nebraska' },
+  { value: 'US-NV', label: 'Nevada' },
+  { value: 'US-NH', label: 'New Hampshire' },
+  { value: 'US-NJ', label: 'New Jersey' },
+  { value: 'US-NM', label: 'New Mexico' },
+  { value: 'US-NY', label: 'New York' },
+  { value: 'US-NC', label: 'North Carolina' },
+  { value: 'US-ND', label: 'North Dakota' },
+  { value: 'US-OH', label: 'Ohio' },
+  { value: 'US-OK', label: 'Oklahoma' },
+  { value: 'US-OR', label: 'Oregon' },
+  { value: 'US-PA', label: 'Pennsylvania' },
+  { value: 'US-RI', label: 'Rhode Island' },
+  { value: 'US-SC', label: 'South Carolina' },
+  { value: 'US-SD', label: 'South Dakota' },
+  { value: 'US-TN', label: 'Tennessee' },
+  { value: 'US-TX', label: 'Texas' },
+  { value: 'US-UT', label: 'Utah' },
+  { value: 'US-VT', label: 'Vermont' },
+  { value: 'US-VA', label: 'Virginia' },
+  { value: 'US-WA', label: 'Washington' },
+  { value: 'US-WV', label: 'West Virginia' },
+  { value: 'US-WI', label: 'Wisconsin' },
+  { value: 'US-WY', label: 'Wyoming' },
+  // International regions
+  { value: 'INTL-CANADA', label: 'Canada' },
+  { value: 'INTL-MEXICO', label: 'Mexico' },
+  { value: 'INTL-UK', label: 'United Kingdom' },
+  { value: 'INTL-GERMANY', label: 'Germany' },
+  { value: 'INTL-FRANCE', label: 'France' },
+  { value: 'INTL-CHINA', label: 'China' },
+  { value: 'INTL-JAPAN', label: 'Japan' },
+  { value: 'INTL-SOUTH-KOREA', label: 'South Korea' },
+  { value: 'INTL-AUSTRALIA', label: 'Australia' },
+  { value: 'INTL-BRAZIL', label: 'Brazil' },
+  { value: 'INTL-INDIA', label: 'India' },
+  { value: 'INTL-OTHER', label: 'Other International' },
+];
+
+// Export customer services
+export { customerShipmentsService } from './customerShipmentsService';
+export { claimsService } from './claimsService';
+export { notesService } from './notesService';
+export { notificationsService } from './notificationsService';

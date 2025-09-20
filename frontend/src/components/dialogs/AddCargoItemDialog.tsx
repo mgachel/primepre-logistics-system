@@ -39,6 +39,7 @@ interface AddCargoItemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   containerId: string;
+  cargoType?: 'sea' | 'air';
   onSuccess?: () => void;
 }
 
@@ -46,6 +47,7 @@ export function AddCargoItemDialog({
   open,
   onOpenChange,
   containerId,
+  cargoType,
   onSuccess,
 }: AddCargoItemDialogProps) {
   const { toast } = useToast();
@@ -79,6 +81,15 @@ export function AddCargoItemDialog({
     setClientQuery("");
     setNotes("");
   };
+
+  // Clear fields based on cargo type
+  useEffect(() => {
+    if (cargoType === 'air') {
+      setCbm("");
+    } else if (cargoType === 'sea') {
+      setWeight("");
+    }
+  }, [cargoType]);
 
   // Debounce the client query to reduce API calls
   useEffect(() => {
@@ -127,10 +138,16 @@ export function AddCargoItemDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!description || !quantity || !cbm || !selectedClient) {
+    if (!description || !quantity || (cargoType === 'sea' && !cbm) || !selectedClient) {
+      const missingFields = [];
+      if (!description) missingFields.push("Description");
+      if (!quantity) missingFields.push("Quantity");
+      if (cargoType === 'sea' && !cbm) missingFields.push("CBM");
+      if (!selectedClient) missingFields.push("Client");
+      
       toast({
         title: "Validation Error",
-        description: "Description, quantity, CBM, and client are required",
+        description: `${missingFields.join(", ")} ${missingFields.length === 1 ? 'is' : 'are'} required`,
         variant: "destructive",
       });
       return;
@@ -145,8 +162,8 @@ export function AddCargoItemDialog({
           ? `${itemType}: ${description}`
           : description,
         quantity: parseInt(quantity, 10),
-        weight: weight ? parseFloat(weight) : null,
-        cbm: parseFloat(cbm),
+        ...(cargoType === 'air' && { weight: weight ? parseFloat(weight) : null }),
+        ...(cargoType === 'sea' && { cbm: parseFloat(cbm) }),
         // Optionally support values/ status later
       };
 
@@ -163,7 +180,7 @@ export function AddCargoItemDialog({
           item_description: string;
           quantity: number;
           weight?: number | null;
-          cbm: number;
+          cbm?: number;
           unit_value?: number | null;
           total_value?: number | null;
           status?: "pending" | "in_transit" | "delivered" | "delayed";
@@ -335,31 +352,35 @@ export function AddCargoItemDialog({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="weight">Weight (kg)</Label>
-              <Input
-                id="weight"
-                type="number"
-                min="0"
-                step="0.1"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-                placeholder="0.0"
-              />
-            </div>
+            {cargoType === 'air' && (
+              <div>
+                <Label htmlFor="weight">Weight (kg)</Label>
+                <Input
+                  id="weight"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  placeholder="0.0"
+                />
+              </div>
+            )}
 
-            <div>
-              <Label htmlFor="cbm">CBM (m³) *</Label>
-              <Input
-                id="cbm"
-                type="number"
-                min="0"
-                step="0.01"
-                value={cbm}
-                onChange={(e) => setCbm(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
+            {cargoType === 'sea' && (
+              <div>
+                <Label htmlFor="cbm">CBM (m³) *</Label>
+                <Input
+                  id="cbm"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={cbm}
+                  onChange={(e) => setCbm(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+            )}
           </div>
 
           <div>

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle2, KeySquare } from 'lucide-react';
+import { AlertCircle, CheckCircle2, } from 'lucide-react';
 import { authService } from '@/services/authService';
 
 export default function ForgotPassword() {

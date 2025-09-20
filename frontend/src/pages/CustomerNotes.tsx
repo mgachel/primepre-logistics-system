@@ -41,12 +41,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/stores/authStore';
 import { notesService, Note, CreateNoteData, UpdateNoteData } from '@/services/notesService';
 import { formatDate } from '@/lib/date';
 
 export default function CustomerNotes() {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

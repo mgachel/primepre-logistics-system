@@ -27,7 +27,10 @@ SECRET_KEY = config(
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = config('DEBUG', default=True, cast=bool)
+
+# Environment detection
+ENVIRONMENT = config('ENVIRONMENT', default='development')
 
 # Security settings for production
 SECURE_BROWSER_XSS_FILTER = True
@@ -45,7 +48,6 @@ ALLOWED_HOSTS = [
 
 # Application definition
 INSTALLED_APPS = [
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -58,12 +60,14 @@ INSTALLED_APPS = [
     'GoodsRecieved',
     'rates',  
     'notes',
-    'analytics',
+    'Shipments',
     'claims',  # Add claims app
+    'settings',  # Add settings app
     
     # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',  # Add token blacklist support
     'rest_framework.authtoken',
     'django_filters',
     'corsheaders',  # Add CORS support
@@ -163,6 +167,31 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Custom user model
 AUTH_USER_MODEL = 'users.CustomerUser'
+
+# Authentication backends
+AUTHENTICATION_BACKENDS = [
+    'users.authentication.PhoneBackend',  # Custom phone-based authentication
+    'django.contrib.auth.backends.ModelBackend',  # Default backend (fallback)
+]
+
+# Login/Logout URLs for web authentication
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'dashboard'
+LOGOUT_REDIRECT_URL = 'login'
+
+# Session configuration for signup wizard
+SESSION_COOKIE_AGE = 3600  # 1 hour
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# Twilio SMS Configuration
+TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='')
+TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN', default='')
+TWILIO_PHONE_NUMBER = config('TWILIO_PHONE_NUMBER', default='')
+
+# SMS Rate Limiting
+SMS_RATE_LIMIT_PER_HOUR = 3
+SMS_RATE_LIMIT_PER_DAY = 10
 
 # Email configuration
 EMAIL_BACKEND = config(

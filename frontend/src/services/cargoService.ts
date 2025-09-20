@@ -1,3 +1,31 @@
+// Search result type for searchShipments
+export interface SearchResult {
+  id: string;
+  type: string;
+  trackingNumber: string;
+  shippingMark: string;
+  status: string;
+  quantity: string;
+  cbm: string;
+  dates: {
+    received: string;
+    eta: string;
+    loaded: string;
+  };
+  client: string;
+  description: string;
+  supplierTrackingNumber: string;
+  route: string;
+  originCountry: string;
+  destinationCountry: string;
+  measurements: string;
+  // Additional fields for goods received and transport type detection
+  weight?: string;
+  method_of_shipping?: string;
+  warehouseLocation?: string;
+  cargo_type?: string;
+  container_cargo_type?: string;
+}
 import { apiClient, ApiResponse, PaginatedResponse } from "./api";
 
 // Backend-aligned cargo models (from Django cargo app)
@@ -159,6 +187,50 @@ export interface BulkUploadResult {
 }
 
 export const cargoService = {
+  // Search shipments by tracking number or shipping mark
+  async searchShipments(query: string): Promise<SearchResult[]> {
+    const params = new URLSearchParams();
+    params.append("search", query);
+    // You may need to adjust the endpoint to match your backend
+    const endpoint = `/api/cargo/cargo-items/?${params.toString()}`;
+    const response = await apiClient.get(endpoint);
+    // Type assertion for paginated results
+    const data = response?.data as { results?: any[] };
+    if (!data || !data.results) return [];
+    
+    console.log('Search API response:', data.results); // Debug log
+    
+    return data.results.map((item: any) => {
+      const result = {
+        id: item.id,
+        type: "tracking" as const, // Ensure type matches expected union
+        trackingNumber: item.tracking_id || item.tracking_number || "",
+        shippingMark: item.shipping_mark || item.client_shipping_mark || "",
+        status: item.status || "",
+        quantity: item.quantity ? `${item.quantity}` : "",
+        cbm: item.cbm ? `${item.cbm}` : "",
+        dates: {
+          received: item.delivered_date || item.received_date || item.created_at || "",
+          eta: item.eta || item.estimated_arrival || "",
+          loaded: item.load_date || item.loading_date || item.created_at || "",
+        },
+        client: item.client_name || "",
+        description: item.item_description || item.description || "",
+        supplierTrackingNumber: item.supplier_tracking || item.supplier_tracking_number || "",
+        route: item.route || "",
+        originCountry: item.origin_country || "",
+        destinationCountry: item.destination_country || "",
+        measurements: item.measurements || "",
+        // Add additional fields for transport type detection
+        weight: item.weight ? `${item.weight}` : "",
+        cargo_type: item.cargo_type || item.container?.cargo_type || "",  // From backend
+        container_cargo_type: item.container?.cargo_type || "",
+      };
+      
+      console.log('Mapped result:', result); // Debug log
+      return result;
+    });
+  },
   // ================== BACKEND-ALIGNED (DJANGO) MUTATIONS ==================
 
   // Create a new CargoContainer (matches CargoContainerCreateSerializer)

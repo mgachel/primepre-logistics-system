@@ -13,14 +13,13 @@ import {
   X,
   ChevronDown,
   FileText,
-  Bell,
   StickyNote
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuthStore } from "@/stores/authStore";
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -44,12 +43,17 @@ const adminNavigation = [
   {
     name: "Goods Received",
     children: [
-      { name: "China", href: "/goods/china", icon: Package },
-      { name: "Ghana", href: "/goods/ghana", icon: MapPin },
+      { name: "China (All)", href: "/goods/china", icon: Package },
+      { name: "China Sea", href: "/goods/china/sea", icon: Ship },
+      { name: "China Air", href: "/goods/china/air", icon: Plane },
+      { name: "Ghana (All)", href: "/goods/ghana", icon: MapPin },
+      { name: "Ghana Sea", href: "/goods/ghana/sea", icon: Ship },
+      { name: "Ghana Air", href: "/goods/ghana/air", icon: Plane },
     ],
   },
   { name: "Rates", href: "/rates", icon: Calculator },
   { name: "Admins", href: "/my-admins", icon: UserCog },
+  { name: "Notes", href: "/notes", icon: StickyNote },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -59,14 +63,18 @@ const customerNavigation = [
   { name: "My Shipments", href: "/my-shipments", icon: Ship },
   { name: "My Claims", href: "/my-claims", icon: FileText },
   { name: "My Notes", href: "/my-notes", icon: StickyNote },
-  { name: "Notifications", href: "/notifications", icon: Bell },
-  { name: "Profile", href: "/profile", icon: UserCog },
+  { name: "Addresses", href: "/my-addresses", icon: MapPin },
+  { name: "Profile", href: "/my-profile", icon: UserCog },
 ];
 
 export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: SidebarProps) {
   const location = useLocation();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  const { user, isAdmin, isCustomer } = useAuth();
+  const { user } = useAuthStore();
+
+  // Helper functions for role checking
+  const isAdmin = () => user && ['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(user.user_role);
+  const isCustomer = () => user && user.user_role === 'CUSTOMER';
 
   // Get navigation based on user role
   const getNavigation = () => {

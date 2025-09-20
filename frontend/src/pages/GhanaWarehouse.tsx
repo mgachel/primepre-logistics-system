@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Package,
   Search,
@@ -52,7 +52,7 @@ export default function GhanaWarehouse() {
   const [stats, setStats] = useState<AdminWarehouseStatistics | null>(null);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrev, setHasPrev] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [_uploading, setUploading] = useState(false);
 
   // helpers to coerce/format numeric fields safely
   const toNum = (v: unknown) => {
@@ -84,7 +84,7 @@ export default function GhanaWarehouse() {
         }
       } catch (e: unknown) {
         const msg =
-          e instanceof Error ? e.message : "Failed to load Ghana items";
+          e instanceof Error ? e._message : "Failed to load Ghana items";
         if (!ignore)
           toast({
             title: "Load failed",
@@ -140,12 +140,8 @@ export default function GhanaWarehouse() {
   const cols: Column<WarehouseItem>[] = [
     {
       id: "select",
-      header: (
-        <input aria-label="Select all" type="checkbox" className="rounded" />
-      ),
-      accessor: () => (
-        <input aria-label="Select row" type="checkbox" className="rounded" />
-      ),
+      header: "",
+      accessor: () => null, // DataTable handles this internally for 'select' columns
       width: "48px",
       sticky: true,
     },
@@ -211,7 +207,7 @@ export default function GhanaWarehouse() {
     },
   ];
 
-  const onUpload = () => {
+  const _onUpload = () => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".xlsx,.xls";
@@ -235,16 +231,16 @@ export default function GhanaWarehouse() {
         const res = await warehouseService.uploadGhanaExcel(file);
 
         if (res.success && res.data) {
-          const { message, results } = res.data;
+          const { _message, results } = res.data;
           const {
-            total_processed,
+            _total_processed,
             successful_creates,
             failed_creates,
             errors,
           } = results;
 
           if (successful_creates === 0) {
-            // No items were created - show detailed error message
+            // No items were created - show detailed error _message
             const errorMessages = errors.slice(0, 3); // Show first 3 errors
             const displayError =
               errorMessages.length > 0
@@ -281,7 +277,7 @@ export default function GhanaWarehouse() {
           }
         } else {
           // API call failed
-          const errorMsg = res.message || "Upload failed. Please try again.";
+          const errorMsg = res._message || "Upload failed. Please try again.";
           toast({
             title: "Upload failed",
             description: errorMsg,
@@ -294,16 +290,16 @@ export default function GhanaWarehouse() {
 
         if (err instanceof Error) {
           // Check if it's a validation error from the backend
-          if (err.message.includes("Missing required columns")) {
+          if (err._message.includes("Missing required columns")) {
             errorMessage =
               "Missing required columns. Please download and use the template file.";
-          } else if (err.message.includes("File must be an Excel file")) {
+          } else if (err._message.includes("File must be an Excel file")) {
             errorMessage = "Please upload a valid Excel file (.xlsx or .xls).";
-          } else if (err.message.includes("File size must be less than")) {
+          } else if (err._message.includes("File size must be less than")) {
             errorMessage =
               "File is too large. Please upload a file smaller than 10MB.";
           } else {
-            errorMessage = err.message;
+            errorMessage = err._message;
           }
         }
 
@@ -329,7 +325,7 @@ export default function GhanaWarehouse() {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Export failed";
+      const msg = e instanceof Error ? e._message : "Export failed";
       toast({
         title: "Export failed",
         description: msg,
@@ -476,7 +472,7 @@ export default function GhanaWarehouse() {
                     } else {
                       toast({
                         title: "Update failed",
-                        description: res.message,
+                        description: res._message,
                         variant: "destructive",
                       });
                     }
@@ -504,7 +500,7 @@ export default function GhanaWarehouse() {
                     } else {
                       toast({
                         title: "Update failed",
-                        description: res.message,
+                        description: res._message,
                         variant: "destructive",
                       });
                     }
@@ -532,7 +528,7 @@ export default function GhanaWarehouse() {
                     } else {
                       toast({
                         title: "Update failed",
-                        description: res.message,
+                        description: res._message,
                         variant: "destructive",
                       });
                     }
@@ -551,7 +547,7 @@ export default function GhanaWarehouse() {
                     } else {
                       toast({
                         title: "Delete failed",
-                        description: res.message,
+                        description: res._message,
                         variant: "destructive",
                       });
                     }

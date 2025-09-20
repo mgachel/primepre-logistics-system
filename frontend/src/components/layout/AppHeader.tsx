@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Bell, User, ChevronDown } from 'lucide-react';
+import { User, ChevronDown } from 'lucide-react';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -96,19 +96,6 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
 
         {/* Actions */}
         <div className="flex items-center space-x-4">
-          {/* Notifications */}
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="relative" 
-            onClick={() => navigate('/notifications')}
-            aria-label="Notifications"
-            title="View notifications"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute -top-1 -right-1 h-2 w-2 bg-primary rounded-full"></span>
-          </Button>
-
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -132,7 +119,6 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate('/profile')}>Profile Settings</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/notifications')}>Notifications</DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate('/support')}>Support</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={handleLogout}>

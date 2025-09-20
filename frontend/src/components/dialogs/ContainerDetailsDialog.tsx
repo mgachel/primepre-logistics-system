@@ -185,13 +185,15 @@ export function ContainerDetailsDialog({ open, onOpenChange, container }: Contai
                 <p className="font-medium">{container.weight}</p>
               </div>
               
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Volume (CBM)</span>
+              {container.cargo_type === 'sea' && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Volume (CBM)</span>
+                  </div>
+                  <p className="font-medium">{container.cbm} CBM</p>
                 </div>
-                <p className="font-medium">{container.cbm} CBM</p>
-              </div>
+              )}
             </div>
           </div>
 

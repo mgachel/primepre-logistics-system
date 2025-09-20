@@ -1,50 +1,92 @@
 import React, { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { 
+  Eye, 
+  EyeOff, 
+  Phone, 
+  Lock, 
+  ArrowRight, 
+  Shield, 
+  Users, 
+  Package 
+} from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { 
-  Truck, 
-  AlertCircle, 
-  Eye, 
-  EyeOff, 
-  LogIn, 
-  Shield, 
-  Users, 
-  Package,
-  ArrowRight
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
+
+import { useAuthStore } from '@/stores/authStore';
+import { useAuth } from '@/contexts/AuthContext';
+import { loginSchema, type LoginFormData } from '@/lib/validations/auth';
+import { clearAllAuthCache } from '@/lib/auth-utils';
 
 export default function Login() {
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login, isLoading, error, clearError } = useAuthStore();
+  const { _getDashboardUrl, _getWelcomeMessage } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const from = location.state?.from?.pathname || '/';
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  });
+
+  const onSubmit = async (data: LoginFormData) => {
+    clearError();
     
-    try {
-      const success = await login(phone, password);
-      if (success) {
-        // Redirect will happen via route protection
-        window.location.href = '/';
-      } else {
-        setError('Invalid credentials. Please check your phone number and password.');
+    // Clear any cached authentication data before login attempt
+    console.log('🧹 Clearing authentication cache before login...');
+    clearAllAuthCache();
+    
+    console.log('🔐 Attempting login...');
+    const success = await login(data);
+    
+    if (success) {
+      console.log('✅ Login successful, determining redirect...');
+      
+      // Get user data from localStorage to determine redirect
+      const userData = localStorage.getItem('user');
+      let redirectUrl = '/';
+      
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          const userRole = user.user_role;
+          
+          // Determine redirect based on user role
+          if (['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(userRole)) {
+            redirectUrl = '/'; // Admin dashboard (handled by RoleBasedRoute)
+            console.log(`👑 Admin user detected (${userRole}), redirecting to admin dashboard`);
+          } else {
+            redirectUrl = '/'; // Customer dashboard (handled by RoleBasedRoute)
+            console.log(`👤 Customer user detected (${userRole}), redirecting to customer dashboard`);
+          }
+        } catch (error) {
+          console.warn('Failed to parse user data, using default redirect');
+          redirectUrl = '/';
+        }
       }
-    } catch (error) {
-      setError('Login failed. Please try again.');
-    } finally {
-      setLoading(false);
+      
+      // Use the from parameter if it's not the root path
+      if (from !== '/' && from !== '/login') {
+        redirectUrl = from;
+        console.log(`📍 Using original destination: ${redirectUrl}`);
+      }
+      
+      console.log(`🚀 Redirecting to: ${redirectUrl}`);
+      navigate(redirectUrl, { replace: true });
+    } else {
+      console.log('❌ Login failed');
     }
   };
 
@@ -129,59 +171,67 @@ export default function Login() {
 
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 {error && (
                   <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
                 
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Enter your phone number"
-                    className="h-11"
-                    required
-                  />
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="Enter your phone number"
+                      className="pl-10 h-11"
+                      {...register('phone')}
+                      aria-invalid={errors.phone ? 'true' : 'false'}
+                    />
+                  </div>
+                  {errors.phone && (
+                    <p className="text-sm text-red-600">{errors.phone.message}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
-                      className="h-11 pr-10"
-                      required
+                      className="pl-10 pr-10 h-11"
+                      {...register('password')}
+                      aria-invalid={errors.password ? 'true' : 'false'}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                  {errors.password && (
+                    <p className="text-sm text-red-600">{errors.password.message}</p>
+                  )}
                 </div>
 
-                <Button type="submit" className="w-full h-11" disabled={loading}>
-                  {loading ? (
+                <Button type="submit" className="w-full h-11" disabled={isLoading}>
+                  {isLoading ? (
                     <div className="flex items-center">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       Signing In...
                     </div>
                   ) : (
                     <div className="flex items-center">
-                      <LogIn className="h-4 w-4 mr-2" />
                       Sign In
+                      <ArrowRight className="ml-2 h-4 w-4" />
                     </div>
                   )}
                 </Button>
@@ -199,12 +249,12 @@ export default function Login() {
 
           {/* Demo Credentials
           <Card className="border-dashed">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Demo Credentials</CardTitle>
-              <CardDescription className="text-xs">
+            < className="pb-3">
+              < className="text-sm">Demo Credentials</>
+              < className="text-xs">
                 Use these credentials to test different user roles
-              </CardDescription>
-            </CardHeader>
+              </>
+            </>
             <CardContent className="space-y-3">
               {demoCredentials.map((cred, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">

@@ -27,18 +27,20 @@ class ClaimSerializer(serializers.ModelSerializer):
 
 
 class ClaimCreateSerializer(serializers.ModelSerializer):
-    """Simplified serializer for customer claim creation"""
+    """Dedicated serializer for creating claims"""
     
     class Meta:
         model = Claim
         fields = ['tracking_id', 'item_name', 'item_description']
     
     def create(self, validated_data):
-        # Get the customer from the request context
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
             validated_data['customer'] = request.user
+            validated_data['shipping_mark'] = request.user.shipping_mark
         return super().create(validated_data)
+
+
 
 
 class AdminClaimSerializer(serializers.ModelSerializer):

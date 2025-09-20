@@ -283,14 +283,22 @@ export const warehouseService = {
   async createChinaWarehouseItem(
     data: CreateWarehouseItemRequest
   ): Promise<ApiResponse<WarehouseItem>> {
-    return apiClient.post<WarehouseItem>("/api/goods/china/", data);
+    // Use specific endpoint based on shipping method like Ghana
+    const endpoint = data.method_of_shipping === 'SEA' 
+      ? "/api/goods/china/sea_cargo/" 
+      : "/api/goods/china/air_cargo/";
+    return apiClient.post<WarehouseItem>(endpoint, data);
   },
 
   // Create new Ghana warehouse item (admin/staff only)
   async createGhanaWarehouseItem(
     data: CreateWarehouseItemRequest
   ): Promise<ApiResponse<WarehouseItem>> {
-    return apiClient.post<WarehouseItem>("/api/goods/ghana/", data);
+    // Use specific endpoint based on shipping method
+    const endpoint = data.method_of_shipping === 'SEA' 
+      ? "/api/goods/ghana/sea_cargo/" 
+      : "/api/goods/ghana/air_cargo/";
+    return apiClient.post<WarehouseItem>(endpoint, data);
   },
 
   // Update China warehouse item (admin/staff only)
@@ -396,6 +404,156 @@ export const warehouseService = {
       `/api/goods/ghana/${id}/update_status/`,
       { status, reason }
     );
+  },
+
+  // SEA CARGO SPECIFIC ENDPOINTS
+  // China Sea Cargo
+  async getChinaSeaGoods(
+    filters: Partial<{
+      status: string;
+      search: string;
+      ordering: string;
+      page: number;
+      page_size: number;
+      date_from: string;
+      date_to: string;
+      location: string;
+      supplier_name: string;
+    }>
+  ): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "")
+        params.append(k, String(v));
+    });
+    return apiClient.get<PaginatedResponse<WarehouseItem>>(
+      `/api/goods/china/sea_cargo/?${params.toString()}`
+    );
+  },
+
+  async getChinaSeaStatistics(): Promise<ApiResponse<AdminWarehouseStatistics>> {
+    return apiClient.get<AdminWarehouseStatistics>(
+      `/api/goods/china/sea_statistics/`
+    );
+  },
+
+  // China Air Cargo
+  async getChinaAirGoods(
+    filters: Partial<{
+      status: string;
+      search: string;
+      ordering: string;
+      page: number;
+      page_size: number;
+      date_from: string;
+      date_to: string;
+      location: string;
+      supplier_name: string;
+    }>
+  ): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "")
+        params.append(k, String(v));
+    });
+    return apiClient.get<PaginatedResponse<WarehouseItem>>(
+      `/api/goods/china/air_cargo/?${params.toString()}`
+    );
+  },
+
+  async getChinaAirStatistics(): Promise<ApiResponse<AdminWarehouseStatistics>> {
+    return apiClient.get<AdminWarehouseStatistics>(
+      `/api/goods/china/air_statistics/`
+    );
+  },
+
+  // Ghana Sea Cargo
+  async getGhanaSeaGoods(
+    filters: Partial<{
+      status: string;
+      search: string;
+      ordering: string;
+      page: number;
+      page_size: number;
+      date_from: string;
+      date_to: string;
+      location: string;
+      supplier_name: string;
+    }>
+  ): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "")
+        params.append(k, String(v));
+    });
+    return apiClient.get<PaginatedResponse<WarehouseItem>>(
+      `/api/goods/ghana/sea_cargo/?${params.toString()}`
+    );
+  },
+
+  async getGhanaSeaStatistics(): Promise<ApiResponse<AdminWarehouseStatistics>> {
+    return apiClient.get<AdminWarehouseStatistics>(
+      `/api/goods/ghana/sea_statistics/`
+    );
+  },
+
+  // Ghana Air Cargo
+  async getGhanaAirGoods(
+    filters: Partial<{
+      status: string;
+      search: string;
+      ordering: string;
+      page: number;
+      page_size: number;
+      date_from: string;
+      date_to: string;
+      location: string;
+      supplier_name: string;
+    }>
+  ): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "")
+        params.append(k, String(v));
+    });
+    return apiClient.get<PaginatedResponse<WarehouseItem>>(
+      `/api/goods/ghana/air_cargo/?${params.toString()}`
+    );
+  },
+
+  async getGhanaAirStatistics(): Promise<ApiResponse<AdminWarehouseStatistics>> {
+    return apiClient.get<AdminWarehouseStatistics>(
+      `/api/goods/ghana/air_statistics/`
+    );
+  },
+
+  // Helper methods for status updates (reusing existing methods)
+  async updateChinaGoodsStatus(
+    id: number,
+    status: string,
+    reason?: string
+  ): Promise<ApiResponse<WarehouseItem>> {
+    return apiClient.post<WarehouseItem>(
+      `/api/goods/china/${id}/update_status/`,
+      { status, reason }
+    );
+  },
+
+  async updateGhanaGoodsStatus(
+    id: number,
+    status: string,
+    reason?: string
+  ): Promise<ApiResponse<WarehouseItem>> {
+    return this.updateGhanaItemStatus(id, status as any, reason);
+  },
+
+  // Helper methods for deletion
+  async deleteChinaGoods(id: number): Promise<ApiResponse<void>> {
+    return apiClient.delete<void>(`/api/goods/china/${id}/`);
+  },
+
+  async deleteGhanaGoods(id: number): Promise<ApiResponse<void>> {
+    return apiClient.delete<void>(`/api/goods/ghana/${id}/`);
   },
 
   // Update China item status via custom action
