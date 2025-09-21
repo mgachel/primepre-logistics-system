@@ -4,6 +4,8 @@ from django.contrib.auth import authenticate
 from django.contrib import messages
 from django.utils import timezone
 from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from datetime import timedelta
 import logging
 
@@ -611,6 +613,7 @@ class PhonePasswordResetView(APIView):
 # SIMPLIFIED SIGNUP API (NO SMS VERIFICATION, AUTO-GENERATED SHIPPING MARKS)
 # ============================================================================
 
+@method_decorator(csrf_exempt, name='dispatch')
 class SimplifiedSignupView(APIView):
     """
     New simplified signup endpoint that:
