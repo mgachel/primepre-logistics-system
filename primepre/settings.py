@@ -42,6 +42,7 @@ SECURE_HSTS_PRELOAD = True
 ALLOWED_HOSTS = [
     "primepre-logistics-backend.herokuapp.com",
     "primepre-logistics-backend-fb2561752d16.herokuapp.com", 
+    "primepre-backend.onrender.com",  # New Render backend URL
     "localhost",
     "127.0.0.1",
 ]
@@ -273,13 +274,15 @@ def csv_list(value: str) -> list:
     return [v.strip() for v in value.split(',') if v.strip()]
 
 # CORS settings - Secure configuration
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=DEBUG, cast=bool)
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
 
 # Specific allowed origins for production
 CORS_ALLOWED_ORIGINS = csv_list(config(
     'CORS_ALLOWED_ORIGINS',
     default='https://primepre-frontend-ba6f55cc48e5.herokuapp.com,'
             'https://primepre-logistics-backend-fb2561752d16.herokuapp.com,'
+            'https://primepre-backend.onrender.com,'
+            'https://primepre-frontend.onrender.com,'
             'http://localhost:3000,'
             'http://127.0.0.1:3000,'
             'http://localhost:5173,'
@@ -331,7 +334,10 @@ CSRF_TRUSTED_ORIGINS = csv_list(config(
     'CSRF_TRUSTED_ORIGINS',
     default='https://primepre-frontend-ba6f55cc48e5.herokuapp.com,'
             'https://primepre-logistics-backend-fb2561752d16.herokuapp.com,'
-            'https://*.herokuapp.com'
+            'https://primepre-backend.onrender.com,'
+            'https://primepre-frontend.onrender.com,'
+            'https://*.herokuapp.com,'
+            'https://*.onrender.com'
 ))
 
 # SSL and security headers for production
