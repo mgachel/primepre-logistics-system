@@ -623,6 +623,7 @@ class SimplifiedSignupView(APIView):
     4. Returns login tokens
     """
     permission_classes = [AllowAny]
+    authentication_classes = []  # Disable all authentication including session auth
     
     def post(self, request):
         """Create user with auto-generated shipping mark."""
@@ -756,6 +757,7 @@ class LoginView(APIView):
     Supports both regular users and Django superusers.
     """
     permission_classes = [AllowAny]
+    authentication_classes = []  # Disable all authentication including session auth
 
     def post(self, request):
         phone_or_username = request.data.get('phone')  # Can be phone or username
