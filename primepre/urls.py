@@ -16,9 +16,14 @@ Including another URLconf
 """
 from django.urls import path, include
 from .views import home_view
+from django.http import JsonResponse
+
+def api_test_view(request):
+    return JsonResponse({"status": "API working", "endpoint": "test"})
 
 urlpatterns = [
     path('', home_view, name='home'),  # Root URL now has a proper handler
+    path('api/test/', api_test_view, name='api_test'),  # Test endpoint
     path('api/auth/', include('users.urls')),
     path('api/cargo/', include('cargo.urls')),
     path('api/shipments/', include('Shipments.urls')),
