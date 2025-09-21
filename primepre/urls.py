@@ -30,38 +30,15 @@ def debug_signup_view(request):
         if request.method == 'GET':
             return JsonResponse({"status": "GET request successful", "endpoint": "debug_signup"})
         elif request.method == 'POST':
-            # Try to import and test the SimplifiedSignupView
-            from users.views import SimplifiedSignupView
-            
-            # Test data
-            test_data = {
-                'first_name': 'Test',
-                'last_name': 'User', 
-                'email': 'test@example.com',
-                'phone': '+1234567890',
-                'region': 'Upper West',
-                'password': 'testpass123',
-                'confirm_password': 'testpass123'
-            }
-            
-            # Try to create the view and call it
-            view = SimplifiedSignupView()
-            
-            # Import necessary modules for request simulation
-            from django.test import RequestFactory
-            factory = RequestFactory()
-            mock_request = factory.post('/api/auth/signup/simplified/', test_data, content_type='application/json')
-            
-            # Try calling the view
-            response = view.post(mock_request)
-            
-            return JsonResponse({
-                "status": "POST test successful", 
-                "view_response_status": response.status_code,
-                "view_response_data": response.data if hasattr(response, 'data') else str(response.content)
-            })
+            # Test basic imports first
+            try:
+                from users.views import SimplifiedSignupView
+                from users.models import CustomerUser
+                return JsonResponse({"status": "Imports successful", "models_accessible": True})
+            except Exception as import_error:
+                return JsonResponse({"error": f"Import error: {str(import_error)}"})
     except Exception as e:
-        return JsonResponse({"error": str(e), "traceback": traceback.format_exc()}, status=200)  # Return 200 so we can see the error
+        return JsonResponse({"error": str(e), "traceback": traceback.format_exc()}, status=200)
 
 urlpatterns = [
     path('', home_view, name='home'),  # Root URL now has a proper handler

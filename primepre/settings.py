@@ -210,6 +210,7 @@ if not DEBUG:
     EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 
 
+# FIXED: DRF Configuration with proper throttling rates and no Redis dependency
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -232,9 +233,10 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle'
     ],
+    # FIXED: More reasonable throttle rates for production API
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/day',
-        'user': '1000/day'
+        'anon': '1000/hour',  # Was: 100/day - too restrictive
+        'user': '5000/hour'   # Was: 1000/day - too restrictive
     }
 }
 
@@ -274,7 +276,8 @@ def csv_list(value: str) -> list:
     return [v.strip() for v in value.split(',') if v.strip()]
 
 # CORS settings - Secure configuration
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
+CORS_ALLOW_ALL_ORIGINS = True  # Temporarily allow all origins for testing
+# CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
 
 # Specific allowed origins for production
 CORS_ALLOWED_ORIGINS = csv_list(config(
@@ -393,11 +396,11 @@ LOGGING = {
     },
 }
 
-# Cache configuration
+# FIXED: Cache configuration - Always use local memory cache (no Redis dependency)
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache' if DEBUG else 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': config('REDIS_URL', default='redis://127.0.0.1:6379/1') if not DEBUG else '',
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
         'TIMEOUT': 300,
         'OPTIONS': {
             'MAX_ENTRIES': 1000,
