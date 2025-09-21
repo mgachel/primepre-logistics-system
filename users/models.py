@@ -340,21 +340,36 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
         Format: {default_prefix}{regional_rule}{name_based_unique_identifier}
         Example: PM1ACHEL01 (PM + 1 + ACHEL + 01)
         """
-        from settings.models import CompanySettings, ShippingMarkFormattingRule
+        # Safe default values
+        default_prefix = "PM"
+        regional_prefix = "1"
         
-        # Get default prefix from company settings
+        # Try to get settings, but don't fail if they don't exist
         try:
-            company_settings = CompanySettings.objects.first()
-            default_prefix = company_settings.shipping_mark_prefix if company_settings else "PM"
-        except:
-            default_prefix = "PM"
-        
-        # Get regional rule for the user's region
-        try:
-            rule = ShippingMarkFormattingRule.get_rule_for_client(country=country, region=region)
-            regional_prefix = rule.prefix_value if rule else "1"  # Default to "1" if no rule found
-        except:
-            regional_prefix = "1"
+            from settings.models import CompanySettings, ShippingMarkFormattingRule
+            
+            # Get default prefix from company settings
+            try:
+                company_settings = CompanySettings.objects.first()
+                if company_settings and hasattr(company_settings, 'shipping_mark_prefix'):
+                    default_prefix = company_settings.shipping_mark_prefix
+            except Exception:
+                pass  # Use default
+            
+            # Get regional rule for the user's region
+            try:
+                rule = ShippingMarkFormattingRule.get_rule_for_client(country=country, region=region)
+                if rule and hasattr(rule, 'prefix_value'):
+                    regional_prefix = rule.prefix_value
+            except Exception:
+                pass  # Use default
+                
+        except ImportError:
+            # Settings models don't exist, use defaults
+            pass
+        except Exception:
+            # Any other error, use defaults
+            pass
         
         # Clean and format name (take first 6 characters, uppercase, alphanumeric only)
         clean_name = ''.join(c.upper() for c in first_name if c.isalnum())[:6]
