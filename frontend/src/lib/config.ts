@@ -22,7 +22,7 @@ if (missingEnvVars.length > 0 && import.meta.env.PROD) {
 // Environment configuration
 export const config = {
   // API Configuration
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'https://primepre-logistics-backend-fb2561752d16.herokuapp.com',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'https://primepre-backend.onrender.com',
   
   // App Configuration
   appName: import.meta.env.VITE_APP_NAME || 'PrimePre Logistics',

@@ -1,6 +1,7 @@
 import axios from "axios";
+import { config } from "@/lib/config";
 
-const BASE_URL = "https://primepre-logistics-backend-fb2561752d16.herokuapp.com/api";
+const BASE_URL = `${config.apiBaseUrl}/api`;
 
 // Login function
 export async function login(phone: string, password: string) {
