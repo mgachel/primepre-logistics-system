@@ -17,13 +17,25 @@ Including another URLconf
 from django.urls import path, include
 from .views import home_view
 from django.http import JsonResponse
+import traceback
 
 def api_test_view(request):
     return JsonResponse({"status": "API working", "endpoint": "test"})
 
+def debug_signup_view(request):
+    """Debug endpoint to test signup without full logic"""
+    try:
+        if request.method == 'GET':
+            return JsonResponse({"status": "GET request successful", "endpoint": "debug_signup"})
+        elif request.method == 'POST':
+            return JsonResponse({"status": "POST request successful", "endpoint": "debug_signup"})
+    except Exception as e:
+        return JsonResponse({"error": str(e), "traceback": traceback.format_exc()}, status=500)
+
 urlpatterns = [
     path('', home_view, name='home'),  # Root URL now has a proper handler
     path('api/test/', api_test_view, name='api_test'),  # Test endpoint
+    path('api/debug/signup/', debug_signup_view, name='debug_signup'),  # Debug signup
     path('api/auth/', include('users.urls')),
     path('api/cargo/', include('cargo.urls')),
     path('api/shipments/', include('Shipments.urls')),
