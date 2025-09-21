@@ -17,11 +17,13 @@ Including another URLconf
 from django.urls import path, include
 from .views import home_view
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 import traceback
 
 def api_test_view(request):
     return JsonResponse({"status": "API working", "endpoint": "test"})
 
+@csrf_exempt
 def debug_signup_view(request):
     """Debug endpoint to test signup without full logic"""
     try:
