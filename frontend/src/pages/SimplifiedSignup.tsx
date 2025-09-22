@@ -15,6 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
+import { config } from '@/lib/config';
 
 // Region choices (matching backend)
 const REGION_CHOICES = [
@@ -88,7 +89,7 @@ export default function SimplifiedSignup() {
       clearError();
       
       // Call the simplified signup endpoint
-      const response = await fetch('/api/auth/signup/simplified/', {
+      const response = await fetch(`${config.apiBaseUrl}/api/auth/signup/simplified/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
