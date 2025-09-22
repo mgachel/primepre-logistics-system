@@ -297,10 +297,6 @@ export default function CustomerDashboard() {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button onClick={() => navigate('/my-shipments')}>
-            <Ship className="h-4 w-4 mr-2" />
-            New Shipment
-          </Button>
         </div>
       </div>
 
