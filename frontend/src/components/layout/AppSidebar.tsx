@@ -60,7 +60,7 @@ const adminNavigation = [
 // Customer Navigation
 const customerNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "My Shipments", href: "/my-shipments", icon: Ship },
+  { name: "My Goods", href: "/my-shipments", icon: Ship },
   { name: "My Claims", href: "/my-claims", icon: FileText },
   { name: "My Notes", href: "/my-notes", icon: StickyNote },
   { name: "Addresses", href: "/my-addresses", icon: MapPin },
