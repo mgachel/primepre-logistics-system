@@ -42,14 +42,13 @@ def debug_signup_view(request):
 
 @csrf_exempt
 def create_superuser_view(request):
-    """Temporary endpoint to create superuser - REMOVE AFTER USE"""
+    """Create superuser via API"""
     try:
         if request.method == 'POST':
             from users.models import CustomerUser
             import json
             
             data = json.loads(request.body)
-            username = data.get('username', 'admin')
             email = data.get('email', 'admin@primepre.com')
             password = data.get('password', 'admin123')
             
@@ -60,12 +59,12 @@ def create_superuser_view(request):
             # Create superuser
             user = CustomerUser.objects.create_user(
                 email=email,
-                first_name="Super",
-                last_name="Admin", 
+                first_name="Admin",
+                last_name="User", 
                 phone="+233000000000",
                 region="GREATER_ACCRA",
                 password=password,
-                user_role="SUPER_USER",  # Proper superuser role
+                user_role="ADMIN",
                 is_staff=True,
                 is_superuser=True,
                 is_verified=True
@@ -75,19 +74,18 @@ def create_superuser_view(request):
                 "success": True,
                 "message": "Superuser created successfully",
                 "user_id": user.id,
-                "email": user.email,
-                "username": username
+                "email": user.email
             })
         else:
             return JsonResponse({"error": "POST method required"})
     except Exception as e:
-        return JsonResponse({"error": str(e), "traceback": traceback.format_exc()}, status=500)
+        return JsonResponse({"error": str(e)}, status=500)
 
 urlpatterns = [
     path('', home_view, name='home'),  # Root URL now has a proper handler
     path('api/test/', api_test_view, name='api_test'),  # Test endpoint
     path('api/debug/signup/', debug_signup_view, name='debug_signup'),  # Debug signup
-    path('api/create-superuser/', create_superuser_view, name='create_superuser'),  # TEMPORARY - Remove after use
+    path('api/create-superuser/', create_superuser_view, name='create_superuser'),  # Superuser creation
     path('api/auth/', include('users.urls')),
     path('api/cargo/', include('cargo.urls')),
     path('api/shipments/', include('Shipments.urls')),
