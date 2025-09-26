@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { warehouseService } from "@/services/warehouseService";
 import { clientService, Client } from "@/services/clientService";
+import { parse } from "path";
 
 interface NewGoodsDialogProps {
   open: boolean;
@@ -130,7 +131,8 @@ export function NewGoodsDialog({
     const l = parseFloat(length) || 0;
     const w = parseFloat(width) || 0;
     const h = parseFloat(height) || 0;
-    const cbm = l * w * h;
+    const q = parseFloat(formData.quantity) || 1;
+    const cbm = (l * w * h * q) / 1000000; // Convert cubic cm to cubic meters
     // Round to 3 decimal places to avoid precision issues
     return Math.round(cbm * 1000) / 1000;
   };

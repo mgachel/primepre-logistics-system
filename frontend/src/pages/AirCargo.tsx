@@ -1,25 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Ship,
-  Plane,
-  AlertTriangle,
-  Clock,
-  Plus,
   Search,
-  Filter,
-  Upload,
-  MapPin,
+  Plus,
+  Plane,
+  Calendar,
+  Package,
   RefreshCcw,
   Edit,
-  Eye,
-  Trash2,
-  FileDown,
   Settings,
+  Trash2,
+  Eye,
 } from "lucide-react";
-import { EditCargoContainerDialog } from "@/components/dialogs/EditCargoContainerDialog";
-import { MetricCard } from "@/components/ui/metric-card";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
+import { EditCargoContainerDialog } from "@/components/dialogs/EditCargoContainerDialog";
+import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
+import { ExcelUploadButton } from "@/components/ui/ExcelUploadButton";
+import {
+  cargoService,
+  BackendCargoContainer,
+  CargoDashboardStats,
+} from "@/services/cargoService";
+import { DataTable, Column } from "@/components/data-table/DataTable";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
 import {
   Select,
   SelectContent,
@@ -32,119 +41,84 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
-import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
-import { useNavigate } from "react-router-dom";
-import {
-  cargoService,
-  BackendCargoContainer,
-  BackendCargoItem,
-  CargoDashboardStats,
-} from "@/services/cargoService";
-import { DataTable, Column } from "@/components/data-table/DataTable";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { formatDate, formatRelative } from "@/lib/date";
-// If "@/lib/persist" does not exist, add a fallback implementation here:
-export function persistGet<T = string>(key: string, defaultValue: T): T {
-  if (typeof window === "undefined") return defaultValue;
-  try {
-    const value = window.localStorage.getItem(key);
-    return value !== null ? (JSON.parse(value) as T) : defaultValue;
-  } catch {
-    return defaultValue;
-  }
-}
-export function persistSet<T = string>(key: string, value: T) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
-}
-import { useToast } from "@/hooks/use-toast";
 
-interface AirCargoItem {
-  id: string;
-  awbNumber: string;
-  client: string;
-  origin: string;
-  destination: string;
-  airline: string;
-  flightNumber: string;
-  departureDate: string;
-  arrivalDate: string;
-  weight: string;
-  volume: string;
-  goods: string;
-  status: "in-transit" | "delivered" | "pending" | "delayed";
-  notes: string;
+// ✅ Map backend status to badge-friendly values
+function mapStatus(
+  status: BackendCargoContainer["status"]
+): "in-transit" | "delivered" | "pending" | "delayed" {
+  switch (status) {
+    case "in_transit":
+      return "in-transit";
+    case "delivered":
+      return "delivered";
+    case "pending":
+      return "pending";
+    case "demurrage":
+      return "delayed"; // closest match
+    default:
+      return "pending";
+  }
 }
 
 export default function AirCargo() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("air-cargos");
-  const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
   const navigate = useNavigate();
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
+  const [selectedContainer, _setSelectedContainer] =
+    useState<BackendCargoContainer | null>(null);
+  const [showContainerDetails, setShowContainerDetails] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "in-transit" | "pending" | "delivered"
+  >("all");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [items, setItems] = useState<BackendCargoItem[]>([]);
+  const [_error, setError] = useState<string | null>(null);
   const [containers, setContainers] = useState<BackendCargoContainer[]>([]);
   const [dashboard, setDashboard] = useState<CargoDashboardStats | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<
-    "all" | "in_transit" | "delivered" | "pending" | "delayed"
-  >(persistGet("air:filterStatus", "all"));
 
-  // View dialog state
-  const [showViewDialog, setShowViewDialog] = useState(false);
-  const [viewContainer, setViewContainer] =
-    useState<BackendCargoContainer | null>(null);
-
-  // Status dialog state
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [selectedStatusContainer, setSelectedStatusContainer] =
     useState<BackendCargoContainer | null>(null);
   const [newStatus, setNewStatus] = useState<string>("");
+
   const [editOpen, setEditOpen] = useState(false);
   const [editContainer, setEditContainer] =
     useState<BackendCargoContainer | null>(null);
 
-  // Container details state
-  const [showContainerDetails, setShowContainerDetails] = useState(false);
-  const [selectedContainer, setSelectedContainer] =
-    useState<AirCargoItem | null>(null);
-
-  // Load air cargo data (containers) + dashboard
+  // ✅ Load air containers and dashboard
   useEffect(() => {
     let ignore = false;
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const [containersRes, dashRes, itemsRes] = await Promise.all([
-          cargoService.getContainers({ cargo_type: "air" }),
+        const statusParam =
+          statusFilter === "all"
+            ? undefined
+            : statusFilter === "in-transit"
+            ? "in_transit"
+            : statusFilter;
+
+        const [listRes, dashRes] = await Promise.all([
+          cargoService.getContainers({
+            cargo_type: "air",
+            search: searchTerm || undefined,
+            status: statusParam,
+          }),
           cargoService.getDashboard("air"),
-          cargoService.getCargoItems(), // Fetch all cargo items
         ]);
+
         if (!ignore) {
-          const airContainers = containersRes.data?.results || [];
-          const allItems = itemsRes.data?.results || [];
-          
-          // Filter items that belong to air containers
-          const airItems = allItems.filter(item => 
-            airContainers.some(container => container.container_id === item.container)
-          );
-          
-          setContainers(airContainers);
-          setItems(airItems);
+          setContainers(listRes.data?.results || []);
           setDashboard(dashRes.data || null);
         }
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Failed to load air cargo";
+        const msg =
+          e instanceof Error ? e.message : "Failed to load air cargo";
         if (!ignore) setError(msg);
       } finally {
         if (!ignore) setLoading(false);
@@ -154,32 +128,28 @@ export default function AirCargo() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [searchTerm, statusFilter]);
 
-  // Reload data function
+  // ✅ Reload data
   const reloadData = async () => {
-    try {
-      const [containersRes, dashRes, itemsRes] = await Promise.all([
-        cargoService.getContainers({ cargo_type: "air" }),
-        cargoService.getDashboard("air"),
-        cargoService.getCargoItems(), // Fetch all cargo items
-      ]);
-      
-      const airContainers = containersRes.data?.results || [];
-      const allItems = itemsRes.data?.results || [];
-      
-      // Filter items that belong to air containers
-      const airItems = allItems.filter(item => 
-        airContainers.some(container => container.container_id === item.container)
-      );
-      
-      setContainers(airContainers);
-      setItems(airItems);
-      setDashboard(dashRes.data || null);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to reload air cargo";
-      setError(msg);
-    }
+    const statusParam =
+      statusFilter === "all"
+        ? undefined
+        : statusFilter === "in-transit"
+        ? "in_transit"
+        : statusFilter;
+
+    const [listRes, dashRes] = await Promise.all([
+      cargoService.getContainers({
+        cargo_type: "air",
+        search: searchTerm || undefined,
+        status: statusParam,
+      }),
+      cargoService.getDashboard("air"),
+    ]);
+
+    setContainers(listRes.data?.results || []);
+    setDashboard(dashRes.data || null);
   };
 
   const handleStatusUpdate = async () => {
@@ -198,14 +168,11 @@ export default function AirCargo() {
       );
       toast({
         title: "Status updated",
-        description: `${
-          selectedStatusContainer.container_id
-        } → ${newStatus.replace("_", " ")}`,
+        description: `${selectedStatusContainer.container_id} → ${newStatus}`,
       });
       setShowStatusDialog(false);
       setSelectedStatusContainer(null);
       setNewStatus("");
-      // Reload data to get fresh state
       await reloadData();
     } catch (e: unknown) {
       toast({
@@ -216,209 +183,95 @@ export default function AirCargo() {
     }
   };
 
-  const filtered = useMemo(() => {
-    let list = containers;
-    if (filterStatus !== "all") {
-      const statusMap = {
-        in_transit: "in_transit",
-        delivered: "delivered",
-        pending: "pending",
-        delayed: "demurrage", // map delayed to demurrage status
-      };
-      list = list.filter(
-        (c) => c.status === statusMap[filterStatus as keyof typeof statusMap]
-      );
-    }
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      list = list.filter(
-        (c) =>
-          c.container_id.toLowerCase().includes(q) ||
-          (c.route || "").toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [containers, filterStatus, searchTerm]);
+  const filteredCargo = useMemo(() => containers, [containers]);
 
-  const counts = useMemo(
-    () => ({
-      all: containers.length,
-      in_transit: containers.filter((c) => c.status === "in_transit").length,
-      delivered: containers.filter((c) => c.status === "delivered").length,
-      pending: containers.filter((c) => c.status === "pending").length,
-      delayed: containers.filter((c) => c.status === "demurrage").length,
-    }),
-    [containers]
-  );
-
-  type Row = {
-    id: string;
-    container_id: string;
-    loading_date: string;
-    eta: string | null;
-    rate: number | null;
-    total_weight: number | null;
-    status: "in-transit" | "delivered" | "pending" | "delayed";
-    clients: number;
-    created_at: string;
-    _raw: BackendCargoContainer;
-  };
-
-  const rows: Row[] = useMemo(
-    () =>
-      filtered.map((container) => {
-        const status: Row["status"] =
-          container.status === "in_transit"
-            ? "in-transit"
-            : container.status === "demurrage"
-            ? "delayed"
-            : (container.status as Row["status"]);
-            
-        // Calculate total weight by summing weights of all cargo items in this container
-        const containerItems = items.filter(item => item.container === container.container_id);
-        const totalWeight = containerItems.reduce((sum, item) => {
-          return sum + (item.weight || 0);
-        }, 0);
-        
-        return {
-          id: container.container_id,
-          container_id: container.container_id,
-          loading_date: container.load_date
-            ? formatDate(new Date(container.load_date))
-            : "-",
-          eta: container.eta ?? null,
-          rate: container.rates ? Number(container.rates) : null,
-          total_weight: totalWeight > 0 ? totalWeight : null,
-          status,
-          clients: container.total_clients,
-          created_at: container.created_at,
-          _raw: container,
-        };
-      }),
-    [filtered, items]
-  );
-
-  // Helper function to check if a date is overdue (in the past)
-  function isOverdue(date: Date): boolean {
-    return date.getTime() < new Date().getTime();
-  }
-  
-    const columns: Column<Row>[] = [
+  // ✅ Table columns
+  const cols: Column<BackendCargoContainer>[] = [
     {
       id: "created_at",
       header: "Created",
-      accessor: () => "", // Hidden column for sorting only
-      sort: (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      width: "0px", // Hide the column
+      accessor: () => "",
+      sort: (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      width: "0px",
     },
     {
-      id: "select",
-      header: (
-        <input type="checkbox" className="rounded" aria-label="Select all" />
-      ),
-      accessor: () => (
-        <input type="checkbox" className="rounded" aria-label="Select row" />
-      ),
-      width: "48px",
-      sticky: true,
-    },
-    {
-      id: "container_id",
-      header: "Container ID",
-      accessor: (r) => <span className="font-medium">{r.container_id}</span>,
+      id: "container",
+      header: "Airway Bill No.",
+      accessor: (c) => <span className="font-medium">{c.container_id}</span>,
       sort: (a, b) => a.container_id.localeCompare(b.container_id),
       sticky: true,
       clickable: true,
     },
     {
       id: "loading_date",
-      header: "Loading Date",
-      accessor: (r) => {
-        if (!r.loading_date || r.loading_date === "-") {
-          return <span className="text-sm text-muted-foreground">-</span>;
-        }
-        try {
-          const date = new Date(r.loading_date);
-          if (isNaN(date.getTime())) {
-            return <span className="text-sm text-muted-foreground">-</span>;
-          }
-          return <span className="text-sm">{formatDate(date)}</span>;
-        } catch {
-          return <span className="text-sm text-muted-foreground">-</span>;
-        }
-      },
-      sort: (a, b) => {
-        if (!a.loading_date || a.loading_date === "-") return 1;
-        if (!b.loading_date || b.loading_date === "-") return -1;
-        return a.loading_date.localeCompare(b.loading_date);
-      },
+      header: "Flight Date",
+      accessor: (c) =>
+        c.load_date ? (
+          <span className="text-sm">{formatDate(c.load_date)}</span>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
+        ),
+      sort: (a, b) => (a.load_date || "").localeCompare(b.load_date || ""),
     },
     {
       id: "eta",
       header: "ETA",
-      accessor: (r) => {
-        const d = r.eta ? new Date(r.eta) : null;
-        if (!d) return <span className="text-sm text-muted-foreground">-</span>;
-        const overdue = isOverdue(d);
-        return (
-          <div className="text-sm">
-            <div className={overdue ? "text-destructive font-medium" : ""}>
-              {formatDate(d)}
-            </div>
-            <div
-              className={
-                "text-xs " +
-                (overdue ? "text-destructive" : "text-muted-foreground")
-              }
-            >
-              {overdue
-                ? `${Math.max(
-                    Math.ceil(
-                      (new Date().getTime() - d.getTime()) / (1000 * 60 * 60 * 24)
-                    ),
-                    1
-                  )} days late`
-                : formatRelative(d)}
-            </div>
+      accessor: (c) => (
+        <div>
+          <div
+            className={
+              isOverdue(c.eta) ? "text-red-600 font-medium" : undefined
+            }
+          >
+            {formatDate(c.eta)}
           </div>
-        );
-      },
+          <div className="text-xs text-muted-foreground">
+            {isOverdue(c.eta)
+              ? `${daysLate(c.eta)} days late`
+              : formatRelative(c.eta) || ""}
+          </div>
+        </div>
+      ),
       sort: (a, b) => (a.eta || "").localeCompare(b.eta || ""),
     },
     {
-      id: "rate",
-      header: "Rate",
-      accessor: (r) => {
-        if (r.rate === null || r.rate === undefined) {
-          return <span className="text-sm text-muted-foreground">-</span>;
-        }
-        return <span className="text-sm font-medium">${r.rate.toLocaleString()}</span>;
-      },
-      sort: (a, b) => (a.rate || 0) - (b.rate || 0),
-      align: "right",
-    },
-    {
-      id: "total_weight",
+      id: "weight",
       header: "Total Weight",
-      accessor: (r) => {
-        if (r.total_weight === null || r.total_weight === undefined) {
-          return <span className="text-sm text-muted-foreground">-</span>;
-        }
-        return <span className="text-sm">{r.total_weight} kg</span>;
+      accessor: (c) => {
+        const totalWeight = (c.items || []).reduce(
+          (sum, item) => sum + (item.weight || 0),
+          0
+        );
+        return totalWeight > 0 ? (
+          <span className="text-sm">{totalWeight.toFixed(1)} kg</span>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
+        );
       },
-      sort: (a, b) => (a.total_weight || 0) - (b.total_weight || 0),
+      sort: (a, b) => {
+        const weightA = (a.items || []).reduce(
+          (sum, item) => sum + (item.weight || 0),
+          0
+        );
+        const weightB = (b.items || []).reduce(
+          (sum, item) => sum + (item.weight || 0),
+          0
+        );
+        return weightA - weightB;
+      },
       align: "right",
     },
     {
       id: "status",
       header: "Status",
-      accessor: (r) => <StatusBadge status={r.status} />,
+      accessor: (c) => <StatusBadge status={mapStatus(c.status)} />,
     },
     {
       id: "clients",
       header: "Clients",
-      accessor: (r) => `${r.clients}`,
-      sort: (a, b) => a.clients - b.clients,
+      accessor: (c) => `${c.total_clients}`,
+      sort: (a, b) => a.total_clients - b.total_clients,
       align: "right",
       width: "80px",
     },
@@ -426,367 +279,214 @@ export default function AirCargo() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Air Cargo</h1>
+          <h1 className="text-2xl font-semibold text-foreground flex items-center">
+            <Plane className="h-6 w-6 mr-3 text-primary" />
+            Air Cargo
+          </h1>
           <p className="text-muted-foreground mt-1">
-            Track and manage all air cargo shipments
+            Manage air freight shipments • All times shown in your local time
+            zone
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
+        <div className="flex gap-2">
+          <Button onClick={() => setShowNewCargoDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Air Container
+          </Button>
+          <ExcelUploadButton
+            uploadType="air_cargo"
             variant="outline"
+            onUploadComplete={(response) => {
+              toast({
+                title: "Excel upload completed",
+                description: `Processed ${response.summary.created || 0} air cargo items`,
+              });
+              window.location.reload();
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="logistics-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-muted-foreground">
+                Total Shipments
+              </div>
+              <div className="text-2xl font-semibold mt-1">
+                {dashboard?.total_containers ?? 0}
+              </div>
+            </div>
+            <Package className="h-8 w-8 text-primary/60" />
+          </div>
+        </div>
+        <div className="logistics-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-muted-foreground">In Transit</div>
+              <div className="text-2xl font-semibold mt-1">
+                {dashboard?.containers_in_transit ?? 0}
+              </div>
+            </div>
+            <Plane className="h-8 w-8 text-secondary/60" />
+          </div>
+        </div>
+        <div className="logistics-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-muted-foreground">Total Weight</div>
+              <div className="text-2xl font-semibold mt-1">
+                {filteredCargo
+                  .reduce(
+                    (sum, c) =>
+                      sum +
+                      (c.items || []).reduce(
+                        (sub, item) => sub + (item.weight || 0),
+                        0
+                      ),
+                    0
+                  )
+                  .toFixed(1)}{" "}
+                kg
+              </div>
+            </div>
+            <Package className="h-8 w-8 text-accent/60" />
+          </div>
+        </div>
+        <div className="logistics-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-muted-foreground">This Month</div>
+              <div className="text-2xl font-semibold mt-1">8</div>
+            </div>
+            <Calendar className="h-8 w-8 text-warning/60" />
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by airway bill, client, or tracking ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex items-center space-x-2">
+          {["all", "in-transit", "pending", "delivered"].map((s) => (
+            <Button
+              key={s}
+              variant={statusFilter === s ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter(s as any)}
+            >
+              {s === "all"
+                ? "All"
+                : s.charAt(0).toUpperCase() + s.slice(1).replace("-", " ")}
+            </Button>
+          ))}
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => {
-              const input = document.createElement("input");
-              input.type = "file";
-              input.accept = ".xlsx,.xls,.csv";
-              input.onchange = (e) => {
-                const file = (e.target as HTMLInputElement).files?.[0];
-                if (file) {
-                  // Handle file upload
-                  console.log("Uploading file:", file.name);
-                }
-              };
-              input.click();
+              setSearchTerm("");
+              setStatusFilter("all");
             }}
           >
-            <Upload className="h-4 w-4" />
-            Import Excel
-          </Button>
-          <Button size="sm" onClick={() => setShowNewCargoDialog(true)}>
-            <Plus className="h-4 w-4" />
-            Add Cargo
+            <RefreshCcw className="h-4 w-4 mr-1" /> Reset filters
           </Button>
         </div>
       </div>
 
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-6"
-      >
-        <TabsList className="bg-muted">
-          <TabsTrigger
-            value="sea-cargos"
-            className="flex items-center gap-2"
-            onClick={() => navigate("/cargos/sea")}
-          >
-            <Ship className="h-4 w-4" />
-            Sea Cargos
-          </TabsTrigger>
-          <TabsTrigger value="air-cargos" className="flex items-center gap-2">
-            <Plane className="h-4 w-4" />
-            Air Cargos
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="air-cargos" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Air Cargo Management
-              </h2>
-              <p className="text-muted-foreground">
-                Track and manage all air cargo shipments and their current
-                status
-              </p>
-            </div>
-          </div>
-
-          {/* Metrics Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <MetricCard
-              title="Total Containers"
-              value={(
-                dashboard?.total_containers ?? containers.length
-              ).toString()}
-              icon={Plane}
-              className="border-primary/20 bg-primary/5"
-            />
-            <MetricCard
-              title="Demurraged"
-              value={(dashboard?.demurrage_containers ?? 0).toString()}
-              icon={AlertTriangle}
-              className="border-destructive/20 bg-destructive/5"
-            />
-            <MetricCard
-              title="In Transit"
-              value={(dashboard?.containers_in_transit ?? 0).toString()}
-              icon={Clock}
-              className="border-blue-500/20 bg-blue-500/5"
-            />
-          </div>
-
-          {/* Air Cargo Management Section */}
-          <div className="logistics-card p-6 space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">
-                Air Cargo Management
-              </h3>
-              <p className="text-muted-foreground">
-                Track and manage all air cargo shipments and their current
-                status
-              </p>
-            </div>
-
-            {/* Search and Filters */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by tracking ID or client"
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  size="sm"
-                  variant={filterStatus === "all" ? "default" : "outline"}
-                  onClick={() => {
-                    setFilterStatus("all");
-                    persistSet("air:filterStatus", "all");
-                  }}
-                >
-                  All ({counts.all})
-                </Button>
-                <Button
-                  size="sm"
-                  variant={
-                    filterStatus === "in_transit" ? "default" : "outline"
+      {/* Cargo Table */}
+      <div className="logistics-card p-4">
+        <DataTable
+          id="air-cargo"
+          rows={filteredCargo}
+          columns={cols}
+          loading={loading}
+          defaultSort={{ column: "created_at", direction: "desc" }}
+          empty={<p className="text-muted-foreground">No air cargo yet.</p>}
+          rowActions={(row) => (
+            <>
+              <DropdownMenuItem
+                onClick={() => {
+                  navigate(`/containers/${row.container_id}`);
+                }}
+              >
+                <Eye className="h-4 w-4 mr-2" /> View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedStatusContainer(row);
+                  setNewStatus(row.status);
+                  setShowStatusDialog(true);
+                }}
+              >
+                <Settings className="h-4 w-4 mr-2" /> Update Status
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setEditContainer(row);
+                  setEditOpen(true);
+                }}
+              >
+                <Edit className="h-4 w-4 mr-2" /> Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={async () => {
+                  if (
+                    !confirm(
+                      `Delete air container ${row.container_id}? This cannot be undone.`
+                    )
+                  )
+                    return;
+                  try {
+                    await cargoService.deleteBackendContainer(row.container_id);
+                    await reloadData();
+                    toast({
+                      title: "Deleted",
+                      description: `${row.container_id} removed.`,
+                    });
+                  } catch (e: unknown) {
+                    toast({
+                      title: "Delete failed",
+                      description:
+                        e instanceof Error ? e.message : "Unable to delete",
+                      variant: "destructive",
+                    });
                   }
-                  onClick={() => {
-                    setFilterStatus("in_transit");
-                    persistSet("air:filterStatus", "in_transit");
-                  }}
-                >
-                  In Transit ({counts.in_transit})
-                </Button>
-                <Button
-                  size="sm"
-                  variant={filterStatus === "pending" ? "default" : "outline"}
-                  onClick={() => {
-                    setFilterStatus("pending");
-                    persistSet("air:filterStatus", "pending");
-                  }}
-                >
-                  Pending ({counts.pending})
-                </Button>
-                <Button
-                  size="sm"
-                  variant={filterStatus === "delivered" ? "default" : "outline"}
-                  onClick={() => {
-                    setFilterStatus("delivered");
-                    persistSet("air:filterStatus", "delivered");
-                  }}
-                >
-                  Delivered ({counts.delivered})
-                </Button>
-                <Button
-                  size="sm"
-                  variant={filterStatus === "delayed" ? "default" : "outline"}
-                  onClick={() => {
-                    setFilterStatus("delayed");
-                    persistSet("air:filterStatus", "delayed");
-                  }}
-                >
-                  Delayed ({counts.delayed})
-                </Button>
-                {(filterStatus !== "all" || searchTerm) && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setFilterStatus("all");
-                      setSearchTerm("");
-                      persistSet("air:filterStatus", "all");
-                    }}
-                  >
-                    <RefreshCcw className="h-4 w-4 mr-1" /> Reset filters
-                  </Button>
-                )}
-              </div>
-              <div className="ml-auto flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const input = document.createElement("input");
-                    input.type = "file";
-                    input.accept = ".xlsx,.xls,.csv";
-                    input.onchange = (e) => {
-                      const file = (e.target as HTMLInputElement).files?.[0];
-                      if (file) {
-                        console.log("Uploading file:", file.name);
-                      }
-                    };
-                    input.click();
-                  }}
-                >
-                  <Upload className="h-4 w-4" />
-                  Import Excel
-                </Button>
-                <Button size="sm" onClick={() => setShowNewCargoDialog(true)}>
-                  <Plus className="h-4 w-4" />
-                  Add Cargo
-                </Button>
-              </div>
-            </div>
-
-            <DataTable
-              id="air-cargo"
-              rows={rows}
-              columns={columns}
-              loading={loading}
-              defaultSort={{ column: "created_at", direction: "desc" }}
-              empty={
-                <div className="text-center space-y-2 py-6">
-                  <div className="text-muted-foreground">
-                    No air cargo yet. Add Cargo or Import from Excel.
-                  </div>
-                  <a
-                    className="text-primary underline text-sm"
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      const csv =
-                        "AWB Number,Airline,Route,Flight,Departure,Arrival,ETA\n000-12345678,SampleAir,PVG-ACC,SA123,2025-08-01,2025-08-02,2025-08-03";
-                      const blob = new Blob([csv], { type: "text/csv" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = "air-cargo-template.csv";
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }}
-                  >
-                    Download sample CSV
-                  </a>
-                </div>
-              }
-              renderBulkBar={(rows) => (
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline">
-                    <Settings className="h-4 w-4 mr-1" />
-                    Update Status
-                  </Button>
-                  <Button size="sm" variant="outline">
-                    <FileDown className="h-4 w-4 mr-1" />
-                    Export
-                  </Button>
-                  <Button size="sm" variant="destructive">
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete
-                  </Button>
-                </div>
-              )}
-              rowActions={(row) => (
-                <>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      navigate(`/containers/${row._raw.container_id}`);
-                    }}
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Details
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setSelectedStatusContainer(row._raw);
-                      setNewStatus(row._raw.status);
-                      setShowStatusDialog(true);
-                    }}
-                  >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Update Status
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setEditContainer(row._raw);
-                      setEditOpen(true);
-                    }}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={async () => {
-                      if (!confirm(`Delete cargo container ${row.container_id}?`))
-                        return;
-                      try {
-                        await cargoService.deleteBackendContainer(
-                          row._raw.container_id
-                        );
-                        await reloadData(); // Reload data instead of local state update
-                        toast({
-                          title: "Deleted",
-                          description: `${row.container_id} removed.`,
-                        });
-                      } catch (e: unknown) {
-                        toast({
-                          title: "Delete failed",
-                          description:
-                            e instanceof Error ? e.message : "Unable to delete",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </>
-              )}
-            />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="sea-cargos" className="space-y-6">
-          <div className="logistics-card p-6">
-            <div className="text-center py-8">
-              <Ship className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                Sea Cargo Management
-              </h3>
-              <p className="text-muted-foreground">
-                Sea cargo management will be implemented here
-              </p>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      <NewCargoContainerDialog
-        open={showNewCargoDialog}
-        onOpenChange={setShowNewCargoDialog}
-        defaultType="air"
-        onCreated={async (containerId) => {
-          // Reload data to show the new container at the top
-          await reloadData();
-          toast({
-            title: "Success",
-            description: `Container ${containerId} has been created and appears at the top of the list.`,
-          });
-        }}
-      />
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" /> Delete
+              </DropdownMenuItem>
+            </>
+          )}
+        />
+      </div>
 
       {/* Status Update Dialog */}
       <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update Container Status</DialogTitle>
+            <DialogTitle>Update Air Container Status</DialogTitle>
             <DialogDescription>
-              Change the status of the selected container to reflect its current
-              state.
+              Change the status of the selected air container.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground">
-                Container:{" "}
+                Airway Bill:{" "}
                 <span className="font-medium">
                   {selectedStatusContainer?.container_id}
                 </span>
@@ -798,26 +498,20 @@ export default function AirCargo() {
                 </span>
               </p>
             </div>
-            <div>
-              <label className="text-sm font-medium">New Status</label>
-              <Select value={newStatus} onValueChange={setNewStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select new status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="in_transit">In Transit</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="demurrage">Demurrage</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={newStatus} onValueChange={setNewStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select new status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="in_transit">In Transit</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="demurrage">Demurrage</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowStatusDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowStatusDialog(false)}>
               Cancel
             </Button>
             <Button
@@ -832,154 +526,18 @@ export default function AirCargo() {
         </DialogContent>
       </Dialog>
 
-      {/* View Container Dialog */}
-      <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              Container Details - {viewContainer?.container_id}
-            </DialogTitle>
-            <DialogDescription>
-              Detailed information about the selected air cargo container.
-            </DialogDescription>
-          </DialogHeader>
-          {viewContainer && (
-            <div className="space-y-6">
-              {/* Basic Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Container ID
-                  </label>
-                  <p className="text-sm font-mono">
-                    {viewContainer.container_id}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Type
-                  </label>
-                  <p className="text-sm capitalize">
-                    {viewContainer.cargo_type}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Status
-                  </label>
-                  <StatusBadge
-                    status={
-                      viewContainer.status === "in_transit"
-                        ? "in-transit"
-                        : viewContainer.status
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* Route Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Route
-                  </label>
-                  <p className="text-sm">{viewContainer.route}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Load Date
-                  </label>
-                  <p className="text-sm">
-                    {viewContainer.load_date
-                      ? formatDate(new Date(viewContainer.load_date))
-                      : "Not set"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Capacity & Weight */}
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Weight (kg)
-                  </label>
-                  <p className="text-sm">
-                    {viewContainer.weight
-                      ? `${viewContainer.weight.toLocaleString()} kg`
-                      : "Not set"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Timing */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    ETA
-                  </label>
-                  <p className="text-sm">
-                    {viewContainer.eta
-                      ? formatDate(new Date(viewContainer.eta))
-                      : "Not set"}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Rates
-                  </label>
-                  <p className="text-sm">
-                    {viewContainer.rates ? viewContainer.rates : "Not set"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Days tracking */}
-              {(viewContainer.stay_days > 0 ||
-                viewContainer.delay_days > 0) && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Stay Days
-                    </label>
-                    <p className="text-sm">{viewContainer.stay_days}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Delay Days
-                    </label>
-                    <p className="text-sm">{viewContainer.delay_days}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Timestamps */}
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Created
-                  </label>
-                  <p className="text-sm">
-                    {formatDate(new Date(viewContainer.created_at))}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Last Updated
-                  </label>
-                  <p className="text-sm">
-                    {formatDate(new Date(viewContainer.updated_at))}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <ContainerDetailsDialog
-        open={showContainerDetails}
-        onOpenChange={setShowContainerDetails}
-        container={selectedContainer}
+      {/* Dialogs */}
+      <NewCargoContainerDialog
+        open={showNewCargoDialog}
+        onOpenChange={setShowNewCargoDialog}
+        defaultType="air"
+        onCreated={async (containerId) => {
+          await reloadData();
+          toast({
+            title: "Created",
+            description: `Air container ${containerId} created.`,
+          });
+        }}
       />
 
       <EditCargoContainerDialog
@@ -989,6 +547,12 @@ export default function AirCargo() {
         onSaved={async () => {
           await reloadData();
         }}
+      />
+
+      <ContainerDetailsDialog
+        open={showContainerDetails}
+        onOpenChange={setShowContainerDetails}
+        container={selectedContainer}
       />
     </div>
   );

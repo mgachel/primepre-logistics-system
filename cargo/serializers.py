@@ -111,7 +111,7 @@ class CargoContainerSerializer(serializers.ModelSerializer):
             'container_id', 'cargo_type', 'load_date', 'eta', 'route',
             'rates', 'cbm', 'status', 'total_clients', 'total_cbm', 'rate'
         ]
-        read_only_fields = ['total_clients', 'total_cbm', 'rate']
+        read_only_fields = ['total_clients', 'total_cbm','rate']
 
 
 class CargoContainerDetailSerializer(serializers.ModelSerializer):

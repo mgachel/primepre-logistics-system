@@ -8,6 +8,7 @@ import {
   Plus,
   Upload,
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -331,6 +332,16 @@ export default function Dashboard() {
     },
   ];
 
+  // Refresh handler to refetch all dashboard queries
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
+    queryClient.invalidateQueries({ queryKey: ["goods-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["containers-summary"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-user-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
+    queryClient.invalidateQueries({ queryKey: ["customer-claims"] });
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -346,6 +357,10 @@ export default function Dashboard() {
           <Button variant="outline" size="sm">
             <Calendar className="h-4 w-4 mr-2" />
             This Month
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
           </Button>
         </div>
       </div>
