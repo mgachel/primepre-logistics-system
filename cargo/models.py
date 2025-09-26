@@ -64,7 +64,16 @@ class CargoContainer(models.Model):
             )['total_cbm']
             return total or 0
         return 0
-
+    
+    def calculate_total_weight(self):
+        """Calculate total weight from all cargo items in this container."""
+        if self.cargo_type == 'air':
+            total = self.cargo_items.filter(weight__isnull=False).aggregate(
+                total_weight=models.Sum('weight')
+            )['total_weight']
+            return total or 0
+        return 0
+    
     def update_total_cbm(self):
         """Update the container's CBM field with calculated total from cargo items."""
         if self.cargo_type == 'sea':

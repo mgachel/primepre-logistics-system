@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { settingsService, WarehouseAddress } from '@/services/settingsService';
+import { useAuth } from '@/contexts/AuthContext';
 
-const AddressCard = ({ address }: { address: WarehouseAddress }) => {
+const AddressCard = ({ address, shippingMark }: { address: WarehouseAddress, shippingMark: string }) => {
   const { toast } = useToast();
 
   const copyToClipboard = (text: string, label: string) => {
@@ -65,12 +66,14 @@ const AddressCard = ({ address }: { address: WarehouseAddress }) => {
             <MapPin className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium text-sm">Address</span>
           </div>
-          <p className="text-sm text-muted-foreground pl-6">{address.address}</p>
+          <p className="text-sm text-muted-foreground pl-6">
+            {shippingMark} {address.address}
+          </p>
           <div className="flex gap-2 pl-6">
             <Button
               size="sm"
               variant="outline"
-              onClick={() => copyToClipboard(address.address, 'Address')}
+              onClick={() => copyToClipboard(`${shippingMark} ${address.address}`, 'Address')}
               className="flex items-center gap-1"
             >
               <Copy className="h-3 w-3" />
@@ -88,7 +91,7 @@ const AddressCard = ({ address }: { address: WarehouseAddress }) => {
           </div>
         </div>
 
-                {/* Created Date */}
+        {/* Created Date */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm">Created</span>
@@ -97,26 +100,6 @@ const AddressCard = ({ address }: { address: WarehouseAddress }) => {
             {new Date(address.created_at).toLocaleDateString()}
           </p>
         </div>
-
-        {/* Capacity Information */}
-        {(address.storage_capacity_cbm || address.handling_capacity_daily) && (
-          <div className="space-y-2 pt-2 border-t">
-            <div className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-sm">Capacity</span>
-            </div>
-            {address.storage_capacity_cbm && (
-              <p className="text-sm text-muted-foreground pl-6">
-                Storage: {address.storage_capacity_cbm} CBM
-              </p>
-            )}
-            {address.handling_capacity_daily && (
-              <p className="text-sm text-muted-foreground pl-6">
-                Daily Handling: {address.handling_capacity_daily} items
-              </p>
-            )}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -126,14 +109,18 @@ export default function CustomerAddresses() {
   const [addresses, setAddresses] = useState<WarehouseAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+
+  console.log("Auth user object:", user); // Debugging log
+
+  const shippingMark = user?.shipping_mark || "No Shipping Mark Found";
 
   useEffect(() => {
-    // Fetch warehouse addresses from admin settings
     const fetchAddresses = async () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         const response = await settingsService.getWarehouseAddresses();
         if (response.success) {
           setAddresses(response.data);
@@ -229,7 +216,7 @@ export default function CustomerAddresses() {
         
         <div className="grid gap-6 md:grid-cols-2">
           {addresses.map((address) => (
-            <AddressCard key={address.id} address={address} />
+            <AddressCard key={address.id} address={address} shippingMark={shippingMark} />
           ))}
         </div>
       </div>

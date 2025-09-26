@@ -41,6 +41,16 @@ import { useToast } from "@/hooks/use-toast";
 export default function Clients() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Refresh handler for dashboard-related queries
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
+    queryClient.invalidateQueries({ queryKey: ["goods-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["containers-summary"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-user-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
+    queryClient.invalidateQueries({ queryKey: ["customer-claims"] });
+  };
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<
     "all" | "active" | "inactive"
@@ -306,15 +316,21 @@ export default function Clients() {
             Manage client relationships and view recent shipments
           </p>
         </div>
-        <Button onClick={() => setShowNewClientDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Client
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setShowNewClientDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Client
+          </Button>
+          <Button variant="outline" onClick={handleRefresh}>
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 max-w-md flex items-center gap-2">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search clients..."
@@ -322,6 +338,15 @@ export default function Clients() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
+          <Button
+            variant="outline"
+            size="sm"
+            style={{ marginLeft: 8 }}
+            onClick={() => fetchAllClients(queryParams)}
+          >
+            <Search className="h-4 w-4 mr-1" />
+            Search
+          </Button>
         </div>
         <div className="flex items-center space-x-2">
           <Button
