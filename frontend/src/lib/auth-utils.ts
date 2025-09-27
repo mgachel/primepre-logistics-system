@@ -112,7 +112,8 @@ export function canAccessRoute(user: User | null, route: string): boolean {
     '/my-claims',
     '/my-notes',
     '/my-profile',
-    '/my-addresses'
+    '/my-addresses',
+    '/my-rates'
   ];
 
   // Check if route is admin-only

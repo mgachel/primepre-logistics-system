@@ -138,31 +138,49 @@ class GoodsReceivedGhanaSerializer(BaseGoodsReceivedSerializer):
         model = GoodsReceivedGhana
         fields = [
             "id", "customer", "shipping_mark", "supply_tracking",
-            "cbm", "weight", "quantity", "description", "location",
-            "status", "method_of_shipping", "date_loading",
-            "date_received", "created_at", "updated_at",
+            "length", "breadth", "height", "cbm", "weight", "quantity", 
+            "description", "location", "status", "method_of_shipping", 
+            "date_loading", "date_received", "created_at", "updated_at",
             "days_in_warehouse", "is_ready_for_delivery", "is_flagged",
         ]
         read_only_fields = ["date_received", "created_at", "updated_at"]
         extra_kwargs = {
             'customer': {'required': False, 'allow_null': True},
             'shipping_mark': {'required': False, 'allow_null': True, 'allow_blank': True},
+            'length': {'required': False, 'allow_null': True},
+            'breadth': {'required': False, 'allow_null': True},
+            'height': {'required': False, 'allow_null': True},
             'cbm': {'required': False, 'allow_null': True}
         }
 
     def validate(self, data):
-        """Override to make CBM conditional based on shipping method."""
+        """Override to make CBM conditional based on shipping method and validate dimensions."""
         # Call parent validation first
         data = super().validate(data)
         
         method_of_shipping = data.get("method_of_shipping")
         cbm = data.get("cbm")
+        length = data.get("length")
+        breadth = data.get("breadth")
+        height = data.get("height")
         
-        # CBM is required for SEA but optional for AIR
-        if method_of_shipping == "SEA" and not cbm:
-            raise serializers.ValidationError({
-                "cbm": "CBM is required for sea cargo."
-            })
+        # For sea cargo, either provide dimensions OR CBM directly
+        if method_of_shipping == "SEA":
+            has_dimensions = all([length, breadth, height])
+            has_cbm = cbm is not None
+            
+            if not has_dimensions and not has_cbm:
+                raise serializers.ValidationError({
+                    "cbm": "For sea cargo, either provide dimensions (length, breadth, height) for auto-calculation or enter CBM directly."
+                })
+            
+            # If dimensions are provided, validate them
+            if has_dimensions:
+                for dim_name, dim_value in [("length", length), ("breadth", breadth), ("height", height)]:
+                    if dim_value <= 0:
+                        raise serializers.ValidationError({
+                            dim_name: f"{dim_name.capitalize()} must be greater than 0."
+                        })
         
         return data
 

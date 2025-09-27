@@ -336,16 +336,16 @@ export default function GhanaWarehouse() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
             Ghana Warehouse
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm lg:text-base">
             Manage goods available in Ghana warehouses
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <ExcelUploadButton
             uploadType="goods_received"
             warehouse="Ghana"

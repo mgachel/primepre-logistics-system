@@ -76,7 +76,7 @@ export function NewGhanaSeaContainerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Ghana Sea Container</DialogTitle>
           <DialogDescription>Enter container details for Ghana Sea Cargo</DialogDescription>

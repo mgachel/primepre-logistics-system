@@ -26,7 +26,24 @@ class CargoDashboardView(APIView):
 
     def get(self, request):
         cargo_type = request.query_params.get('cargo_type', 'sea')
+        location = request.query_params.get('location')
+        warehouse_type = request.query_params.get('warehouse_type')
+        
         containers = CargoContainer.objects.filter(cargo_type=cargo_type)
+        
+        # Apply location filter if specified
+        if location:
+            containers = containers.filter(location=location)
+            
+        # Apply warehouse_type filter if specified  
+        if warehouse_type:
+            containers = containers.filter(warehouse_type=warehouse_type)
+
+        cargo_items_query = CargoItem.objects.filter(container__cargo_type=cargo_type)
+        if location:
+            cargo_items_query = cargo_items_query.filter(container__location=location)
+        if warehouse_type:
+            cargo_items_query = cargo_items_query.filter(container__warehouse_type=warehouse_type)
 
         data = {
             'total_containers': containers.count(),
@@ -34,7 +51,7 @@ class CargoDashboardView(APIView):
             'demurrage_containers': containers.filter(status='demurrage').count(),
             'delivered_containers': containers.filter(status='delivered').count(),
             'pending_containers': containers.filter(status='pending').count(),
-            'total_cargo_items': CargoItem.objects.filter(container__cargo_type=cargo_type).count(),
+            'total_cargo_items': cargo_items_query.count(),
             'recent_containers': CargoContainerSerializer(
                 containers.order_by('-created_at')[:10], many=True
             ).data,
@@ -128,11 +145,17 @@ class CargoContainerViewSet(viewsets.ModelViewSet):
         cargo_type = self.request.query_params.get('cargo_type')
         status_filter = self.request.query_params.get('status')
         search = self.request.query_params.get('search')
+        location = self.request.query_params.get('location')
+        warehouse_type = self.request.query_params.get('warehouse_type')
 
         if cargo_type:
             qs = qs.filter(cargo_type=cargo_type)
         if status_filter:
             qs = qs.filter(status=status_filter)
+        if location:
+            qs = qs.filter(location=location)
+        if warehouse_type:
+            qs = qs.filter(warehouse_type=warehouse_type)
         if search:
             qs = qs.filter(Q(container_id__icontains=search) | Q(route__icontains=search))
         return qs
@@ -170,6 +193,11 @@ class CargoContainerViewSet(viewsets.ModelViewSet):
                 container=container, client=cargo_item.client
             )
             summary.update_totals()
+            # Update container totals
+            if container.cargo_type == 'sea':
+                container.update_total_cbm()
+            elif container.cargo_type == 'air':
+                container.update_total_weight()
             return Response(CargoItemSerializer(cargo_item).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -208,6 +236,41 @@ class CargoItemViewSet(viewsets.ModelViewSet):
             container=cargo_item.container, client=cargo_item.client
         )
         summary.update_totals()
+        # Update container totals
+        container = cargo_item.container
+        if container.cargo_type == 'sea':
+            container.update_total_cbm()
+        elif container.cargo_type == 'air':
+            container.update_total_weight()
+
+    def perform_update(self, serializer):
+        cargo_item = serializer.save()
+        summary, _ = ClientShipmentSummary.objects.get_or_create(
+            container=cargo_item.container, client=cargo_item.client
+        )
+        summary.update_totals()
+        # Update container totals
+        container = cargo_item.container
+        if container.cargo_type == 'sea':
+            container.update_total_cbm()
+        elif container.cargo_type == 'air':
+            container.update_total_weight()
+
+    def perform_destroy(self, instance):
+        container = instance.container
+        client = instance.client
+        instance.delete()
+        # Update summary
+        try:
+            summary = ClientShipmentSummary.objects.get(container=container, client=client)
+            summary.update_totals()
+        except ClientShipmentSummary.DoesNotExist:
+            pass
+        # Update container totals
+        if container.cargo_type == 'sea':
+            container.update_total_cbm()
+        elif container.cargo_type == 'air':
+            container.update_total_weight()
 
 # ================================================================
 # SUMMARIES

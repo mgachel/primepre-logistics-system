@@ -11,7 +11,9 @@ import {
   XCircle,
   FileText,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Image as ImageIcon,
+  Camera
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +37,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { FileUpload } from '@/components/ui/file-upload';
 import { claimsService, Claim, CreateClaimData } from '@/services/claimsService';
 import { formatDate, formatRelative } from '@/lib/date';
 
@@ -53,6 +56,9 @@ export default function CustomerClaims() {
     tracking_id: '',
     item_name: '',
     item_description: '',
+    image_1: undefined,
+    image_2: undefined,
+    image_3: undefined,
   });
 
   // Load claims
@@ -109,6 +115,9 @@ export default function CustomerClaims() {
           tracking_id: '',
           item_name: '',
           item_description: '',
+          image_1: undefined,
+          image_2: undefined,
+          image_3: undefined,
         });
         setShowCreateModal(false);
         setSuccess('Claim submitted successfully!');
@@ -203,11 +212,11 @@ export default function CustomerClaims() {
               Add New Claim
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+                    <DialogContent className="w-[95vw] max-w-[425px] sm:max-w-[500px] md:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Submit New Claim</DialogTitle>
               <DialogDescription>
-                Provide details about the lost or damaged item to start a claim.
+                Report a lost, damaged, or missing item from your shipment.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 pt-4">
@@ -239,15 +248,63 @@ export default function CustomerClaims() {
                   rows={4}
                 />
               </div>
-              <div className="flex justify-end space-x-2 pt-4">
+              
+              {/* Image Upload Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Camera className="h-5 w-5 text-primary" />
+                  <Label className="text-base font-medium">Supporting Images (Optional)</Label>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Upload up to 3 images to support your claim. Images help us process your claim faster.
+                </p>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">Image 1</Label>
+                    <FileUpload
+                      onFileSelect={(file) => setNewClaim(prev => ({ ...prev, image_1: file || undefined }))}
+                      currentFile={newClaim.image_1 || null}
+                      placeholder="Upload first image"
+                      maxSize={5}
+                      disabled={creating}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">Image 2</Label>
+                    <FileUpload
+                      onFileSelect={(file) => setNewClaim(prev => ({ ...prev, image_2: file || undefined }))}
+                      currentFile={newClaim.image_2 || null}
+                      placeholder="Upload second image"
+                      maxSize={5}
+                      disabled={creating}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">Image 3</Label>
+                    <FileUpload
+                      onFileSelect={(file) => setNewClaim(prev => ({ ...prev, image_3: file || undefined }))}
+                      currentFile={newClaim.image_3 || null}
+                      placeholder="Upload third image"
+                      maxSize={5}
+                      disabled={creating}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-2 pt-4">
                 <Button 
                   variant="outline" 
                   onClick={() => setShowCreateModal(false)}
                   disabled={creating}
+                  className="w-full sm:w-auto"
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleCreateClaim} disabled={creating}>
+                <Button onClick={handleCreateClaim} disabled={creating} className="w-full sm:w-auto">
                   {creating ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -372,6 +429,57 @@ export default function CustomerClaims() {
                     <h4 className="font-medium text-sm text-muted-foreground mb-1">Description</h4>
                     <p className="text-sm">{claim.item_description}</p>
                   </div>
+                  
+                  {/* Images Section */}
+                  {(claim.image_1 || claim.image_2 || claim.image_3) && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
+                        <ImageIcon className="h-4 w-4" />
+                        Supporting Images
+                      </h4>
+                      <div className="flex gap-2 flex-wrap">
+                        {claim.image_1 && (
+                          <div className="relative group">
+                            <img
+                              src={claim.image_1}
+                              alt="Claim supporting image 1"
+                              className="w-16 h-16 object-cover rounded-lg border cursor-pointer hover:opacity-75 transition-opacity"
+                              onClick={() => window.open(claim.image_1, '_blank')}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+                        {claim.image_2 && (
+                          <div className="relative group">
+                            <img
+                              src={claim.image_2}
+                              alt="Claim supporting image 2"
+                              className="w-16 h-16 object-cover rounded-lg border cursor-pointer hover:opacity-75 transition-opacity"
+                              onClick={() => window.open(claim.image_2, '_blank')}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+                        {claim.image_3 && (
+                          <div className="relative group">
+                            <img
+                              src={claim.image_3}
+                              alt="Claim supporting image 3"
+                              className="w-16 h-16 object-cover rounded-lg border cursor-pointer hover:opacity-75 transition-opacity"
+                              onClick={() => window.open(claim.image_3, '_blank')}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="flex justify-between items-center text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">

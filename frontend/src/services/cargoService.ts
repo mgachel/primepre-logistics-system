@@ -34,14 +34,18 @@ export interface BackendCargoContainer {
   cargo_type: "sea" | "air";
   weight?: number | null;
   cbm?: number | null;
+  total_weight?: number | null;
   load_date: string;
   eta: string;
   unloading_date?: string | null;
   route: string;
   rates?: string | number | null;
+  dollar_rate?: string | number | null;
   stay_days: number;
   delay_days: number;
   status: "pending" | "in_transit" | "delivered" | "demurrage";
+  location?: "china" | "ghana" | "transit";
+  warehouse_type?: "cargo" | "goods_received";
   total_cargo_items: number;
   total_clients: number;
   is_demurrage: boolean;
@@ -56,10 +60,13 @@ export interface BackendCargoItem {
   client_name?: string;
   client_shipping_mark?: string;
   tracking_id: string;
-  item_description: string;
+  item_description?: string;
   quantity: number;
   weight?: number | null;
   cbm: number;
+  length?: number | null;
+  breadth?: number | null;
+  height?: number | null;
   unit_value?: number | null;
   total_value?: number | null;
   status: "pending" | "in_transit" | "delivered" | "delayed";
@@ -72,6 +79,8 @@ export interface CargoListFilters {
   cargo_type?: "sea" | "air";
   status?: string;
   search?: string;
+  location?: "china" | "ghana" | "transit";
+  warehouse_type?: "cargo" | "goods_received";
   page?: number;
 }
 
@@ -241,8 +250,10 @@ export const cargoService = {
     cbm?: number | null;
     load_date: string; // YYYY-MM-DD
     eta: string; // YYYY-MM-DD
+    unloading_date?: string; // YYYY-MM-DD
     route: string; // e.g. "China to Ghana"
     rates?: number | string | null;
+    dollar_rate?: number | string | null;
     stay_days?: number;
     delay_days?: number;
     status?: "pending" | "in_transit" | "delivered" | "demurrage";
@@ -291,7 +302,7 @@ export const cargoService = {
       container: string; // container_id
       client: number;
       tracking_id: string;
-      item_description: string;
+      item_description?: string;
       quantity: number;
       weight: number | null;
       cbm: number;
@@ -312,10 +323,13 @@ export const cargoService = {
     container: string; // container_id
     client: number;
     tracking_id?: string;
-    item_description: string;
+    item_description?: string;
     quantity: number;
     weight?: number | null;
-    cbm: number;
+    cbm?: number;
+    length?: number | null;
+    breadth?: number | null;
+    height?: number | null;
     unit_value?: number | null;
     total_value?: number | null;
     status?: "pending" | "in_transit" | "delivered" | "delayed";
@@ -368,12 +382,19 @@ export const cargoService = {
     return apiClient.get<PaginatedResponse<BackendCargoItem>>(endpoint);
   },
 
-  // Admin cargo dashboard with optional cargo_type filter (sea/air)
+  // Admin cargo dashboard with optional filters
   async getDashboard(
-    cargoType?: "sea" | "air"
+    cargoType?: "sea" | "air",
+    location?: string,
+    warehouse_type?: string
   ): Promise<ApiResponse<CargoDashboardStats>> {
-    const qs = cargoType ? `?cargo_type=${cargoType}` : "";
-    return apiClient.get<CargoDashboardStats>(`/api/cargo/dashboard/${qs}`);
+    const params = new URLSearchParams();
+    if (cargoType) params.append("cargo_type", cargoType);
+    if (location) params.append("location", location);
+    if (warehouse_type) params.append("warehouse_type", warehouse_type);
+    
+    const qs = params.toString();
+    return apiClient.get<CargoDashboardStats>(`/api/cargo/dashboard/${qs ? `?${qs}` : ""}`);
   },
 
   // ================== CUSTOMER ENDPOINTS ==================

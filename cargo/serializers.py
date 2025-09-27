@@ -43,8 +43,8 @@ class CargoItemSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'container', 'client', 'client_name', 'client_shipping_mark',
             'tracking_id', 'item_description', 'quantity', 'weight', 'cbm',
-            'unit_value', 'total_value', 'status', 'delivered_date',
-            'created_at', 'updated_at'
+            'length', 'breadth', 'height', 'unit_value', 'total_value', 
+            'status', 'delivered_date', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
@@ -103,15 +103,17 @@ class CargoContainerSerializer(serializers.ModelSerializer):
     """Basic container list serializer"""
     total_clients = serializers.ReadOnlyField()
     total_cbm = serializers.FloatField(source='cbm', read_only=True)
+    total_weight = serializers.FloatField(source='weight', read_only=True)
     rate = serializers.DecimalField(source='rates', max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = CargoContainer
         fields = [
             'container_id', 'cargo_type', 'load_date', 'eta', 'route',
-            'rates', 'cbm', 'status', 'total_clients', 'total_cbm', 'rate'
+            'rates', 'dollar_rate', 'cbm', 'weight', 'status', 'total_clients', 'total_cbm', 'total_weight', 'rate',
+            'location', 'warehouse_type'
         ]
-        read_only_fields = ['total_clients', 'total_cbm','rate']
+        read_only_fields = ['total_clients', 'total_cbm', 'total_weight', 'rate']
 
 
 class CargoContainerDetailSerializer(serializers.ModelSerializer):
@@ -124,20 +126,22 @@ class CargoContainerDetailSerializer(serializers.ModelSerializer):
     )
     cargo_items = CargoItemSerializer(many=True, read_only=True)
     total_cbm = serializers.FloatField(source='cbm', read_only=True)
+    total_weight = serializers.FloatField(source='weight', read_only=True)
     rate = serializers.DecimalField(source='rates', max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = CargoContainer
         fields = [
             'container_id', 'cargo_type', 'weight', 'cbm', 'load_date',
-            'eta', 'unloading_date', 'route', 'rates', 'stay_days',
+            'eta', 'unloading_date', 'route', 'rates', 'dollar_rate', 'stay_days',
             'delay_days', 'status', 'total_cargo_items', 'total_clients',
             'is_demurrage', 'client_summaries', 'cargo_items',
-            'created_at', 'updated_at', 'rate', 'total_cbm'
+            'created_at', 'updated_at', 'rate', 'total_cbm', 'total_weight',
+            'location', 'warehouse_type'
         ]
         read_only_fields = [
             'total_cargo_items', 'total_clients', 'is_demurrage',
-            'created_at', 'updated_at', 'rate', 'total_cbm'
+            'created_at', 'updated_at', 'rate', 'total_cbm', 'total_weight'
         ]
 
 
@@ -147,8 +151,9 @@ class CargoContainerCreateSerializer(serializers.ModelSerializer):
         model = CargoContainer
         fields = [
             'container_id', 'cargo_type', 'weight', 'cbm',
-            'load_date', 'eta', 'route', 'rates',
-            'stay_days', 'delay_days', 'status'
+            'load_date', 'eta', 'unloading_date', 'route', 'rates', 'dollar_rate',
+            'stay_days', 'delay_days', 'status',
+            'location', 'warehouse_type'
         ]
 
 

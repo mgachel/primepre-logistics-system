@@ -1,18 +1,20 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Plus,
-  Package,
   RefreshCcw,
   Edit,
   Trash2,
+  Search,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { Input } from "@/components/ui/input";
 import { DataTable, Column } from "@/components/data-table/DataTable";
 import { AddCargoItemDialog } from "@/components/dialogs/AddCargoItemDialog";
+import { EditCargoContainerDialog } from "@/components/dialogs/EditCargoContainerDialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -36,6 +38,10 @@ export default function ContainerDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedMark, setExpandedMark] = useState<string | null>(null);
   const [showAddItemDialog, setShowAddItemDialog] = useState(false);
+  const [showEditContainerDialog, setShowEditContainerDialog] = useState(false);
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Load container and cargo items
   useEffect(() => {
@@ -70,11 +76,25 @@ export default function ContainerDetailsPage() {
     loadData();
   }, [containerId]);
 
-  // Group cargo items by shipping mark
+  // Filter and group cargo items by shipping mark based on search
   const groupedByShippingMark = useMemo(() => {
     const groups: Record<string, BackendCargoItem[]> = {};
 
-    cargoItems.forEach((item) => {
+    // Filter items based on search query
+    const filteredItems = cargoItems.filter((item) => {
+      if (!searchQuery.trim()) return true;
+      
+      const query = searchQuery.toLowerCase();
+      const trackingId = item.tracking_id?.toLowerCase() || "";
+      const shippingMark = item.client_shipping_mark?.toLowerCase() || "";
+      const description = item.item_description?.toLowerCase() || "";
+      
+      return trackingId.includes(query) || 
+             shippingMark.includes(query) || 
+             description.includes(query);
+    });
+
+    filteredItems.forEach((item) => {
       const mark = item.client_shipping_mark || "Unknown";
       if (!groups[mark]) {
         groups[mark] = [];
@@ -83,7 +103,7 @@ export default function ContainerDetailsPage() {
     });
 
     return groups;
-  }, [cargoItems]);
+  }, [cargoItems, searchQuery]);
 
   const handleDeleteItem = async (itemId: string) => {
     if (
@@ -183,10 +203,10 @@ export default function ContainerDetailsPage() {
         </Button>
       </div>
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-2xl font-semibold">{container.container_id}</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl lg:text-2xl font-semibold">{container.container_id}</h1>
+          <p className="text-muted-foreground text-sm lg:text-base">
             {container.cargo_type === "sea" ? "Sea" : "Air"} Cargo •{" "}
             {cargoItems.length} items
           </p>
@@ -195,9 +215,26 @@ export default function ContainerDetailsPage() {
           <Button variant="outline" size="sm">
             <RefreshCcw className="h-4 w-4" /> Refresh
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowEditContainerDialog(true)}>
+            <Edit className="h-4 w-4" /> Edit Container
+          </Button>
           <Button size="sm" onClick={() => setShowAddItemDialog(true)}>
             <Plus className="h-4 w-4" /> Add Item
           </Button>
+        </div>
+      </div>
+
+      {/* Search Field */}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            type="text"
+            placeholder="Search by tracking number, shipping mark, or description..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
         </div>
       </div>
 
@@ -210,29 +247,32 @@ export default function ContainerDetailsPage() {
           return (
             <div key={mark} className="logistics-card p-4">
               {/* Group Row */}
-              <div
-                className="flex justify-between items-center cursor-pointer"
-                onClick={() =>
-                  setExpandedMark(expandedMark === mark ? null : mark)
-                }
-              >
-                <div>
-                  <h3 className="font-semibold">{mark}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {items.length} item{items.length > 1 ? "s" : ""}
-                  </p>
+              <div className="flex justify-between items-center">
+                <div
+                  className="flex-1 cursor-pointer"
+                  onClick={() =>
+                    setExpandedMark(expandedMark === mark ? null : mark)
+                  }
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="font-semibold">{mark}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {items.length} item{items.length > 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div className="flex gap-8">
+                      {container?.cargo_type === "sea" ? (
+                        <span>CBM: {totalCBM.toFixed(3)}</span>
+                      ) : (
+                        <span>
+                          Weight: {items.reduce((sum, i) => sum + (i.weight || 0), 0).toFixed(1)} kg
+                        </span>
+                      )}
+                      <span>Qty: {totalQty}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex gap-8">
-                  {container?.cargo_type === "sea" ? (
-                    <span>CBM: {totalCBM.toFixed(3)}</span>
-                  ) : (
-                    <span>
-                      Weight: {items.reduce((sum, i) => sum + (i.weight || 0), 0).toFixed(1)} kg
-                    </span>
-                  )}
-                  <span>Qty: {totalQty}</span>
-                </div>
-
               </div>
 
               {/* Expanded cargo items */}
@@ -277,11 +317,28 @@ export default function ContainerDetailsPage() {
       <AddCargoItemDialog
         open={showAddItemDialog}
         onOpenChange={setShowAddItemDialog}
-        containerId={containerId!}
+        containerId={containerId || ""}
         cargoType={container?.cargo_type}
+        location={container?.location}
+        warehouse_type={container?.warehouse_type}
         onSuccess={() => {
           // reload container data
           window.location.reload();
+        }}
+      />
+
+      {/* Edit Container Dialog */}
+      <EditCargoContainerDialog
+        open={showEditContainerDialog}
+        onOpenChange={setShowEditContainerDialog}
+        container={container}
+        onSaved={(updatedContainer) => {
+          setContainer(updatedContainer);
+          setShowEditContainerDialog(false);
+          toast({
+            title: "Success",
+            description: "Container updated successfully",
+          });
         }}
       />
     </div>

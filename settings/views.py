@@ -498,6 +498,76 @@ class WarehouseAddressViewSet(viewsets.ModelViewSet):
             'message': 'Active warehouses retrieved successfully'
         })
     
+    @action(detail=False, methods=['get'], url_path='client-personalized')
+    def client_personalized_addresses(self, request):
+        """Get warehouse addresses with client-specific placeholder replacement"""
+        from users.models import CustomerUser
+        
+        try:
+            warehouses = self.get_queryset().filter(is_active=True)
+            warehouse_data = []
+            
+            # Get client information
+            user = request.user
+            client_data = {}
+            
+            if hasattr(user, 'customeruser'):
+                client_user = user.customeruser
+                client_data = {
+                    'shipping_mark': client_user.shipping_mark or 'N/A',
+                    'phone': client_user.phone or 'N/A',
+                    'name': client_user.get_full_name() or 'N/A'
+                }
+            else:
+                # Fallback for regular user
+                client_data = {
+                    'shipping_mark': getattr(user, 'shipping_mark', 'N/A'),
+                    'phone': getattr(user, 'phone', 'N/A'),
+                    'name': user.get_full_name() if hasattr(user, 'get_full_name') else 'N/A'
+                }
+            
+            for warehouse in warehouses:
+                # Replace placeholders in address and description
+                personalized_address = warehouse.address
+                personalized_description = warehouse.description
+                
+                if personalized_address:
+                    personalized_address = personalized_address.replace('{{SHIPPING_MARK}}', client_data['shipping_mark'])
+                    personalized_address = personalized_address.replace('{{PHONE_NUMBER}}', client_data['phone'])
+                    personalized_address = personalized_address.replace('{{NAME}}', client_data['name'])
+                
+                if personalized_description:
+                    personalized_description = personalized_description.replace('{{SHIPPING_MARK}}', client_data['shipping_mark'])
+                    personalized_description = personalized_description.replace('{{PHONE_NUMBER}}', client_data['phone'])
+                    personalized_description = personalized_description.replace('{{NAME}}', client_data['name'])
+                
+                warehouse_dict = {
+                    'id': warehouse.id,
+                    'name': warehouse.name,
+                    'location': warehouse.location,
+                    'address': personalized_address,
+                    'description': personalized_description,
+                    'is_active': warehouse.is_active,
+                    'created_at': warehouse.created_at,
+                    'updated_at': warehouse.updated_at
+                }
+                
+                warehouse_data.append(warehouse_dict)
+            
+            return Response({
+                'success': True,
+                'data': warehouse_data,
+                'count': len(warehouse_data),
+                'client_info': client_data,
+                'message': 'Personalized warehouse addresses retrieved successfully'
+            })
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'Error retrieving personalized addresses: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     @action(detail=False, methods=['get'], url_path='by-shipment-type')
     def warehouses_by_shipment_type(self, request):
         """Get warehouses grouped by shipment type"""

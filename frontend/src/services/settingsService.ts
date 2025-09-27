@@ -124,6 +124,25 @@ class SettingsService {
   }
 
   /**
+   * Get personalized warehouse addresses for clients (with placeholder replacement)
+   */
+  async getPersonalizedWarehouseAddresses(): Promise<ApiResponse<WarehouseAddress[]>> {
+    try {
+      const response = await apiClient.get<{data: WarehouseAddress[], client_info: any}>('/api/settings/warehouse-addresses/client-personalized/');
+      
+      return {
+        success: response.success,
+        data: response.data.data || [],
+        message: response.message || 'Personalized warehouses retrieved successfully'
+      };
+    } catch (error) {
+      console.error('Error fetching personalized warehouse addresses:', error);
+      // Fallback to regular addresses if personalized endpoint fails
+      return this.getWarehouseAddresses();
+    }
+  }
+
+  /**
    * Create a new warehouse address
    */
   async createWarehouseAddress(data: CreateWarehouseRequest): Promise<ApiResponse<WarehouseAddress>> {

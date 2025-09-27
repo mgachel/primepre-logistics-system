@@ -345,28 +345,28 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl lg:text-3xl font-semibold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground mt-1 text-sm lg:text-base">
             Monitor your logistics operations and key metrics • All times shown
             in your local time zone
           </p>
         </div>
-        <div className="flex items-center space-x-3 mt-4 sm:mt-0">
-          <Button variant="outline" size="sm">
-            <Calendar className="h-4 w-4 mr-2" />
-            This Month
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+          <Button variant="outline" size="sm" className="justify-center">
+            <Calendar className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">This Month</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+          <Button variant="outline" size="sm" onClick={handleRefresh} className="justify-center">
+            <RefreshCw className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         {loadingStats ? (
           Array.from({ length: isCustomer ? 4 : 4 }).map((_, i) => (
             <div key={i} className="logistics-card p-6">
@@ -443,7 +443,7 @@ export default function Dashboard() {
       </div>
 
       {/* Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6">
         {/* Transiting Cargo */}
         <div className="logistics-card xl:col-span-2">
           <div className="p-6 border-b border-border">

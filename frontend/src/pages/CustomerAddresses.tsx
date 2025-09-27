@@ -67,13 +67,13 @@ const AddressCard = ({ address, shippingMark }: { address: WarehouseAddress, shi
             <span className="font-medium text-sm">Address</span>
           </div>
           <p className="text-sm text-muted-foreground pl-6">
-            {shippingMark} {address.address}
+            {address.address}
           </p>
           <div className="flex gap-2 pl-6">
             <Button
               size="sm"
               variant="outline"
-              onClick={() => copyToClipboard(`${shippingMark} ${address.address}`, 'Address')}
+              onClick={() => copyToClipboard(address.address, 'Address')}
               className="flex items-center gap-1"
             >
               <Copy className="h-3 w-3" />
@@ -121,7 +121,7 @@ export default function CustomerAddresses() {
         setLoading(true);
         setError(null);
 
-        const response = await settingsService.getWarehouseAddresses();
+        const response = await settingsService.getPersonalizedWarehouseAddresses();
         if (response.success) {
           setAddresses(response.data);
         } else {

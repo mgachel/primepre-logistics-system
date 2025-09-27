@@ -12,10 +12,12 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultType?: 'sea' | 'air';
+  location?: 'china' | 'ghana' | 'transit';
+  warehouse_type?: 'cargo' | 'goods_received';
   onCreated?: (containerId: string) => void;
 };
 
-export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea', onCreated }: Props) {
+export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea', location = 'china', warehouse_type = 'cargo', onCreated }: Props) {
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [rates, setRates] = useState<Rate[]>([]);
@@ -25,10 +27,13 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
     container_id: "",
     load_date: "",
     eta: "",
-    route: "China to Ghana",
+    unloading_date: "",
+    route: location === 'ghana' ? "Ghana Warehouse" : "China to Ghana",
     cbm: "",
-    weight: "",
     rates: "",
+    dollar_rate: "",
+    location: location,
+    warehouse_type: warehouse_type,
     status: "pending" as 'pending' | 'in_transit' | 'delivered' | 'demurrage',
   });
 
@@ -42,7 +47,7 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
     if (form.cargo_type === 'air') {
       setForm((f)=>({ ...f, cbm: "" }));
     } else if (form.cargo_type === 'sea') {
-      setForm((f)=>({ ...f, weight: "", cbm: "" }));
+      setForm((f)=>({ ...f, cbm: "" }));
     }
   }, [form.cargo_type]);
 
@@ -80,19 +85,35 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
       const payload = {
         container_id: form.container_id.trim(),
         cargo_type: form.cargo_type,
-        ...(form.cargo_type === 'air' && { weight: form.weight ? Number(form.weight) : null }),
         load_date: form.load_date,
         eta: form.eta,
+        unloading_date: form.unloading_date,
         route: form.route.trim(),
         rates: form.rates ? Number(form.rates) : null,
+        dollar_rate: form.dollar_rate ? Number(form.dollar_rate) : null,
         stay_days: 0,
         delay_days: 0,
         status: form.status,
+        location: form.location,
+        warehouse_type: form.warehouse_type,
       };
       const res = await cargoService.createBackendContainer(payload);
       toast({ title: "Cargo created", description: `Container ${payload.container_id} (${payload.cargo_type}) created.` });
       onOpenChange(false);
-      setForm({ cargo_type: defaultType, container_id: "", load_date: "", eta: "", route: "China to Ghana", cbm: "", weight: "", rates: "", status: "pending" });
+      setForm({ 
+        cargo_type: defaultType, 
+        container_id: "", 
+        load_date: "", 
+        eta: "", 
+        unloading_date: "",
+        route: location === 'ghana' ? "Ghana Warehouse" : "China to Ghana", 
+        cbm: "", 
+        rates: "", 
+        dollar_rate: "",
+        location: location,
+        warehouse_type: warehouse_type, 
+        status: "pending" 
+      });
       onCreated?.(res.data?.container_id || payload.container_id);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to create cargo';
@@ -104,14 +125,14 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
 
   return (
     <Dialog open={open} onOpenChange={(v)=>{ if (!submitting) onOpenChange(v); }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Cargo Container</DialogTitle>
           <DialogDescription>Creates a cargo container aligned with backend fields. Choose shipment type and enter container details.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Shipment Type</Label>
               <Select value={form.cargo_type} onValueChange={(v)=> setForm(f=> ({...f, cargo_type: v as 'sea' | 'air'}))}>
@@ -127,30 +148,72 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
 
             <div className="space-y-2">
               <Label htmlFor="container_id">Container/AWB ID</Label>
-              <Input id="container_id" placeholder="e.g., MSKU7823456 or 000-12345678" value={form.container_id} onChange={(e)=> setForm(f=> ({...f, container_id: e.target.value}))} required />
+              <Input 
+                id="container_id" 
+                placeholder={location === 'ghana' && warehouse_type === 'goods_received' 
+                  ? "e.g., GHCR-001 or AWB-12345678" 
+                  : "e.g., MSKU7823456 or 000-12345678"
+                } 
+                value={form.container_id} 
+                onChange={(e)=> setForm(f=> ({...f, container_id: e.target.value}))} 
+                required 
+              />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="load_date">Load Date</Label>
-              <Input id="load_date" type="date" value={form.load_date} onChange={(e)=> setForm(f=> ({...f, load_date: e.target.value}))} required />
-            </div>
+            {location === 'ghana' && warehouse_type === 'goods_received' ? (
+              // Ghana goods received - only offloading date
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="unloading_date">Offloading Date</Label>
+                <Input 
+                  id="unloading_date" 
+                  type="date" 
+                  value={form.unloading_date || form.load_date} 
+                  onChange={(e)=> setForm(f=> ({...f, unloading_date: e.target.value, load_date: e.target.value, eta: e.target.value}))} 
+                  required 
+                />
+              </div>
+            ) : (
+              // Regular cargo - load date and ETA
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="load_date">Load Date</Label>
+                  <Input 
+                    id="load_date" 
+                    type="date" 
+                    value={form.load_date} 
+                    onChange={(e)=> setForm(f=> ({...f, load_date: e.target.value}))} 
+                    required 
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="eta">ETA</Label>
-              <Input id="eta" type="date" value={form.eta} onChange={(e)=> setForm(f=> ({...f, eta: e.target.value}))} required />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="eta">ETA</Label>
+                  <Input 
+                    id="eta" 
+                    type="date" 
+                    value={form.eta} 
+                    onChange={(e)=> setForm(f=> ({...f, eta: e.target.value}))} 
+                    required 
+                  />
+                </div>
+              </>
+            )}
 
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="route">Route</Label>
-              <Input id="route" placeholder="China to Ghana" value={form.route} onChange={(e)=> setForm(f=> ({...f, route: e.target.value}))} required />
+              <Input 
+                id="route" 
+                placeholder={location === 'ghana' && warehouse_type === 'goods_received' 
+                  ? "China to Ghana (Arrived)" 
+                  : "China to Ghana"
+                } 
+                value={form.route} 
+                onChange={(e)=> setForm(f=> ({...f, route: e.target.value}))} 
+                required 
+              />
             </div>
 
-            {form.cargo_type === 'air' && (
-              <div className="space-y-2">
-                <Label htmlFor="weight">Weight (kg)</Label>
-                <Input id="weight" type="number" step="0.01" placeholder="0.00" value={form.weight} onChange={(e)=> setForm(f=> ({...f, weight: e.target.value}))} />
-              </div>
-            )}
+
 
             <div className="space-y-2">
               <Label htmlFor="rates">Rates (USD)</Label>
@@ -168,6 +231,30 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
                       .filter(rate => rate.amount != null && rate.amount.toString() !== "")
                       .map((rate) => (
                         <SelectItem key={rate.id} value={rate.amount.toString()}>
+                          {rate.title} - ${rate.amount} ({rate.route})
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dollar_rate">Dollar Rate (USD)</Label>
+              <Select value={form.dollar_rate} onValueChange={(v)=> setForm(f=> ({...f, dollar_rate: v}))}>
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingRates ? "Loading rates..." : "Select a dollar rate"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingRates ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading rates...</div>
+                  ) : rates.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">No rates available</div>
+                  ) : (
+                    rates
+                      .filter(rate => rate.amount != null && rate.amount.toString() !== "")
+                      .map((rate) => (
+                        <SelectItem key={`dollar_${rate.id}`} value={rate.amount.toString()}>
                           {rate.title} - ${rate.amount} ({rate.route})
                         </SelectItem>
                       ))

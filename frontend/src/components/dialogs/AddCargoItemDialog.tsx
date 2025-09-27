@@ -40,6 +40,8 @@ interface AddCargoItemDialogProps {
   onOpenChange: (open: boolean) => void;
   containerId: string;
   cargoType?: 'sea' | 'air';
+  location?: 'china' | 'ghana' | 'transit';
+  warehouse_type?: 'cargo' | 'goods_received';
   onSuccess?: () => void;
 }
 
@@ -48,6 +50,8 @@ export function AddCargoItemDialog({
   onOpenChange,
   containerId,
   cargoType,
+  location,
+  warehouse_type,
   onSuccess,
 }: AddCargoItemDialogProps) {
   const { toast } = useToast();
@@ -59,6 +63,9 @@ export function AddCargoItemDialog({
   const [quantity, setQuantity] = useState("");
   const [weight, setWeight] = useState("");
   const [cbm, setCbm] = useState("");
+  const [length, setLength] = useState("");
+  const [breadth, setBreadth] = useState("");
+  const [height, setHeight] = useState("");
   const [trackingId, setTrackingId] = useState("");
   const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
@@ -76,6 +83,9 @@ export function AddCargoItemDialog({
     setQuantity("");
     setWeight("");
     setCbm("");
+    setLength("");
+    setBreadth("");
+    setHeight("");
     setTrackingId("");
     setSelectedClient(null);
     setClientQuery("");
@@ -90,6 +100,21 @@ export function AddCargoItemDialog({
       setWeight("");
     }
   }, [cargoType]);
+
+  // Auto-calculate CBM for Ghana sea containers
+  useEffect(() => {
+    if (location === 'ghana' && warehouse_type === 'goods_received' && cargoType === 'sea') {
+      const l = parseFloat(length);
+      const b = parseFloat(breadth);
+      const h = parseFloat(height);
+      const q = parseInt(quantity);
+      
+      if (l > 0 && b > 0 && h > 0 && q > 0) {
+        const calculatedCbm = (l * b * h * q) / 1000000;
+        setCbm(calculatedCbm.toFixed(3));
+      }
+    }
+  }, [length, breadth, height, quantity, location, warehouse_type, cargoType]);
 
   // Debounce the client query to reduce API calls
   useEffect(() => {
@@ -112,7 +137,7 @@ export function AddCargoItemDialog({
       const hasNext = Boolean(res.data?.next);
       setClients((prev) => (append ? [...prev, ...results] : results));
       setClientsHasNext(hasNext);
-    } catch (e) {
+    } catch {
       // silent fail in combobox
     } finally {
       setClientsLoading(false);
@@ -138,12 +163,25 @@ export function AddCargoItemDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!description || !quantity || (cargoType === 'sea' && !cbm) || !selectedClient) {
-      const missingFields = [];
-      if (!description) missingFields.push("Description");
+    const isGhanaSeaContainer = location === 'ghana' && warehouse_type === 'goods_received' && cargoType === 'sea';
+    
+    if (!quantity || !selectedClient || (cargoType === 'sea' && !cbm)) {
+      const missingFields: string[] = [];
       if (!quantity) missingFields.push("Quantity");
-      if (cargoType === 'sea' && !cbm) missingFields.push("CBM");
       if (!selectedClient) missingFields.push("Client");
+      
+      // For Ghana sea containers, check dimensions instead of CBM directly
+      if (isGhanaSeaContainer) {
+        if (!length || !breadth || !height) {
+          const missingDimensions: string[] = [];
+          if (!length) missingDimensions.push("Length");
+          if (!breadth) missingDimensions.push("Breadth");
+          if (!height) missingDimensions.push("Height");
+          missingFields.push(...missingDimensions);
+        }
+      } else if (cargoType === 'sea' && !cbm) {
+        missingFields.push("CBM");
+      }
       
       toast({
         title: "Validation Error",
@@ -164,6 +202,12 @@ export function AddCargoItemDialog({
         quantity: parseInt(quantity, 10),
         ...(cargoType === 'air' && { weight: weight ? parseFloat(weight) : null }),
         ...(cargoType === 'sea' && { cbm: parseFloat(cbm) }),
+        // Include dimensions for Ghana sea containers
+        ...(isGhanaSeaContainer && {
+          length: parseFloat(length),
+          breadth: parseFloat(breadth), 
+          height: parseFloat(height)
+        }),
         // Optionally support values/ status later
       };
 
@@ -177,10 +221,13 @@ export function AddCargoItemDialog({
           container: string;
           client: number;
           tracking_id?: string;
-          item_description: string;
+          item_description?: string;
           quantity: number;
           weight?: number | null;
           cbm?: number;
+          length?: number | null;
+          breadth?: number | null;
+          height?: number | null;
           unit_value?: number | null;
           total_value?: number | null;
           status?: "pending" | "in_transit" | "delivered" | "delayed";
@@ -219,11 +266,11 @@ export function AddCargoItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="w-[95vw] max-w-[425px] sm:max-w-[500px] md:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Cargo Item</DialogTitle>
+          <DialogTitle>Add New Item</DialogTitle>
           <DialogDescription>
-            Add a new cargo item to container {containerId}
+            Add a new item to the container.
           </DialogDescription>
         </DialogHeader>
 
@@ -262,12 +309,12 @@ export function AddCargoItemDialog({
           </div>
 
           <div>
-            <Label htmlFor="description">Description *</Label>
+            <Label htmlFor="description">Description</Label>
             <Input
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief description of the item"
+              placeholder="Brief description of the item (optional)"
             />
           </div>
 
@@ -367,7 +414,63 @@ export function AddCargoItemDialog({
               </div>
             )}
 
-            {cargoType === 'sea' && (
+            {cargoType === 'sea' && location === 'ghana' && warehouse_type === 'goods_received' && (
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <Label htmlFor="length">Length (cm) *</Label>
+                    <Input
+                      id="length"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={length}
+                      onChange={(e) => setLength(e.target.value)}
+                      placeholder="0.0"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="breadth">Breadth (cm) *</Label>
+                    <Input
+                      id="breadth"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={breadth}
+                      onChange={(e) => setBreadth(e.target.value)}
+                      placeholder="0.0"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="height">Height (cm) *</Label>
+                    <Input
+                      id="height"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={height}
+                      onChange={(e) => setHeight(e.target.value)}
+                      placeholder="0.0"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="cbm">CBM (m³) - Auto Calculated</Label>
+                  <Input
+                    id="cbm"
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={cbm}
+                    readOnly
+                    placeholder="Auto-calculated from dimensions"
+                    className="bg-gray-50"
+                  />
+                </div>
+              </>
+            )}
+
+            {cargoType === 'sea' && !(location === 'ghana' && warehouse_type === 'goods_received') && (
               <div>
                 <Label htmlFor="cbm">CBM (m³) *</Label>
                 <Input
@@ -394,16 +497,17 @@ export function AddCargoItemDialog({
             />
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={handleClose}
               disabled={loading}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="w-full sm:w-auto">
               {loading ? "Adding..." : "Add Item"}
             </Button>
           </DialogFooter>

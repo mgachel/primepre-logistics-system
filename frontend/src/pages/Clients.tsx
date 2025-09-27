@@ -308,12 +308,12 @@ export default function Clients() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      {/* Header */}
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Clients</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage client relationships and view recent shipments
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Clients</h1>
+          <p className="text-muted-foreground text-sm lg:text-base">
+            Manage your clients and their information
           </p>
         </div>
         <div className="flex items-center gap-2">

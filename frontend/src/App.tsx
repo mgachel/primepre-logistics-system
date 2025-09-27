@@ -27,14 +27,15 @@ import ChinaWarehouse from "./pages/ChinaWarehouse";
 import GhanaWarehouse from "./pages/GhanaWarehouse";
 import GoodsReceivedChinaSea from "./pages/GoodsReceivedChinaSea";
 import GoodsReceivedChinaAir from "./pages/GoodsReceivedChinaAir";
-import GoodsReceivedGhanaSea from "./pages/GoodsReceivedGhanaSea";
-import GoodsReceivedGhanaAir from "./pages/GoodsReceivedGhanaAir";
+import GhanaSeaContainers from "./pages/GhanaSeaContainers";
+import GhanaAirContainers from "./pages/GhanaAirContainers";
 import Claims from "./pages/Claims";
 import CustomerShipments from "./pages/CustomerShipments";
 import CustomerClaims from "./pages/CustomerClaims";
 import CustomerNotes from "./pages/CustomerNotes";
 import CustomerProfile from "./pages/customer/CustomerProfile";
 import CustomerAddresses from "./pages/CustomerAddresses";
+import CustomerRates from "./pages/CustomerRates";
 import Notes from "./pages/Notes";
 import Admins from "./pages/Admins";
 import Settings from "./pages/Settings";
@@ -221,7 +222,7 @@ const App = () => (
                   <RoleBasedRoute
                     adminComponent={
                       <AppLayout>
-                        <GoodsReceivedGhanaSea />
+                        <GhanaSeaContainers />
                       </AppLayout>
                     }
                     customerComponent={<Navigate to="/" replace />}
@@ -236,7 +237,7 @@ const App = () => (
                   <RoleBasedRoute
                     adminComponent={
                       <AppLayout>
-                        <GoodsReceivedGhanaAir />
+                        <GhanaAirContainers />
                       </AppLayout>
                     }
                     customerComponent={<Navigate to="/" replace />}
@@ -381,6 +382,21 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/my-rates"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <CustomerRates />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Shared routes */}
             <Route
@@ -425,6 +441,21 @@ const App = () => (
             />
             <Route
               path="/containers/:containerId"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={
+                      <AppLayout>
+                        <ContainerDetailsPage />
+                      </AppLayout>
+                    }
+                    customerComponent={<Navigate to="/" replace />}
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ghana-container/:containerId"
               element={
                 <ProtectedRoute>
                   <RoleBasedRoute

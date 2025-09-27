@@ -63,6 +63,7 @@ const customerNavigation = [
   { name: "My Goods", href: "/my-shipments", icon: Ship },
   { name: "My Claims", href: "/my-claims", icon: FileText },
   { name: "My Notes", href: "/my-notes", icon: StickyNote },
+  { name: "Rates", href: "/my-rates", icon: Calculator },
   { name: "Addresses", href: "/my-addresses", icon: MapPin },
   { name: "Profile", href: "/my-profile", icon: UserCog },
 ];
@@ -73,7 +74,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
   const { user } = useAuthStore();
 
   // Helper functions for role checking
-  const isAdmin = () => user && ['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(user.user_role);
+  const isAdmin = () => user && user.user_role && ['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(user.user_role);
   const isCustomer = () => user && user.user_role === 'CUSTOMER';
 
   // Get navigation based on user role

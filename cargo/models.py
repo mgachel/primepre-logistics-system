@@ -17,6 +17,17 @@ class CargoContainer(models.Model):
         ('demurrage', 'Demurrage'),
     )
 
+    LOCATION_CHOICES = (
+        ('china', 'China'),
+        ('ghana', 'Ghana'),
+        ('transit', 'In Transit'),
+    )
+
+    WAREHOUSE_TYPE_CHOICES = (
+        ('cargo', 'Cargo Operations'),
+        ('goods_received', 'Goods Received'),
+    )
+
     container_id = models.CharField(max_length=100, unique=True, primary_key=True)
     cargo_type = models.CharField(max_length=10, choices=CARGO_TYPE_CHOICES)
     weight = models.FloatField(null=True, blank=True)
@@ -26,9 +37,13 @@ class CargoContainer(models.Model):
     unloading_date = models.DateField(null=True, blank=True)
     route = models.CharField(max_length=255)
     rates = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    dollar_rate = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     stay_days = models.IntegerField(default=0)
     delay_days = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    # New fields for Ghana operations
+    location = models.CharField(max_length=20, choices=LOCATION_CHOICES, default='china')
+    warehouse_type = models.CharField(max_length=20, choices=WAREHOUSE_TYPE_CHOICES, default='cargo')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -79,6 +94,12 @@ class CargoContainer(models.Model):
         if self.cargo_type == 'sea':
             self.cbm = self.calculate_total_cbm()
             self.save(update_fields=['cbm'])
+    
+    def update_total_weight(self):
+        """Update the container's weight field with calculated total from cargo items."""
+        if self.cargo_type == 'air':
+            self.weight = self.calculate_total_weight()
+            self.save(update_fields=['weight'])
 
 
 class CargoItem(models.Model):
@@ -93,10 +114,14 @@ class CargoItem(models.Model):
     container = models.ForeignKey(CargoContainer, on_delete=models.CASCADE, related_name='cargo_items')
     client = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cargo_items')
     tracking_id = models.CharField(max_length=100, unique=True, editable=True)
-    item_description = models.TextField()
+    item_description = models.TextField(blank=True, null=True)
     quantity = models.IntegerField()
     weight = models.FloatField(null=True, blank=True)
     cbm = models.FloatField(null=True, blank=True)
+    # Dimension fields for Ghana goods received auto-calculation
+    length = models.FloatField(null=True, blank=True, help_text="Length in centimeters")
+    breadth = models.FloatField(null=True, blank=True, help_text="Breadth/Width in centimeters")
+    height = models.FloatField(null=True, blank=True, help_text="Height in centimeters")
     unit_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     total_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -122,19 +147,32 @@ class CargoItem(models.Model):
                     created_at__date=timezone.now().date()
                 ).count() + 1
                 self.tracking_id = f"{self.container.container_id}_{client_mark}_{today}_{count:04d}"
+            
+            # Auto-calculate CBM for Ghana sea containers from dimensions
+            if (self.container.location == 'ghana' and 
+                self.container.warehouse_type == 'goods_received' and 
+                self.container.cargo_type == 'sea' and
+                self.length and self.breadth and self.height and self.quantity):
+                # CBM = (length * breadth * height * quantity) / 1,000,000
+                self.cbm = (self.length * self.breadth * self.height * self.quantity) / 1000000
+            
             super().save(*args, **kwargs)
             
-            # Update container's total CBM if this is a sea cargo item
+            # Update container totals based on cargo type
             if self.container.cargo_type == 'sea':
                 self.container.update_total_cbm()
+            elif self.container.cargo_type == 'air':
+                self.container.update_total_weight()
 
     def delete(self, *args, **kwargs):
-        """Custom delete to update container CBM after deletion."""
+        """Custom delete to update container totals after deletion."""
         container = self.container
         super().delete(*args, **kwargs)
-        # Update container's total CBM after deletion
+        # Update container totals based on cargo type
         if container.cargo_type == 'sea':
             container.update_total_cbm()
+        elif container.cargo_type == 'air':
+            container.update_total_weight()
 
     def __str__(self):
         return f"{self.tracking_id} - {self.item_description[:50]}"

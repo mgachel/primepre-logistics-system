@@ -182,11 +182,11 @@ export default function CustomerNotes() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Notes</h1>
-          <p className="text-muted-foreground">
-            Create and manage your personal notes
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Your Notes</h1>
+          <p className="text-muted-foreground text-sm lg:text-base">
+            Messages and notifications from the team
           </p>
         </div>
         <Button onClick={() => setShowCreateModal(true)}>
@@ -312,7 +312,7 @@ export default function CustomerNotes() {
 
       {/* Create Note Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Note</DialogTitle>
           </DialogHeader>
@@ -374,7 +374,7 @@ export default function CustomerNotes() {
 
       {/* Edit Note Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Note</DialogTitle>
           </DialogHeader>

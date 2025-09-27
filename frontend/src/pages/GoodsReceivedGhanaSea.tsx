@@ -220,12 +220,12 @@ export default function GoodsReceivedGhanaSea() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">
+          <h1 className="text-xl lg:text-2xl font-semibold text-foreground">
             Ghana Warehouse - Sea Cargo
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm lg:text-base">
             Manage sea cargo goods received in Ghana warehouse
           </p>
         </div>

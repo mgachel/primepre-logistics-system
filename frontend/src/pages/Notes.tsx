@@ -231,16 +231,16 @@ export default function Notes() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Notes</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl lg:text-3xl font-semibold text-foreground">Notes</h1>
+          <p className="text-muted-foreground text-sm lg:text-base">
             Manage your personal notes and reminders
           </p>
         </div>
-        <Button onClick={handleAddNote} className="flex items-center gap-2">
+        <Button onClick={handleAddNote} className="flex items-center justify-center gap-2 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
-          Add Note
+          <span>Add Note</span>
         </Button>
       </div>
 
@@ -328,7 +328,7 @@ export default function Notes() {
 
       {/* Add/Edit Note Dialog */}
       <Dialog open={showNoteDialog} onOpenChange={setShowNoteDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingNote ? "Edit Note" : "Add New Note"}
