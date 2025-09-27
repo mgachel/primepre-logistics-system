@@ -603,24 +603,26 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
-        <p className="text-muted-foreground mt-1">
+    <div className="space-y-6 max-w-7xl mx-auto">
+      <div className="px-4 sm:px-0">
+        <h1 className="text-xl lg:text-2xl font-semibold text-foreground">Settings</h1>
+        <p className="text-muted-foreground text-sm lg:text-base mt-1">
           Manage system configuration and company settings
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="invoice">Invoice Meta</TabsTrigger>
-          <TabsTrigger value="offices">Company Offices</TabsTrigger>
-          <TabsTrigger value="warehouses">Warehouse Addresses</TabsTrigger>
-          <TabsTrigger value="shipping-marks">Shipping Mark Formatting</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full px-4 sm:px-0">
+        <div className="overflow-x-auto">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5 gap-1">
+            <TabsTrigger value="general" className="text-xs lg:text-sm">General</TabsTrigger>
+            <TabsTrigger value="invoice" className="text-xs lg:text-sm">Invoice</TabsTrigger>
+            <TabsTrigger value="offices" className="text-xs lg:text-sm">Offices</TabsTrigger>
+            <TabsTrigger value="warehouses" className="text-xs lg:text-sm">Warehouses</TabsTrigger>
+            <TabsTrigger value="shipping-marks" className="text-xs lg:text-sm col-span-2 lg:col-span-1">Shipping Marks</TabsTrigger>
+          </TabsList>
+        </div>
         
-        <TabsContent value="general" className="space-y-6 mt-6">
+        <TabsContent value="general" className="space-y-6 mt-6 px-4 sm:px-0">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -632,25 +634,27 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
+                  <Label htmlFor="firstName" className="text-sm font-medium">First Name</Label>
                   <Input 
                     id="firstName" 
                     value={generalSettings.firstName}
                     onChange={(e) => setGeneralSettings({...generalSettings, firstName: e.target.value})}
+                    className="w-full"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="lastName" className="text-sm font-medium">Last Name</Label>
                   <Input 
                     id="lastName" 
                     value={generalSettings.lastName}
                     onChange={(e) => setGeneralSettings({...generalSettings, lastName: e.target.value})}
+                    className="w-full"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="flex items-center gap-2">
+                  <Label htmlFor="email" className="flex items-center gap-2 text-sm font-medium">
                     <Mail className="h-4 w-4" />
                     Email Address
                   </Label>
@@ -658,10 +662,11 @@ export default function Settings() {
                     id="email" 
                     value={generalSettings.email}
                     onChange={(e) => setGeneralSettings({...generalSettings, email: e.target.value})}
+                    className="w-full"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone" className="flex items-center gap-2">
+                  <Label htmlFor="phone" className="flex items-center gap-2 text-sm font-medium">
                     <Phone className="h-4 w-4" />
                     Phone Number
                   </Label>
@@ -669,12 +674,13 @@ export default function Settings() {
                     id="phone" 
                     value={generalSettings.phone}
                     onChange={(e) => setGeneralSettings({...generalSettings, phone: e.target.value})}
+                    className="w-full"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="region">Region</Label>
+                  <Label htmlFor="region" className="text-sm font-medium">Region</Label>
                   <Select value={generalSettings.region} onValueChange={(value) => setGeneralSettings({...generalSettings, region: value})}>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -685,7 +691,7 @@ export default function Settings() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="company" className="flex items-center gap-2">
+                  <Label htmlFor="company" className="flex items-center gap-2 text-sm font-medium">
                     <Building className="h-4 w-4" />
                     Company Name
                   </Label>
@@ -693,6 +699,7 @@ export default function Settings() {
                     id="company" 
                     value={generalSettings.company}
                     onChange={(e) => setGeneralSettings({...generalSettings, company: e.target.value})}
+                    className="w-full"
                   />
                 </div>
                 <div className="space-y-2">
@@ -745,7 +752,7 @@ export default function Settings() {
               </div>
 
               <div className="pt-4">
-                <Button onClick={handleSaveGeneral} className="flex items-center gap-2">
+                <Button onClick={handleSaveGeneral} className="flex items-center justify-center gap-2 w-full sm:w-auto">
                   <Save className="h-4 w-4" />
                   Update Profile
                 </Button>
@@ -754,7 +761,7 @@ export default function Settings() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="invoice" className="space-y-6 mt-6">
+        <TabsContent value="invoice" className="space-y-6 mt-6 px-4 sm:px-0">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -766,18 +773,18 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="companyLogo">Company Logo</Label>
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                    <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Drag & drop logo here or click to browse</p>
-                    <Button variant="outline" size="sm" className="mt-2">Browse Files</Button>
+                  <Label htmlFor="companyLogo" className="text-sm font-medium">Company Logo</Label>
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 lg:p-6 text-center">
+                    <Upload className="h-6 w-6 lg:h-8 lg:w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-xs lg:text-sm text-muted-foreground">Drag & drop logo here or click to browse</p>
+                    <Button variant="outline" size="sm" className="mt-2 w-full sm:w-auto">Browse Files</Button>
                   </div>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="themeColor" className="flex items-center gap-2">
+                    <Label htmlFor="themeColor" className="flex items-center gap-2 text-sm font-medium">
                       <Palette className="h-4 w-4" />
                       Theme Color
                     </Label>
@@ -786,10 +793,10 @@ export default function Settings() {
                         id="themeColor" 
                         value={invoiceSettings.themeColor} 
                         type="color" 
-                        className="w-16 h-10"
+                        className="w-12 h-8 lg:w-16 lg:h-10 flex-shrink-0"
                         onChange={(e) => setInvoiceSettings({...invoiceSettings, themeColor: e.target.value})}
                       />
-                      <Input value={invoiceSettings.themeColor} readOnly />
+                      <Input value={invoiceSettings.themeColor} readOnly className="flex-1" />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -852,7 +859,7 @@ export default function Settings() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="offices" className="space-y-6 mt-6">
+        <TabsContent value="offices" className="space-y-6 mt-6 px-4 sm:px-0">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-foreground mb-2">Company Offices</h2>
@@ -866,7 +873,7 @@ export default function Settings() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
             {offices.map((office) => (
               <Card key={office.id} className="group hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
@@ -918,7 +925,7 @@ export default function Settings() {
           </div>
         </TabsContent>
         
-        <TabsContent value="warehouses" className="space-y-6 mt-6">
+        <TabsContent value="warehouses" className="space-y-6 mt-6 px-4 sm:px-0">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-foreground mb-2">Warehouse Addresses</h2>
@@ -932,15 +939,15 @@ export default function Settings() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             {warehousesLoading ? (
-              <div className="col-span-2 text-center py-8">
+              <div className="col-span-1 lg:col-span-2 text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground mt-2">Loading warehouses...</p>
+                <p className="text-muted-foreground text-sm lg:text-base mt-2">Loading warehouses...</p>
               </div>
             ) : !Array.isArray(warehouses) || warehouses.length === 0 ? (
-              <div className="col-span-2 text-center py-8">
-                <Ship className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <div className="col-span-1 lg:col-span-2 text-center py-8">
+                <Ship className="h-10 w-10 lg:h-12 lg:w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No warehouses found. Add your first warehouse to get started.</p>
               </div>
             ) : (
@@ -996,7 +1003,7 @@ export default function Settings() {
           </div>
         </TabsContent>
 
-        <TabsContent value="shipping-marks" className="space-y-6 mt-6">
+        <TabsContent value="shipping-marks" className="space-y-6 mt-6 px-4 sm:px-0">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1068,11 +1075,12 @@ export default function Settings() {
                             <Badge variant="secondary" className="text-xs">Inactive</Badge>
                           )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1 lg:gap-2">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleEditRegionalRule(rule)}
+                            className="px-2 lg:px-3"
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
@@ -1080,6 +1088,7 @@ export default function Settings() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleDeleteRegionalRule(rule.id)}
+                            className="px-2 lg:px-3"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -1128,7 +1137,7 @@ export default function Settings() {
 
       {/* Office Edit Dialog */}
       <Dialog open={isOfficeDialogOpen} onOpenChange={setIsOfficeDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingOffice?.id === 0 ? "Add New Office" : "Edit Office"}
@@ -1202,7 +1211,7 @@ export default function Settings() {
 
       {/* Warehouse Edit Dialog */}
       <Dialog open={isWarehouseDialogOpen} onOpenChange={setIsWarehouseDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingWarehouse?.id === undefined ? "Add New Warehouse" : "Edit Warehouse"}
@@ -1236,13 +1245,75 @@ export default function Settings() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="warehouseAddress">Address</Label>
-                <Textarea
-                  id="warehouseAddress"
-                  value={editingWarehouse.address}
-                  onChange={(e) => setEditingWarehouse({...editingWarehouse, address: e.target.value})}
-                  placeholder="Enter full warehouse address"
-                  rows={2}
-                />
+                <div className="space-y-2">
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Use buttons below to insert dynamic placeholders. Clients will see their personalized information instead of the placeholders.
+                  </div>
+                  <div className="flex gap-1 lg:gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 px-2 bg-blue-500 text-white hover:bg-blue-600 flex-shrink-0"
+                      onClick={() => {
+                        const textarea = document.getElementById('warehouseAddress') as HTMLTextAreaElement;
+                        const cursorPos = textarea.selectionStart;
+                        const textBefore = editingWarehouse.address.substring(0, cursorPos);
+                        const textAfter = editingWarehouse.address.substring(cursorPos);
+                        const newAddress = textBefore + '{{SHIPPING_MARK}}' + textAfter;
+                        setEditingWarehouse({...editingWarehouse, address: newAddress});
+                      }}
+                    >
+                      SHIPPING_MARK
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 px-2 bg-blue-500 text-white hover:bg-blue-600"
+                      onClick={() => {
+                        const textarea = document.getElementById('warehouseAddress') as HTMLTextAreaElement;
+                        const cursorPos = textarea.selectionStart;
+                        const textBefore = editingWarehouse.address.substring(0, cursorPos);
+                        const textAfter = editingWarehouse.address.substring(cursorPos);
+                        const newAddress = textBefore + '{{PHONE_NUMBER}}' + textAfter;
+                        setEditingWarehouse({...editingWarehouse, address: newAddress});
+                      }}
+                    >
+                      PHONE_NUMBER
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 px-2 bg-blue-500 text-white hover:bg-blue-600"
+                      onClick={() => {
+                        const textarea = document.getElementById('warehouseAddress') as HTMLTextAreaElement;
+                        const cursorPos = textarea.selectionStart;
+                        const textBefore = editingWarehouse.address.substring(0, cursorPos);
+                        const textAfter = editingWarehouse.address.substring(cursorPos);
+                        const newAddress = textBefore + '{{NAME}}' + textAfter;
+                        setEditingWarehouse({...editingWarehouse, address: newAddress});
+                      }}
+                    >
+                      NAME
+                    </Button>
+                  </div>
+                  <Textarea
+                    id="warehouseAddress"
+                    value={editingWarehouse.address}
+                    onChange={(e) => setEditingWarehouse({...editingWarehouse, address: e.target.value})}
+                    placeholder="Example: Building 123, {{NAME}} Collection Center, Contact: {{PHONE_NUMBER}}, Mark: {{SHIPPING_MARK}}, Accra, Ghana"
+                    rows={4}
+                    className="font-mono"
+                  />
+                  {(editingWarehouse.address?.includes('{{') || editingWarehouse.address?.includes('}}')) && (
+                    <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                      <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                      Placeholders detected - clients will see personalized addresses
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="warehouseDescription">Description</Label>
@@ -1269,7 +1340,7 @@ export default function Settings() {
 
       {/* Regional Rule Edit Dialog */}
       <Dialog open={isRegionalRuleDialogOpen} onOpenChange={setIsRegionalRuleDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingRegionalRule?.id === 0 ? "Add Regional Rule" : "Edit Regional Rule"}

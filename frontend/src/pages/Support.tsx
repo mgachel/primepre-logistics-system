@@ -117,16 +117,16 @@ export default function Support() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 lg:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Support Center</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Support Center</h1>
+        <p className="text-muted-foreground text-sm lg:text-base">
           Get help with your account and learn how to use the platform
         </p>
       </div>
 
       <Tabs defaultValue="contact" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 h-auto">
           <TabsTrigger value="contact">Contact Support</TabsTrigger>
           <TabsTrigger value="tickets">My Tickets</TabsTrigger>
           <TabsTrigger value="faq">FAQ</TabsTrigger>
@@ -134,7 +134,7 @@ export default function Support() {
         </TabsList>
 
         <TabsContent value="contact" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
             {/* Contact Methods */}
             <Card>
               <CardHeader>
@@ -347,7 +347,7 @@ export default function Support() {
         </TabsContent>
 
         <TabsContent value="resources" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

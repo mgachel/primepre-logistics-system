@@ -8,7 +8,6 @@ import {
   Package,
   RefreshCcw,
   Edit,
-  Settings,
   Trash2,
   Eye,
 } from "lucide-react";
@@ -19,7 +18,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
 import { EditCargoContainerDialog } from "@/components/dialogs/EditCargoContainerDialog";
 import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
-
+import { ExcelUploadButton } from "@/components/ui/ExcelUploadButton";
 import {
   cargoService,
   BackendCargoContainer,
@@ -45,7 +44,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
-// ✅ Map backend status to badge-friendly values
+// Map backend status to badge-friendly values
 function mapStatus(
   status: BackendCargoContainer["status"]
 ): "in-transit" | "delivered" | "pending" | "delayed" {
@@ -57,26 +56,26 @@ function mapStatus(
     case "pending":
       return "pending";
     case "demurrage":
-      return "delayed"; // closest match
+      return "delayed";
     default:
       return "pending";
   }
 }
 
-export default function AirCargo() {
+export default function GhanaAirContainers() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
-  const [selectedContainer, _setSelectedContainer] =
+  const [selectedContainer, setSelectedContainer] =
     useState<BackendCargoContainer | null>(null);
   const [showContainerDetails, setShowContainerDetails] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
     "all" | "in-transit" | "pending" | "delivered"
   >("all");
   const [loading, setLoading] = useState(true);
-  const [_error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [containers, setContainers] = useState<BackendCargoContainer[]>([]);
   const [dashboard, setDashboard] = useState<CargoDashboardStats | null>(null);
 
@@ -89,7 +88,7 @@ export default function AirCargo() {
   const [editContainer, setEditContainer] =
     useState<BackendCargoContainer | null>(null);
 
-  // ✅ Load air containers and dashboard
+  // Load Ghana air containers and dashboard
   useEffect(() => {
     let ignore = false;
     const load = async () => {
@@ -106,11 +105,12 @@ export default function AirCargo() {
         const [listRes, dashRes] = await Promise.all([
           cargoService.getContainers({
             cargo_type: "air",
-            location: "china", // Show China-based cargo operations, not Ghana goods received
+            location: "ghana",
+            warehouse_type: "goods_received",
             search: searchTerm || undefined,
             status: statusParam,
           }),
-          cargoService.getDashboard("air", "china"),
+          cargoService.getDashboard("air", "ghana", "goods_received"),
         ]);
 
         if (!ignore) {
@@ -119,7 +119,7 @@ export default function AirCargo() {
         }
       } catch (e: unknown) {
         const msg =
-          e instanceof Error ? e.message : "Failed to load air cargo";
+          e instanceof Error ? e.message : "Failed to load Ghana air containers";
         if (!ignore) setError(msg);
       } finally {
         if (!ignore) setLoading(false);
@@ -131,7 +131,7 @@ export default function AirCargo() {
     };
   }, [searchTerm, statusFilter]);
 
-  // ✅ Reload data
+  // Reload data
   const reloadData = async () => {
     const statusParam =
       statusFilter === "all"
@@ -143,11 +143,12 @@ export default function AirCargo() {
     const [listRes, dashRes] = await Promise.all([
       cargoService.getContainers({
         cargo_type: "air",
-        location: "china", // Show China-based cargo operations, not Ghana goods received
+        location: "ghana",
+        warehouse_type: "goods_received",
         search: searchTerm || undefined,
         status: statusParam,
       }),
-      cargoService.getDashboard("air"),
+      cargoService.getDashboard("air", "ghana", "goods_received"),
     ]);
 
     setContainers(listRes.data?.results || []);
@@ -187,7 +188,7 @@ export default function AirCargo() {
 
   const filteredCargo = useMemo(() => containers, [containers]);
 
-  // ✅ Table columns
+  // Table columns
   const cols: Column<BackendCargoContainer>[] = [
     {
       id: "created_at",
@@ -206,15 +207,17 @@ export default function AirCargo() {
       clickable: true,
     },
     {
-      id: "loading_date",
-      header: "Flight Date",
+      id: "offloading_date",
+      header: "Offloading Date",
       accessor: (c) =>
-        c.load_date ? (
+        c.unloading_date ? (
+          <span className="text-sm">{formatDate(c.unloading_date)}</span>
+        ) : c.load_date ? (
           <span className="text-sm">{formatDate(c.load_date)}</span>
         ) : (
           <span className="text-sm text-muted-foreground">-</span>
         ),
-      sort: (a, b) => (a.load_date || "").localeCompare(b.load_date || ""),
+      sort: (a, b) => (a.unloading_date || a.load_date || "").localeCompare(b.unloading_date || b.load_date || ""),
     },
     {
       id: "eta",
@@ -277,18 +280,28 @@ export default function AirCargo() {
         <div>
           <h1 className="text-xl lg:text-2xl font-semibold text-foreground flex items-center">
             <Plane className="h-5 w-5 lg:h-6 lg:w-6 mr-3 text-primary" />
-            Air Cargo Operations
+            Ghana Goods Received - Air Cargo
           </h1>
           <p className="text-muted-foreground text-sm lg:text-base mt-1">
-            Manage China-based air cargo containers and shipping operations • Distinct from Ghana warehouse operations
+            Manage air cargo containers and goods received in Ghana warehouse
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
-          <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0">
+        <div className="flex gap-2">
+          <Button onClick={() => setShowNewCargoDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Air Container
           </Button>
-                    {/* Excel upload disabled for air cargo operations to avoid confusion with goods received */}
+          <ExcelUploadButton
+            uploadType="air_cargo"
+            variant="outline"
+            onUploadComplete={(response) => {
+              toast({
+                title: "Excel upload completed",
+                description: `Processed ${response.summary.created || 0} air cargo items`,
+              });
+              window.location.reload();
+            }}
+          />
         </div>
       </div>
 
@@ -298,7 +311,7 @@ export default function AirCargo() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm text-muted-foreground">
-                Total Shipments
+                Ghana Air Containers
               </div>
               <div className="text-2xl font-semibold mt-1">
                 {dashboard?.total_containers ?? 0}
@@ -310,38 +323,34 @@ export default function AirCargo() {
         <div className="logistics-card p-4">
           <div className="flex items-center justify-between">
             <div>
+              <div className="text-sm text-muted-foreground">Pending</div>
+              <div className="text-2xl font-semibold mt-1">
+                {dashboard?.pending_containers ?? 0}
+              </div>
+            </div>
+            <Package className="h-8 w-8 text-orange-500/60" />
+          </div>
+        </div>
+        <div className="logistics-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
               <div className="text-sm text-muted-foreground">In Transit</div>
               <div className="text-2xl font-semibold mt-1">
                 {dashboard?.containers_in_transit ?? 0}
               </div>
             </div>
-            <Plane className="h-8 w-8 text-secondary/60" />
+            <Plane className="h-8 w-8 text-blue-500/60" />
           </div>
         </div>
         <div className="logistics-card p-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm text-muted-foreground">Total Weight</div>
+              <div className="text-sm text-muted-foreground">Delivered</div>
               <div className="text-2xl font-semibold mt-1">
-                {filteredCargo
-                  .reduce(
-                    (sum, c) => sum + (c.total_weight || c.weight || 0),
-                    0
-                  )
-                  .toFixed(1)}{" "}
-                kg
+                {dashboard?.delivered_containers ?? 0}
               </div>
             </div>
-            <Package className="h-8 w-8 text-accent/60" />
-          </div>
-        </div>
-        <div className="logistics-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-muted-foreground">This Month</div>
-              <div className="text-2xl font-semibold mt-1">8</div>
-            </div>
-            <Calendar className="h-8 w-8 text-warning/60" />
+            <Calendar className="h-8 w-8 text-green-500/60" />
           </div>
         </div>
       </div>
@@ -357,124 +366,104 @@ export default function AirCargo() {
             className="pl-10"
           />
         </div>
-        <div className="flex items-center space-x-2">
-          {["all", "in-transit", "pending", "delivered"].map((s) => (
-            <Button
-              key={s}
-              variant={statusFilter === s ? "default" : "outline"}
-              size="sm"
-              onClick={() => setStatusFilter(s as "all" | "in-transit" | "pending" | "delivered")}
-            >
-              {s === "all"
-                ? "All"
-                : s.charAt(0).toUpperCase() + s.slice(1).replace("-", " ")}
-            </Button>
-          ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSearchTerm("");
-              setStatusFilter("all");
-            }}
-          >
-            <RefreshCcw className="h-4 w-4 mr-1" /> Reset filters
-          </Button>
-        </div>
+        <Select
+          value={statusFilter}
+          onValueChange={(value: string) => setStatusFilter(value as "all" | "in-transit" | "pending" | "delivered")}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="in-transit">In Transit</SelectItem>
+            <SelectItem value="delivered">Delivered</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Cargo Table */}
-      <div className="logistics-card p-4">
-        <DataTable
-          id="air-cargo"
-          rows={filteredCargo}
-          columns={cols}
-          loading={loading}
-          defaultSort={{ column: "created_at", direction: "desc" }}
-          empty={<p className="text-muted-foreground">No air cargo yet.</p>}
-          rowActions={(row) => (
-            <>
-              <DropdownMenuItem
-                onClick={() => {
-                  navigate(`/containers/${row.container_id}`);
-                }}
-              >
-                <Eye className="h-4 w-4 mr-2" /> View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setSelectedStatusContainer(row);
-                  setNewStatus(row.status);
-                  setShowStatusDialog(true);
-                }}
-              >
-                <Settings className="h-4 w-4 mr-2" /> Update Status
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setEditContainer(row);
-                  setEditOpen(true);
-                }}
-              >
-                <Edit className="h-4 w-4 mr-2" /> Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={async () => {
-                  if (
-                    !confirm(
-                      `Delete air container ${row.container_id}? This cannot be undone.`
-                    )
-                  )
-                    return;
-                  try {
-                    await cargoService.deleteBackendContainer(row.container_id);
-                    await reloadData();
-                    toast({
-                      title: "Deleted",
-                      description: `${row.container_id} removed.`,
-                    });
-                  } catch (e: unknown) {
-                    toast({
-                      title: "Delete failed",
-                      description:
-                        e instanceof Error ? e.message : "Unable to delete",
-                      variant: "destructive",
-                    });
-                  }
-                }}
-              >
-                <Trash2 className="h-4 w-4 mr-2" /> Delete
-              </DropdownMenuItem>
-            </>
-          )}
-        />
-      </div>
+      {/* Containers Table */}
+      <DataTable
+        id="ghana-air-containers"
+        columns={cols}
+        rows={filteredCargo}
+        loading={loading}
+        onRowClick={(container) => {
+          navigate(`/ghana-container/${container.container_id}`);
+        }}
+        rowActions={(container) => (
+          <>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/ghana-container/${container.container_id}`);
+              }}
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              View Details
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditContainer(container);
+                setEditOpen(true);
+              }}
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Container
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedStatusContainer(container);
+                setNewStatus(container.status);
+                setShowStatusDialog(true);
+              }}
+            >
+              <RefreshCcw className="h-4 w-4 mr-2" />
+              Update Status
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Handle delete
+                toast({
+                  title: "Delete container",
+                  description: "Delete functionality will be implemented",
+                });
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </>
+        )}
+        empty={
+          <div className="text-center py-12">
+            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">No containers found</h3>
+            <p className="text-muted-foreground mb-4">
+              Add your first Ghana air container or adjust your search filters
+            </p>
+            <Button onClick={() => setShowNewCargoDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Air Container
+            </Button>
+          </div>
+        }
+      />
 
       {/* Status Update Dialog */}
       <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Update Air Container Status</DialogTitle>
+            <DialogTitle>Update Container Status</DialogTitle>
             <DialogDescription>
-              Change the status of the selected air container.
+              Change the status of container {selectedStatusContainer?.container_id}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Airway Bill:{" "}
-                <span className="font-medium">
-                  {selectedStatusContainer?.container_id}
-                </span>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Current Status:{" "}
-                <span className="font-medium">
-                  {selectedStatusContainer?.status?.replace("_", " ")}
-                </span>
-              </p>
-            </div>
             <Select value={newStatus} onValueChange={setNewStatus}>
               <SelectTrigger>
                 <SelectValue placeholder="Select new status" />
@@ -488,7 +477,10 @@ export default function AirCargo() {
             </Select>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowStatusDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowStatusDialog(false)}
+            >
               Cancel
             </Button>
             <Button
@@ -508,11 +500,13 @@ export default function AirCargo() {
         open={showNewCargoDialog}
         onOpenChange={setShowNewCargoDialog}
         defaultType="air"
+        location="ghana"
+        warehouse_type="goods_received"
         onCreated={async (containerId) => {
           await reloadData();
           toast({
             title: "Created",
-            description: `Air container ${containerId} created.`,
+            description: `Ghana air container ${containerId} created.`,
           });
         }}
       />

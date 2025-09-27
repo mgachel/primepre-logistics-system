@@ -16,7 +16,8 @@ import {
   User,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -291,7 +292,7 @@ export default function Claims() {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Claims</CardTitle>
@@ -527,7 +528,7 @@ export default function Claims() {
 
       {/* Claim Detail Modal */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Claim #{selectedClaim?.id} Details</DialogTitle>
             <DialogDescription>
@@ -598,6 +599,61 @@ export default function Claims() {
                   <Label className="text-sm font-medium text-muted-foreground">Item Description</Label>
                   <p className="mt-1 text-sm text-muted-foreground">{selectedClaim.item_description}</p>
                 </div>
+                
+                {/* Images Section */}
+                {(selectedClaim.image_1 || selectedClaim.image_2 || selectedClaim.image_3) && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4" />
+                      Supporting Images
+                    </Label>
+                    <div className="flex gap-3 mt-2 flex-wrap">
+                      {selectedClaim.image_1 && (
+                        <div className="relative group">
+                          <img
+                            src={selectedClaim.image_1}
+                            alt="Claim supporting image 1"
+                            className="w-20 h-20 object-cover rounded-lg border cursor-pointer hover:opacity-75 transition-opacity"
+                            onClick={() => window.open(selectedClaim.image_1, '_blank')}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all">
+                            <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100" />
+                          </div>
+                        </div>
+                      )}
+                      {selectedClaim.image_2 && (
+                        <div className="relative group">
+                          <img
+                            src={selectedClaim.image_2}
+                            alt="Claim supporting image 2"
+                            className="w-20 h-20 object-cover rounded-lg border cursor-pointer hover:opacity-75 transition-opacity"
+                            onClick={() => window.open(selectedClaim.image_2, '_blank')}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all">
+                            <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100" />
+                          </div>
+                        </div>
+                      )}
+                      {selectedClaim.image_3 && (
+                        <div className="relative group">
+                          <img
+                            src={selectedClaim.image_3}
+                            alt="Claim supporting image 3"
+                            className="w-20 h-20 object-cover rounded-lg border cursor-pointer hover:opacity-75 transition-opacity"
+                            onClick={() => window.open(selectedClaim.image_3, '_blank')}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all">
+                            <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Submitted</Label>
                   <p className="mt-1">{formatDate(selectedClaim.created_at)} ({formatRelative(selectedClaim.created_at)})</p>

@@ -66,6 +66,26 @@ class Claim(models.Model):
         help_text="Internal notes from admin review"
     )
     
+    # Image attachments for claims
+    image_1 = models.ImageField(
+        upload_to='claims/images/',
+        blank=True,
+        null=True,
+        help_text="First supporting image for the claim"
+    )
+    image_2 = models.ImageField(
+        upload_to='claims/images/',
+        blank=True,
+        null=True,
+        help_text="Second supporting image for the claim"
+    )
+    image_3 = models.ImageField(
+        upload_to='claims/images/',
+        blank=True,
+        null=True,
+        help_text="Third supporting image for the claim"
+    )
+    
     class Meta:
         ordering = ['-created_at']
         verbose_name = "Claim"

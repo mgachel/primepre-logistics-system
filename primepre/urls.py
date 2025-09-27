@@ -15,6 +15,8 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from .views import home_view
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -95,3 +97,7 @@ urlpatterns = [
     path('api/claims/', include('claims.urls')),  # Claims endpoints
     path('api/settings/', include('settings.urls')),  # Settings endpoints
 ]
+
+# Serve media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

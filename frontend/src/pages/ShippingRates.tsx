@@ -45,6 +45,8 @@ const ShippingRates = () => {
   const [stats, setStats] = useState<RateStats | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [editingRate, setEditingRate] = useState<Rate | null>(null);
+  const [updating, setUpdating] = useState(false);
   const { toast } = useToast();
 
   // Form state
@@ -58,6 +60,22 @@ const ShippingRates = () => {
     office_name: "",
     amount: 0,
   });
+
+  // Reset form to initial state
+  const resetForm = () => {
+    setFormData({
+      category: "NORMAL_GOODS",
+      rate_type: "SEA_RATES",
+      title: "",
+      description: "",
+      origin_country: "",
+      destination_country: "",
+      office_name: "",
+      amount: 0,
+    });
+    setEditingRate(null);
+    setShowAddForm(false);
+  };
 
   // Fetch rates data
   const fetchRates = useCallback(async () => {
@@ -162,34 +180,21 @@ const ShippingRates = () => {
     }
   };
 
-  // Handle create rate
+  // Handle form submission for creating new rate
   const handleCreateRate = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    setCreating(true);
     try {
-      setCreating(true);
       const response = await ratesService.createRate(formData);
 
       if (response.success) {
         toast({
           title: "Success",
-          description: "Rate created successfully",
+          description: `Rate "${formData.title}" created successfully`,
         });
-
-        // Reset form
-        setFormData({
-          category: "NORMAL_GOODS",
-          rate_type: "SEA_RATES",
-          title: "",
-          description: "",
-          origin_country: "",
-          destination_country: "",
-          office_name: "",
-          amount: 0,
-        });
-
-        setShowAddForm(false);
-        fetchRates();
+        resetForm();
+        fetchRates(); // Refresh the list
       } else {
         throw new Error(response.message || "Failed to create rate");
       }
@@ -205,6 +210,59 @@ const ShippingRates = () => {
       setCreating(false);
     }
   };
+
+  // Handle rate update
+  const handleUpdateRate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRate) return;
+
+    setUpdating(true);
+    try {
+      const response = await ratesService.updateRate(editingRate.id, formData);
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: `Rate "${formData.title}" updated successfully`,
+        });
+        resetForm();
+        fetchRates(); // Refresh the list
+      } else {
+        throw new Error(response.message || "Failed to update rate");
+      }
+    } catch (error) {
+      console.error("Error updating rate:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to update rate",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // Handle form submission (create or update)
+  const handleFormSubmit = editingRate ? handleUpdateRate : handleCreateRate;
+
+  // Handle rate editing
+  const handleEditRate = (rate: Rate) => {
+    setFormData({
+      category: rate.category,
+      rate_type: rate.rate_type,
+      title: rate.title,
+      description: rate.description || "",
+      origin_country: rate.origin_country,
+      destination_country: rate.destination_country,
+      office_name: rate.office_name,
+      amount: rate.amount,
+    });
+    setEditingRate(rate);
+    setShowAddForm(true);
+  };
+
+
 
   // Handle rate deletion
   const handleDeleteRate = async (rateId: number, title: string) => {
@@ -281,7 +339,10 @@ const ShippingRates = () => {
           <Button
             className="w-full border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary"
             variant="outline"
-            onClick={() => setShowAddForm(true)}
+            onClick={() => {
+              resetForm();
+              setShowAddForm(true);
+            }}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add New Rate
@@ -297,20 +358,20 @@ const ShippingRates = () => {
             <Button
               variant={selectedCategory === "SEA_RATES" ? "default" : "outline"}
               size="sm"
-              className="flex items-center gap-2"
+              className="flex items-center justify-center gap-1 lg:gap-2"
               onClick={() => setSelectedCategory("SEA_RATES")}
             >
               <Ship className="h-4 w-4" />
-              Sea
+              <span className="text-xs lg:text-sm">Sea</span>
             </Button>
             <Button
               variant={selectedCategory === "AIR_RATES" ? "default" : "outline"}
               size="sm"
-              className="flex items-center gap-2"
+              className="flex items-center justify-center gap-1 lg:gap-2"
               onClick={() => setSelectedCategory("AIR_RATES")}
             >
               <Plane className="h-4 w-4" />
-              Air
+              <span className="text-xs lg:text-sm">Air</span>
             </Button>
           </div>
         </div>
@@ -428,12 +489,14 @@ const ShippingRates = () => {
             <div className="flex items-center gap-2 mb-6">
               <ArrowLeft
                 className="h-5 w-5 cursor-pointer"
-                onClick={() => setShowAddForm(false)}
+                onClick={resetForm}
               />
-              <h2 className="text-2xl font-bold">Add New Shipping Rate</h2>
+              <h2 className="text-2xl font-bold">
+                {editingRate ? "Edit Shipping Rate" : "Add New Shipping Rate"}
+              </h2>
             </div>
 
-            <form onSubmit={handleCreateRate} className="space-y-6">
+            <form onSubmit={handleFormSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="title" className="text-sm font-medium">
@@ -615,19 +678,22 @@ const ShippingRates = () => {
         ) : (
           <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
               <div>
-                <h2 className="text-2xl font-bold">
+                <h2 className="text-xl lg:text-2xl font-bold">
                   Shipping Rates Management
                 </h2>
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground text-sm lg:text-base">
                   Manage your shipping rates for sea and air cargo
                 </p>
               </div>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => setShowAddForm(true)}
+                  onClick={() => {
+                    resetForm();
+                    setShowAddForm(true);
+                  }}
                   className="flex items-center gap-2"
                 >
                   <Plus className="h-4 w-4" />
@@ -674,7 +740,10 @@ const ShippingRates = () => {
                         ? "No rates match your search criteria."
                         : "Get started by adding your first shipping rate."}
                     </p>
-                    <Button onClick={() => setShowAddForm(true)}>
+                    <Button onClick={() => {
+                      resetForm();
+                      setShowAddForm(true);
+                    }}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Rate
                     </Button>
@@ -720,7 +789,10 @@ const ShippingRates = () => {
                             <p className="text-sm">{rate.route}</p>
                           </td>
                           <td className="p-4">
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge 
+                              variant="secondary" 
+                              className={`text-xs ${getCategoryColor(rate.category)}`}
+                            >
                               {rate.category_display}
                             </Badge>
                           </td>
@@ -735,9 +807,18 @@ const ShippingRates = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => handleEditRate(rate)}
+                                title="Edit rate"
+                              >
+                                <Edit className="h-4 w-4 text-blue-600" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() =>
                                   handleDeleteRate(rate.id, rate.title)
                                 }
+                                title="Delete rate"
                               >
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>

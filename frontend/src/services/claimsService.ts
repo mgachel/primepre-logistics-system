@@ -13,6 +13,9 @@ export interface Claim {
   customer_name: string;
   days_since_submission: number;
   admin_notes?: string;
+  image_1?: string;
+  image_2?: string;
+  image_3?: string;
 }
 
 export interface AdminClaim extends Claim {
@@ -25,6 +28,9 @@ export interface CreateClaimData {
   tracking_id: string;
   item_name: string;
   item_description: string;
+  image_1?: File;
+  image_2?: File;
+  image_3?: File;
 }
 
 export interface ClaimStatusUpdate {
@@ -78,7 +84,28 @@ class ClaimsService {
 
   async createClaim(claimData: CreateClaimData): Promise<{ success: boolean; data: Claim }> {
     try {
-      const response = await apiClient.post<Claim>('/api/claims/my-claims/', claimData);
+      // Create FormData to handle file uploads
+      const formData = new FormData();
+      formData.append('tracking_id', claimData.tracking_id);
+      formData.append('item_name', claimData.item_name);
+      formData.append('item_description', claimData.item_description);
+      
+      // Append image files if they exist
+      if (claimData.image_1) {
+        formData.append('image_1', claimData.image_1);
+      }
+      if (claimData.image_2) {
+        formData.append('image_2', claimData.image_2);
+      }
+      if (claimData.image_3) {
+        formData.append('image_3', claimData.image_3);
+      }
+
+      const response = await apiClient.post<Claim>('/api/claims/my-claims/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       return {
         success: response.success,
         data: response.data

@@ -279,7 +279,7 @@ export default function Notifications() {
                 Send Message
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
               <DialogHeader className="flex-shrink-0">
                 <DialogTitle>Send Message to Clients</DialogTitle>
                 <DialogDescription>

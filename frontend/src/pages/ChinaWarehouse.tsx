@@ -337,12 +337,12 @@ export default function ChinaWarehouse() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
             China Warehouse
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm lg:text-base">
             Manage goods available in China warehouses
           </p>
         </div>

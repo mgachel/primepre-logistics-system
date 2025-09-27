@@ -47,6 +47,7 @@ export function EditCargoContainerDialog({
   const [weight, setWeight] = useState<string | "">("");
   const [cbm, setCbm] = useState<string | "">("");
   const [rates, setRates] = useState<string | "">("");
+  const [dollarRate, setDollarRate] = useState<string | "">("");
   const [stayDays, setStayDays] = useState<string | "">("");
   const [delayDays, setDelayDays] = useState<string | "">("");
   const [status, setStatus] =
@@ -61,6 +62,7 @@ export function EditCargoContainerDialog({
     setWeight(container.cargo_type === 'air' && container.weight != null ? String(container.weight) : "");
     setCbm(""); // CBM not used for any cargo type
     setRates(container.rates != null ? String(container.rates) : "");
+    setDollarRate(container.dollar_rate != null ? String(container.dollar_rate) : "");
     setStayDays(container.stay_days != null ? String(container.stay_days) : "");
     setDelayDays(
       container.delay_days != null ? String(container.delay_days) : ""
@@ -75,9 +77,11 @@ export function EditCargoContainerDialog({
     const loadRates = async () => {
       setLoadingRates(true);
       try {
-        const rateTypes = container.cargo_type === 'sea' ? ['SEA_RATES'] : ['AIR_RATES'];
-        const rates = await ratesService.getRatesByTypes(rateTypes);
-        setAvailableRates(rates);
+        const rateType = container.cargo_type === 'sea' ? 'SEA_RATES' : 'AIR_RATES';
+        const response = await ratesService.getRates({ rate_type: rateType });
+        if (response.success && response.data?.results) {
+          setAvailableRates(response.data.results);
+        }
       } catch (error) {
         console.error('Failed to load rates:', error);
         setAvailableRates([]);
@@ -111,6 +115,7 @@ export function EditCargoContainerDialog({
           unloading_date: unloadingDate || undefined,
           ...(container.cargo_type === 'air' && { weight: weight === "" ? null : parseFloat(weight) }),
           rates: rates === "" ? null : parseFloat(rates),
+          dollar_rate: dollarRate === "" ? null : parseFloat(dollarRate),
           stay_days: stayDays === "" ? 0 : parseInt(stayDays, 10),
           delay_days: delayDays === "" ? 0 : parseInt(delayDays, 10),
           status,
@@ -142,7 +147,7 @@ export function EditCargoContainerDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Cargo Container</DialogTitle>
           <DialogDescription>
@@ -230,6 +235,31 @@ export function EditCargoContainerDialog({
               </Select>
             </div>
             <div>
+              <Label>Dollar Rate</Label>
+              <Select value={dollarRate} onValueChange={setDollarRate} disabled={loadingRates}>
+                <SelectTrigger>
+                  <SelectValue 
+                    placeholder={loadingRates ? "Loading rates..." : "Select a dollar rate"}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingRates ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading rates...</div>
+                  ) : availableRates.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">No rates available</div>
+                  ) : (
+                    availableRates
+                      .filter(rate => rate.amount != null && rate.amount.toString() !== "")
+                      .map((rate) => (
+                        <SelectItem key={`dollar_${rate.id}`} value={String(rate.amount)}>
+                          {rate.title} - ${rate.amount} ({rate.route})
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Stay Days</Label>
               <Input
                 type="number"
@@ -266,16 +296,17 @@ export function EditCargoContainerDialog({
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={saving}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!canSave || saving}>
+            <Button type="submit" disabled={!canSave || saving} className="w-full sm:w-auto">
               {saving ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>

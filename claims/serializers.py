@@ -14,7 +14,8 @@ class ClaimSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'tracking_id', 'item_name', 'item_description',
             'status', 'shipping_mark', 'created_at', 'updated_at',
-            'customer_name', 'days_since_submission', 'admin_notes'
+            'customer_name', 'days_since_submission', 'admin_notes',
+            'image_1', 'image_2', 'image_3'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'shipping_mark']
     
@@ -31,7 +32,7 @@ class ClaimCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Claim
-        fields = ['tracking_id', 'item_name', 'item_description']
+        fields = ['tracking_id', 'item_name', 'item_description', 'image_1', 'image_2', 'image_3']
     
     def create(self, validated_data):
         request = self.context.get('request')
@@ -58,7 +59,8 @@ class AdminClaimSerializer(serializers.ModelSerializer):
             'id', 'tracking_id', 'item_name', 'item_description',
             'status', 'shipping_mark', 'created_at', 'updated_at',
             'customer_name', 'customer_phone', 'customer_email', 
-            'customer_region', 'days_since_submission', 'admin_notes'
+            'customer_region', 'days_since_submission', 'admin_notes',
+            'image_1', 'image_2', 'image_3'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'shipping_mark']
 

@@ -246,7 +246,7 @@ export function GlobalSearch() {
           </Button>
         </DialogTrigger>
 
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+        <DialogContent className="w-[95vw] max-w-6xl max-h-[90vh] overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <DialogTitle className="text-xl font-semibold">Search for item</DialogTitle>
             <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
@@ -384,7 +384,7 @@ export function GlobalSearch() {
 
       {/* Expanded Detail View */}
       <Dialog open={!!selectedResult} onOpenChange={() => setSelectedResult(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedResult && (
             <div className="space-y-6">
               <div className="flex items-start justify-between">

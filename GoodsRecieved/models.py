@@ -159,13 +159,36 @@ class GoodsReceivedGhana(models.Model):
 
     supply_tracking = models.CharField(max_length=50, unique=True)
 
+    # Dimension fields for sea cargo CBM calculation
+    length = models.DecimalField(
+        max_digits=8, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="Length in centimeters (for sea cargo CBM calculation)"
+    )
+    breadth = models.DecimalField(
+        max_digits=8, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="Breadth/Width in centimeters (for sea cargo CBM calculation)"
+    )
+    height = models.DecimalField(
+        max_digits=8, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="Height in centimeters (for sea cargo CBM calculation)"
+    )
+    
     cbm = models.DecimalField(
         max_digits=10, 
         decimal_places=3, 
         validators=[MinValueValidator(Decimal("0.001"))],
         null=True, 
         blank=True,
-        help_text="Cubic meters - optional for air cargo"
+        help_text="Cubic meters - auto-calculated for sea cargo, manual for air cargo"
     )
     weight = models.DecimalField(
         max_digits=10, decimal_places=2,
@@ -205,6 +228,13 @@ class GoodsReceivedGhana(models.Model):
     def save(self, *args, **kwargs):
         if self.customer:
             self.shipping_mark = self.customer.shipping_mark
+        
+        # Auto-calculate CBM for sea cargo if dimensions are provided
+        if (self.method_of_shipping == "SEA" and 
+            self.length and self.breadth and self.height and self.quantity):
+            # CBM = (length * breadth * height * quantity) / 1,000,000
+            self.cbm = (self.length * self.breadth * self.height * self.quantity) / Decimal('1000000')
+        
         super().save(*args, **kwargs)
 
     def clean(self):
