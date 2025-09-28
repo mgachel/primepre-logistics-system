@@ -85,9 +85,9 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
       const payload = {
         container_id: form.container_id.trim(),
         cargo_type: form.cargo_type,
-        load_date: form.load_date,
-        eta: form.eta,
-        unloading_date: form.unloading_date,
+        load_date: form.load_date || null,
+        eta: form.eta || null,
+        unloading_date: form.unloading_date || null,
         route: form.route.trim(),
         rates: form.rates ? Number(form.rates) : null,
         dollar_rate: form.dollar_rate ? Number(form.dollar_rate) : null,

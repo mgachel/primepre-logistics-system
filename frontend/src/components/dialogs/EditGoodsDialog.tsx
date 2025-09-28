@@ -61,7 +61,7 @@ export function EditGoodsDialog({
     description: "",
     location: "",
     length: "",
-    width: "",
+    breadth: "",
     height: "",
     method_of_shipping: "SEA" as "AIR" | "SEA",
   });
@@ -78,7 +78,7 @@ export function EditGoodsDialog({
         description: item.description || "",
         location: item.location || "",
         length: "",
-        width: "",
+        breadth: "",
         height: "",
         method_of_shipping: item.method_of_shipping || "SEA",
       });
@@ -133,11 +133,11 @@ export function EditGoodsDialog({
     // Auto-calculate CBM for Ghana Sea cargo
     if (isGhanaSea) {
       const length = parseFloat(newFormData.length) || 0;
-      const width = parseFloat(newFormData.width) || 0;
+      const breadth = parseFloat(newFormData.breadth) || 0;
       const height = parseFloat(newFormData.height) || 0;
 
-      if (length > 0 && width > 0 && height > 0) {
-        const cbm = (length * width * height) / 1000000; // Convert cm³ to m³
+      if (length > 0 && breadth > 0 && height > 0) {
+        const cbm = (length * breadth * height) / 1000000; // Convert cm³ to m³
         newFormData.cbm = cbm.toFixed(3);
         setFormData(newFormData);
       }
@@ -301,16 +301,15 @@ export function EditGoodsDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="width">Width (cm) *</Label>
+                                    <Label htmlFor="breadth">Breadth (cm) *</Label>
                   <Input
-                    id="width"
+                    id="breadth"
                     type="number"
-                    step="0.1"
-                    min="0"
-                    value={formData.width}
-                    onChange={(e) => handleDimensionChange("width", e.target.value)}
-                    required
-                  />
+                    step="0.01"
+                    min="0.1"
+                    placeholder="Enter breadth in cm"
+                    value={formData.breadth}
+                    onChange={(e) => handleDimensionChange("breadth", e.target.value)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="height">Height (cm) *</Label>

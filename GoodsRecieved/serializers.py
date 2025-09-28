@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import GoodsReceivedChina, GoodsReceivedGhana
+from .models import GoodsReceivedChina, GoodsReceivedGhana, GoodsReceivedContainer, GoodsReceivedItem
 from users.models import CustomerUser
 import pandas as pd
 import io
@@ -9,7 +9,7 @@ from decimal import Decimal, InvalidOperation
 CHINA_DEFAULT_LOCATION = "GUANGZHOU"
 GHANA_DEFAULT_LOCATION = "ACCRA"
 MAX_FILE_SIZE_MB = 10
-MAX_CBM_LIMIT = 1000
+MAX_CBM_LIMIT = 10000  # Increased temporarily for debugging
 MAX_WEIGHT_LIMIT = 50000
 MAX_QUANTITY_LIMIT = 100000
 MAX_VALUE_LIMIT = 1000000
@@ -452,3 +452,179 @@ class ExcelUploadResultSerializer(serializers.Serializer):
     error_count = serializers.IntegerField(default=0)
     errors = serializers.ListField(child=serializers.DictField(), default=list)
     created_items = serializers.ListField(child=serializers.DictField(), default=list)
+
+
+# ==========================================
+# NEW CONTAINER-BASED SERIALIZERS
+# ==========================================
+
+class GoodsReceivedItemSerializer(serializers.ModelSerializer):
+    """Serializer for individual goods received items within containers."""
+    
+    days_in_warehouse = serializers.SerializerMethodField()
+    is_flagged = serializers.SerializerMethodField()
+    customer_name = serializers.CharField(source='customer.username', read_only=True)
+    
+    class Meta:
+        model = GoodsReceivedItem
+        fields = [
+            'id', 'container', 'customer', 'customer_name', 'shipping_mark', 
+            'supply_tracking', 'description', 'quantity', 'weight', 'cbm',
+            'length', 'breadth', 'height', 'estimated_value', 'supplier_name',
+            'location', 'status', 'date_received', 'delivery_date', 'notes',
+            'days_in_warehouse', 'is_flagged', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'date_received', 'created_at', 'updated_at', 'days_in_warehouse', 'is_flagged']
+    
+    def get_days_in_warehouse(self, obj):
+        return obj.days_in_warehouse
+    
+    def get_is_flagged(self, obj):
+        return obj.is_flagged
+    
+    def validate_weight(self, value):
+        if value and value > MAX_WEIGHT_LIMIT:
+            raise serializers.ValidationError(f"Weight too large (max {MAX_WEIGHT_LIMIT} kg).")
+        return value
+    
+    def validate_cbm(self, value):
+        if value is not None and value > MAX_CBM_LIMIT:
+            raise serializers.ValidationError(f"CBM too large (max {MAX_CBM_LIMIT}).")
+        return value
+    
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Quantity must be positive.")
+        if value > MAX_QUANTITY_LIMIT:
+            raise serializers.ValidationError(f"Quantity too large (max {MAX_QUANTITY_LIMIT}).")
+        return value
+
+
+class GoodsReceivedContainerSerializer(serializers.ModelSerializer):
+    """Serializer for goods received containers."""
+    
+    goods_items = GoodsReceivedItemSerializer(many=True, read_only=True)
+    items_by_shipping_mark = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = GoodsReceivedContainer
+        fields = [
+            'container_id', 'container_type', 'location', 'arrival_date',
+            'expected_delivery_date', 'actual_delivery_date', 'total_weight',
+            'total_cbm', 'total_items_count', 'selected_rate_id', 'rates', 'dollar_rate', 'status', 'notes', 
+            'created_at', 'updated_at', 'goods_items', 'items_by_shipping_mark'
+        ]
+        read_only_fields = ['container_id', 'total_weight', 'total_cbm', 'total_items_count', 'created_at', 'updated_at']
+    
+    def get_items_by_shipping_mark(self, obj):
+        """Group items by shipping mark for organized display."""
+        items = obj.goods_items.all()
+        grouped = {}
+        
+        for item in items:
+            mark = item.shipping_mark or "Unknown"
+            if mark not in grouped:
+                grouped[mark] = []
+            grouped[mark].append(GoodsReceivedItemSerializer(item).data)
+        
+        return grouped
+
+
+class CreateGoodsReceivedContainerSerializer(serializers.ModelSerializer):
+    """Serializer for creating new goods received containers."""
+    
+    class Meta:
+        model = GoodsReceivedContainer
+        fields = [
+            'container_id', 'container_type', 'location', 'arrival_date', 
+            'expected_delivery_date', 'selected_rate_id', 'rates', 'dollar_rate', 'notes', 'status'
+        ]
+    
+    def validate(self, data):
+        # Ensure required fields are present
+        if 'container_type' not in data:
+            raise serializers.ValidationError("Container type is required.")
+        if 'location' not in data:
+            raise serializers.ValidationError("Location is required.")
+        if 'arrival_date' not in data:
+            raise serializers.ValidationError("Arrival date is required.")
+        
+        return data
+
+
+class UpdateGoodsReceivedContainerSerializer(serializers.ModelSerializer):
+    """Serializer for updating existing goods received containers (allows partial updates)."""
+    
+    class Meta:
+        model = GoodsReceivedContainer
+        fields = [
+            'container_id', 'container_type', 'location', 'arrival_date', 
+            'expected_delivery_date', 'selected_rate_id', 'rates', 'dollar_rate', 'notes', 'status'
+        ]
+        extra_kwargs = {
+            'container_id': {'required': False},
+            'container_type': {'required': False},
+            'location': {'required': False},
+            'arrival_date': {'required': False},
+            'expected_delivery_date': {'required': False},
+            'selected_rate_id': {'required': False},
+            'dollar_rate': {'required': False},
+            'notes': {'required': False},
+            'status': {'required': False},
+        }
+    
+    def validate(self, data):
+        # No validation for updates - allow partial updates
+        return data
+
+
+class CreateGoodsReceivedItemSerializer(serializers.ModelSerializer):
+    """Serializer for creating individual goods received items."""
+    
+    class Meta:
+        model = GoodsReceivedItem
+        fields = [
+            'container', 'customer', 'shipping_mark', 'supply_tracking',
+            'description', 'quantity', 'weight', 'cbm', 'length', 'breadth', 
+            'height', 'estimated_value', 'supplier_name', 'location', 'notes'
+        ]
+    
+    def create(self, validated_data):
+        print(f"DEBUG: Creating goods received item with data: {validated_data}")
+        return super().create(validated_data)
+    
+    def validate_weight(self, value):
+        if value and value > MAX_WEIGHT_LIMIT:
+            raise serializers.ValidationError(f"Weight too large (max {MAX_WEIGHT_LIMIT} kg).")
+        return value
+    
+    def validate_cbm(self, value):
+        if value is not None and value > MAX_CBM_LIMIT:
+            raise serializers.ValidationError(f"CBM too large (max {MAX_CBM_LIMIT}).")
+        return value
+    
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Quantity must be positive.")
+        if value > MAX_QUANTITY_LIMIT:
+            raise serializers.ValidationError(f"Quantity too large (max {MAX_QUANTITY_LIMIT}).")
+        return value
+
+
+class GoodsReceivedContainerStatsSerializer(serializers.Serializer):
+    """Serializer for goods received container statistics."""
+    
+    total_containers = serializers.IntegerField()
+    pending_containers = serializers.IntegerField()
+    processing_containers = serializers.IntegerField()
+    ready_for_delivery = serializers.IntegerField()
+    delivered_containers = serializers.IntegerField()
+    flagged_containers = serializers.IntegerField()
+    
+    total_items = serializers.IntegerField()
+    total_weight = serializers.FloatField()
+    total_cbm = serializers.FloatField()
+    
+    # Air vs Sea breakdown
+    air_containers = serializers.IntegerField()
+    sea_containers = serializers.IntegerField()

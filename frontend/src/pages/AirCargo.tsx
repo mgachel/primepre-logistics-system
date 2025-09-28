@@ -19,7 +19,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { NewCargoContainerDialog } from "@/components/dialogs/NewCargoContainerDialog";
 import { EditCargoContainerDialog } from "@/components/dialogs/EditCargoContainerDialog";
 import { ContainerDetailsDialog } from "@/components/dialogs/ContainerDetailsDialog";
-
+import { ExcelUploadButton } from "@/components/ui/ExcelUploadButton";
 import {
   cargoService,
   BackendCargoContainer,
@@ -106,11 +106,10 @@ export default function AirCargo() {
         const [listRes, dashRes] = await Promise.all([
           cargoService.getContainers({
             cargo_type: "air",
-            location: "china", // Show China-based cargo operations, not Ghana goods received
             search: searchTerm || undefined,
             status: statusParam,
           }),
-          cargoService.getDashboard("air", "china"),
+          cargoService.getDashboard("air"),
         ]);
 
         if (!ignore) {
@@ -143,7 +142,6 @@ export default function AirCargo() {
     const [listRes, dashRes] = await Promise.all([
       cargoService.getContainers({
         cargo_type: "air",
-        location: "china", // Show China-based cargo operations, not Ghana goods received
         search: searchTerm || undefined,
         status: statusParam,
       }),
@@ -277,10 +275,11 @@ export default function AirCargo() {
         <div>
           <h1 className="text-xl lg:text-2xl font-semibold text-foreground flex items-center">
             <Plane className="h-5 w-5 lg:h-6 lg:w-6 mr-3 text-primary" />
-            Air Cargo Operations
+            Air Cargo
           </h1>
           <p className="text-muted-foreground text-sm lg:text-base mt-1">
-            Manage China-based air cargo containers and shipping operations • Distinct from Ghana warehouse operations
+            Manage air freight shipments • All times shown in your local time
+            zone
           </p>
         </div>
         <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
@@ -288,7 +287,17 @@ export default function AirCargo() {
             <Plus className="h-4 w-4 mr-2" />
             Add Air Container
           </Button>
-                    {/* Excel upload disabled for air cargo operations to avoid confusion with goods received */}
+          <ExcelUploadButton
+            uploadType="air_cargo"
+            variant="outline"
+            onUploadComplete={(response) => {
+              toast({
+                title: "Excel upload completed",
+                description: `Processed ${response.summary.created || 0} air cargo items`,
+              });
+              window.location.reload();
+            }}
+          />
         </div>
       </div>
 

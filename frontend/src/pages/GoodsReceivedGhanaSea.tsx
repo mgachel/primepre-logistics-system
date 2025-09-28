@@ -1,19 +1,36 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
-  Package,
   Search,
-  Upload,
   Plus,
-  Download,
-  CheckCircle2,
-  Flag,
   Ship,
+  Calendar,
+  Package,
+  RefreshCcw,
+  Edit,
+  Settings,
   Trash2,
-  Pencil,
+  Eye,
 } from "lucide-react";
-import { MetricCard } from "@/components/ui/metric-card";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { NewGoodsReceivedContainerDialog } from "@/components/dialogs/NewGoodsReceivedContainerDialog";
+import { EditGoodsReceivedContainerDialog } from "@/components/dialogs/EditGoodsReceivedContainerDialog";
+
+import { ExcelUploadButton } from "@/components/ui/ExcelUploadButton";
+import {
+  goodsReceivedContainerService,
+  GoodsReceivedContainer,
+  GoodsReceivedContainerStats,
+  GoodsReceivedItem,
+} from "@/services/goodsReceivedContainerService";
+import { DataTable, Column } from "@/components/data-table/DataTable";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { formatDate } from "@/lib/date";
 import {
   Select,
   SelectContent,
@@ -21,369 +38,537 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { NewGoodsDialog } from "@/components/dialogs/NewGoodsDialog";
-import { EditGoodsDialog } from "@/components/dialogs/EditGoodsDialog";
-import { ExcelUploadButton } from "@/components/ui/ExcelUploadButton";
-import { DataTable, Column } from "@/components/data-table/DataTable";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { StatusBadge } from "@/components/ui/status-badge";
 import {
-  warehouseService,
-  WarehouseItem,
-  AdminWarehouseStatistics,
-} from "@/services/warehouseService";
-import { useToast } from "@/hooks/use-toast";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+
+// Map status to badge-friendly values
+function mapStatus(
+  status: GoodsReceivedContainer["status"]
+): "pending" | "in-transit" | "delivered" | "delayed" | "error" {
+  switch (status) {
+    case "pending":
+      return "pending";
+    case "processing":
+      return "in-transit";
+    case "ready_for_delivery":
+      return "delivered"; // Ready for delivery shows as completed/delivered
+    case "delivered":
+      return "delivered";
+    case "flagged":
+      return "error"; // Flagged items show as error
+    default:
+      return "pending";
+  }
+}
 
 export default function GoodsReceivedGhanaSea() {
   const { toast } = useToast();
-  const PAGE_SIZE = 20;
-  const [showNewGoodsDialog, setShowNewGoodsDialog] = useState(false);
-  const [showEditGoodsDialog, setShowEditGoodsDialog] = useState(false);
-  const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<
-    | "all"
-    | "PENDING"
-    | "READY_FOR_DELIVERY"
-    | "FLAGGED"
-    | "DELIVERED"
-    | "CANCELLED"
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showNewContainerDialog, setShowNewContainerDialog] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "pending" | "processing" | "ready_for_delivery" | "delivered" | "flagged"
   >("all");
   const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState<WarehouseItem[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [stats, setStats] = useState<AdminWarehouseStatistics | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [containers, setContainers] = useState<GoodsReceivedContainer[]>([]);
+  const [dashboard, setDashboard] = useState<GoodsReceivedContainerStats | null>(null);
+  const [itemsByShippingMark, _setItemsByShippingMark] = useState<Record<string, GoodsReceivedItem[]>>({});
 
-  // Fetch data
-  const fetchData = async (currentPage = 1, isNewSearch = false) => {
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [selectedStatusContainer, setSelectedStatusContainer] = useState<GoodsReceivedContainer | null>(null);
+  const [newStatus, setNewStatus] = useState<string>("");
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editContainer, setEditContainer] = useState<GoodsReceivedContainer | null>(null);
+
+  // Load Ghana Sea containers and dashboard
+  useEffect(() => {
+    let ignore = false;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const statusParam = statusFilter === "all" ? undefined : statusFilter;
+
+        const [listRes, dashRes] = await Promise.all([
+          goodsReceivedContainerService.getGhanaSeaContainers({
+            search: searchTerm || undefined,
+            status: statusParam,
+            page_size: 100,
+          }),
+          goodsReceivedContainerService.getGhanaSeaStatistics(),
+        ]);
+
+        if (!ignore) {
+          setContainers(listRes.data?.results || []);
+          setDashboard(dashRes.data || null);
+        }
+      } catch (error) {
+        if (!ignore) {
+          console.error("Failed to load Ghana Sea containers:", error);
+          setError("Failed to load containers");
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, [statusFilter, searchTerm]);
+
+  const reloadData = async () => {
     setLoading(true);
     try {
-      const params: any = {
-        page: currentPage,
-        page_size: PAGE_SIZE,
-        search: search || undefined,
-        status: status === "all" ? undefined : status,
+      const statusParam = statusFilter === "all" ? undefined : statusFilter;
+
+      const filters = {
+        search: searchTerm || undefined,
+        status: statusParam,
+        page_size: 100,
       };
+      
+      console.log('Fetching Ghana Sea containers with filters:', filters);
+      
+      const [listRes, dashRes] = await Promise.all([
+        goodsReceivedContainerService.getGhanaSeaContainers(filters),
+        goodsReceivedContainerService.getGhanaSeaStatistics(),
+      ]);
 
-      // Use SEA cargo specific endpoint
-      const response = await warehouseService.getGhanaSeaGoods(params);
-      const newItems = response.data?.results || [];
-
-      if (isNewSearch || currentPage === 1) {
-        setItems(Array.isArray(newItems) ? newItems : []);
-      } else {
-        setItems((prev) => [...(Array.isArray(prev) ? prev : []), ...(Array.isArray(newItems) ? newItems : [])]);
-      }
-
-      setHasMore(!!response.data?.next);
-      setPage(currentPage);
+      console.log('Ghana Sea containers fetched:', listRes.data?.results?.length, 'containers');
+      console.log('Containers data:', listRes.data?.results);
+      
+      setContainers(listRes.data?.results || []);
+      setDashboard(dashRes.data || null);
     } catch (error) {
-      console.error("Failed to fetch Ghana sea goods:", error);
-      setItems([]); // Ensure we always have an array on error
-      toast({
-        title: "Error",
-        description: "Failed to load goods. Please try again.",
-        variant: "destructive",
-      });
+      console.error("Failed to reload data:", error);
+      setError("Failed to reload containers");
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch statistics
-  const fetchStats = async () => {
+  const handleStatusUpdate = async () => {
+    if (!selectedStatusContainer || !newStatus) return;
+
     try {
-      const response = await warehouseService.getGhanaSeaStatistics();
-      setStats(response.data);
-    } catch (error) {
-      console.error("Failed to fetch Ghana sea statistics:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchData(1, true);
-    fetchStats();
-  }, [search, status]);
-
-  const loadMore = () => {
-    if (hasMore && !loading) {
-      fetchData(page + 1);
-    }
-  };
-
-  const handleStatusUpdate = async (item: WarehouseItem, newStatus: string) => {
-    try {
-      await warehouseService.updateGhanaGoodsStatus(item.id, newStatus);
-      await fetchData(1, true);
-      await fetchStats();
+      const updateData = { status: newStatus as "pending" | "processing" | "ready_for_delivery" | "delivered" | "flagged" };
+      console.log('Updating container status:', selectedStatusContainer.container_id, 'with data:', updateData);
+      
+      await goodsReceivedContainerService.updateContainer(
+        selectedStatusContainer.container_id,
+        updateData
+      );
       toast({
-        title: "Success",
-        description: "Status updated successfully",
+        title: "Status updated",
+        description: `${selectedStatusContainer.container_id} → ${newStatus.replace("_", " ")}`,
       });
-    } catch (error) {
-      console.error("Failed to update status:", error);
+      setShowStatusDialog(false);
+      setSelectedStatusContainer(null);
+      setNewStatus("");
+      await reloadData();
+    } catch (e: unknown) {
       toast({
-        title: "Error",
-        description: "Failed to update status. Please try again.",
+        title: "Update failed",
+        description: e instanceof Error ? e.message : "Unable to update",
         variant: "destructive",
       });
     }
   };
 
-  const handleEdit = (item: WarehouseItem) => {
-    setEditingItem(item);
-    setShowEditGoodsDialog(true);
-  };
+  const filteredContainers = useMemo(() => {
+    return containers.filter(container => {
+      const matchesSearch = !searchTerm || 
+        container.container_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        container.created_at?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || container.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [containers, searchTerm, statusFilter]);
 
-  const handleDelete = async (item: WarehouseItem) => {
-    try {
-      await warehouseService.deleteGhanaGoods(item.id);
-      await fetchData(1, true);
-      await fetchStats();
-      toast({
-        title: "Success",
-        description: "Item deleted successfully",
-      });
-    } catch (error) {
-      console.error("Failed to delete item:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete item. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const columns: Column<WarehouseItem>[] = [
+  // Table columns matching cargo structure
+    const columns: Column<GoodsReceivedContainer>[] = [
     {
-      id: "shipping_mark",
-      header: "Shipping Mark",
-      accessor: (item) => item.shipping_mark || "-",
-      sort: (a, b) => (a.shipping_mark || "").localeCompare(b.shipping_mark || ""),
-      sticky: true,
-    },
-    {
-      id: "supply_tracking",
-      header: "Supply Tracking",
-      accessor: (item) => (
-        <code className="text-xs bg-muted px-2 py-1 rounded">
-          {item.supply_tracking}
-        </code>
+      id: "container",
+      header: "Container ID",
+      accessor: (row) => (
+        <div className="font-mono font-medium">{row.container_id}</div>
       ),
-      sort: (a, b) => a.supply_tracking.localeCompare(b.supply_tracking),
+      sort: (a, b) => a.container_id.localeCompare(b.container_id),
     },
     {
-      id: "description",
-      header: "Description",
-      accessor: (item) => (
-        <div className="max-w-xs truncate" title={item.description || ""}>
-          {item.description || "-"}
+      id: "type",
+      header: "Shipment Type",
+      accessor: (row) => (
+        <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium uppercase">
+          {row.container_type === 'sea' ? 'Sea Cargo' : 'Air Cargo'}
         </div>
       ),
+      width: "120px",
     },
     {
-      id: "quantity",
-      header: "Quantity",
-      accessor: (item) => item.quantity?.toString() || "-",
-      sort: (a, b) => (a.quantity || 0) - (b.quantity || 0),
+      id: "offloading_date",
+      header: "Offloading Date",
+      accessor: (row) => (
+        <div className="text-sm">
+          <div className="font-medium">
+            {row.arrival_date ? formatDate(row.arrival_date) : "Not set"}
+          </div>
+        </div>
+      ),
+      sort: (a, b) => {
+        const aDate = a.arrival_date ? new Date(a.arrival_date).getTime() : 0;
+        const bDate = b.arrival_date ? new Date(b.arrival_date).getTime() : 0;
+        return bDate - aDate;
+      },
+      width: "140px",
     },
     {
-      id: "cbm",
-      header: "CBM",
-      accessor: (item) => item.cbm?.toString() || "-",
-      sort: (a, b) => (a.cbm || 0) - (b.cbm || 0),
+      id: "route",
+      header: "Route",
+      accessor: (_row) => (
+        <div className="text-sm font-medium">
+          China to Ghana
+        </div>
+      ),
+      width: "120px",
     },
     {
-      id: "location",
-      header: "Location",
-      accessor: (item) => item.location || "-",
-      sort: (a, b) => (a.location || "").localeCompare(b.location || ""),
+      id: "rates",
+      header: "Rates",
+      accessor: (row) => (
+        <div className="text-sm font-medium">
+          {row.dollar_rate ? `$${row.dollar_rate}` : "Not set"}
+        </div>
+      ),
+      width: "100px",
+    },
+    {
+      id: "dollar_rate",
+      header: "Dollar Rate",
+      accessor: (row) => (
+        <div className="text-sm font-medium">
+          {row.dollar_rate ? `$${row.dollar_rate}` : "Not set"}
+        </div>
+      ),
+      width: "110px",
     },
     {
       id: "status",
       header: "Status",
-      accessor: (item) => <StatusBadge status={item.status} />,
-      sort: (a, b) => a.status.localeCompare(b.status),
+      accessor: (row) => (
+        <StatusBadge status={mapStatus(row.status)}>
+          {row.status?.replace("_", " ").toUpperCase() || "PENDING"}
+        </StatusBadge>
+      ),
+      sort: (a, b) => (a.status || "").localeCompare(b.status || ""),
+      width: "120px",
     },
     {
-      id: "date_received",
-      header: "Date Received",
-      accessor: (item) =>
-        new Date(item.date_received).toLocaleDateString(),
-      sort: (a, b) =>
-        new Date(a.date_received).getTime() -
-        new Date(b.date_received).getTime(),
+      id: "items",
+      header: "Items",
+      accessor: (row) => (
+        <div className="text-center font-medium">{row.total_items_count || 0}</div>
+      ),
+      sort: (a, b) => (a.total_items_count || 0) - (b.total_items_count || 0),
+      width: "80px",
     },
   ];
 
+  // Loading state
+  if (loading && containers.length === 0) {
+    return (
+      <div className="logistics-container">
+        <div className="flex items-center justify-center min-h-96">
+          <div className="text-center">
+            <Package className="h-8 w-8 animate-pulse mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading Ghana Sea containers...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="logistics-container">
+        <div className="text-center py-12">
+          <div className="text-red-500 mb-4">{error}</div>
+          <Button onClick={reloadData}>Try Again</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+    <div className="logistics-container">
+      {/* Header matching cargo structure */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl lg:text-2xl font-semibold text-foreground">
-            Ghana Warehouse - Sea Cargo
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Ship className="h-8 w-8 text-blue-600" />
+            Ghana Sea - Goods Received
           </h1>
-          <p className="text-muted-foreground text-sm lg:text-base">
-            Manage sea cargo goods received in Ghana warehouse
+          <p className="text-muted-foreground">
+            Manage sea cargo containers received in Ghana warehouse
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <ExcelUploadButton
-            uploadUrl="/api/goods/ghana/upload_excel/"
-            templateUrl="/api/goods/ghana/download_template/"
-            onUploadSuccess={() => {
-              fetchData(1, true);
-              fetchStats();
-            }}
+        <div className="flex items-center gap-2">
+          <ExcelUploadButton 
+            onUploadSuccess={reloadData}
+            uploadType="goods-received-sea"
           />
-          <Button
-            onClick={() => setShowNewGoodsDialog(true)}
-            className="flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add Sea Cargo
+          <Button onClick={() => setShowNewContainerDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Container
           </Button>
         </div>
       </div>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Total Items"
-          value={stats?.total_count || 0}
-          icon={Package}
-          trend="neutral"
-        />
-        <MetricCard
-          title="Pending"
-          value={stats?.pending_count || 0}
-          icon={Package}
-          trend="neutral"
-        />
-        <MetricCard
-          title="Ready for Delivery"
-          value={stats?.ready_for_delivery_count || 0}
-          icon={CheckCircle2}
-          trend="positive"
-        />
-        <MetricCard
-          title="Flagged"
-          value={stats?.flagged_count || 0}
-          icon={Flag}
-          trend={stats?.flagged_count ? "negative" : "neutral"}
-        />
+      {/* Stats cards matching cargo structure */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="logistics-card p-6">
+          <div className="flex items-center">
+            <Package className="h-8 w-8 text-blue-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-muted-foreground">Total Containers</p>
+              <p className="text-2xl font-bold">{dashboard?.total_containers || 0}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="logistics-card p-6">
+          <div className="flex items-center">
+            <Package className="h-8 w-8 text-green-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-muted-foreground">Total Items</p>
+              <p className="text-2xl font-bold">{dashboard?.total_items || 0}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="logistics-card p-6">
+          <div className="flex items-center">
+            <Calendar className="h-8 w-8 text-orange-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-muted-foreground">Ready for Delivery</p>
+              <p className="text-2xl font-bold">{dashboard?.ready_for_delivery || 0}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="logistics-card p-6">
+          <div className="flex items-center">
+            <Package className="h-8 w-8 text-purple-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-muted-foreground">Pending</p>
+              <p className="text-2xl font-bold">{dashboard?.pending || 0}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters matching cargo structure */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by tracking, mark, or description..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by container ID, customer, or tracking ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
         </div>
-        <Select value={status} onValueChange={(value: any) => setStatus(value)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="READY_FOR_DELIVERY">Ready for Delivery</SelectItem>
-            <SelectItem value="FLAGGED">Flagged</SelectItem>
-            <SelectItem value="DELIVERED">Delivered</SelectItem>
-            <SelectItem value="CANCELLED">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Data Table */}
-      <DataTable
-        id="ghana-sea-goods"
-        rows={Array.isArray(items) ? items : []}
-        columns={columns}
-        loading={loading}
-        defaultSort={{ column: "date_received", direction: "desc" }}
-        empty={
-          <div className="text-center py-8">
-            <Ship className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              No sea cargo found
-            </h3>
-            <p className="text-muted-foreground">
-              Add sea cargo goods or adjust your search filters
-            </p>
-          </div>
-        }
-        rowActions={(item) => (
-          <>
-            <DropdownMenuItem onClick={() => handleEdit(item)}>
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleStatusUpdate(item, "READY_FOR_DELIVERY")}
-              disabled={item.status === "READY_FOR_DELIVERY"}
+        <div className="flex items-center space-x-2">
+          {["all", "pending", "processing", "ready_for_delivery", "delivered", "flagged"].map((s) => (
+            <Button
+              key={s}
+              variant={statusFilter === s ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter(s as typeof statusFilter)}
             >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Mark Ready
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleStatusUpdate(item, "FLAGGED")}
-              disabled={item.status === "FLAGGED"}
-            >
-              <Flag className="h-4 w-4 mr-2" />
-              Flag Item
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleDelete(item)}
-              className="text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </DropdownMenuItem>
-          </>
-        )}
-      />
-
-      {/* Load More */}
-      {hasMore && (
-        <div className="text-center">
-          <Button variant="outline" onClick={loadMore} disabled={loading}>
-            {loading ? "Loading..." : "Load More"}
+              {s === "all"
+                ? "All"
+                : s.charAt(0).toUpperCase() + s.slice(1).replace("_", " ")}
+            </Button>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchTerm("");
+              setStatusFilter("all");
+            }}
+          >
+            <RefreshCcw className="h-4 w-4 mr-1" /> Reset
           </Button>
         </div>
-      )}
+      </div>
 
-      {/* New Goods Dialog */}
-      <NewGoodsDialog
-        open={showNewGoodsDialog}
-        onOpenChange={setShowNewGoodsDialog}
-        warehouseType="ghana"
-        defaultShippingMethod="SEA"
-        onSuccess={() => {
-          fetchData(1, true);
-          fetchStats();
+      {/* Main DataTable matching cargo structure */}
+      <div className="logistics-card">
+        <DataTable
+          id="goods-received-ghana-sea"
+          rows={filteredContainers}
+          columns={columns}
+          loading={loading}
+          defaultSort={{ column: "created_at", direction: "desc" }}
+          empty={<p className="text-muted-foreground">No sea cargo containers yet.</p>}
+          rowActions={(row) => (
+            <>
+              <DropdownMenuItem
+                onClick={() => {
+                  navigate(`/goods-received/${row.container_id}`);
+                }}
+              >
+                <Eye className="h-4 w-4 mr-2" /> View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedStatusContainer(row);
+                  setNewStatus(row.status || "pending");
+                  setShowStatusDialog(true);
+                }}
+              >
+                <Settings className="h-4 w-4 mr-2" /> Update Status
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setEditContainer(row);
+                  setEditOpen(true);
+                }}
+              >
+                <Edit className="h-4 w-4 mr-2" /> Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={async () => {
+                  if (
+                    !confirm(
+                      `Delete container ${row.container_id}? This cannot be undone.`
+                    )
+                  )
+                    return;
+                  
+                  try {
+                    await goodsReceivedContainerService.deleteContainer(row.container_id);
+                    await reloadData();
+                    toast({
+                      title: "Deleted",
+                      description: `${row.container_id} removed.`,
+                    });
+                  } catch (e: unknown) {
+                    toast({
+                      title: "Delete failed",
+                      description: e instanceof Error ? e.message : "Unable to delete",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" /> Delete
+              </DropdownMenuItem>
+            </>
+          )}
+        />
+      </div>
+
+      {/* Status Update Dialog matching cargo structure */}
+      <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Container Status</DialogTitle>
+            <DialogDescription>
+              Change the status of the selected container.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Container ID:{" "}
+                <span className="font-medium">
+                  {selectedStatusContainer?.container_id}
+                </span>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Current Status:{" "}
+                <span className="font-medium">
+                  {selectedStatusContainer?.status?.replace("_", " ")}
+                </span>
+              </p>
+            </div>
+            <Select value={newStatus} onValueChange={setNewStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select new status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="ready_for_delivery">Ready for Delivery</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="flagged">Flagged</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowStatusDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleStatusUpdate}
+              disabled={
+                !newStatus || newStatus === selectedStatusContainer?.status
+              }
+            >
+              Update Status
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogs matching cargo structure */}
+      <NewGoodsReceivedContainerDialog
+        open={showNewContainerDialog}
+        onOpenChange={setShowNewContainerDialog}
+        defaultType="sea"
+        location="ghana"
+        onCreated={async (containerId) => {
+          await reloadData();
+          toast({
+            title: "Created",
+            description: `Sea container ${containerId} created.`,
+          });
         }}
       />
 
-      {/* Edit Goods Dialog */}
-      <EditGoodsDialog
-        open={showEditGoodsDialog}
-        onOpenChange={setShowEditGoodsDialog}
-        item={editingItem}
-        warehouseType="ghana"
-        onSuccess={() => {
-          fetchData(1, true);
-          fetchStats();
-          setEditingItem(null);
+      <EditGoodsReceivedContainerDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        container={editContainer}
+        onSaved={async () => {
+          await reloadData();
+          toast({
+            title: "Updated",
+            description: "Container updated successfully.",
+          });
         }}
       />
+
+
     </div>
   );
 }

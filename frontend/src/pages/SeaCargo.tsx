@@ -114,11 +114,10 @@ export default function SeaCargo() {
         const [listRes, dashRes] = await Promise.all([
           cargoService.getContainers({
             cargo_type: "sea",
-            location: "china", // Show China-based cargo operations, not Ghana goods received
             search: searchTerm || undefined,
             status: statusParam,
           }),
-          cargoService.getDashboard("sea", "china"),
+          cargoService.getDashboard("sea"),
         ]);
         if (!ignore) {
           setContainers(listRes.data?.results || []);
@@ -149,11 +148,10 @@ export default function SeaCargo() {
       const [listRes, dashRes] = await Promise.all([
         cargoService.getContainers({
           cargo_type: "sea",
-          location: "china", // Show China-based cargo operations
           search: searchTerm || undefined,
           status: statusParam,
         }),
-        cargoService.getDashboard("sea", "china"),
+        cargoService.getDashboard("sea"),
       ]);
       setContainers(listRes.data?.results || []);
       setDashboard(dashRes.data || null);
@@ -304,10 +302,11 @@ export default function SeaCargo() {
         <div>
           <h1 className="text-xl lg:text-2xl font-semibold text-foreground flex items-center">
             <Ship className="h-5 w-5 lg:h-6 lg:w-6 mr-3 text-primary" />
-            Sea Cargo Operations
+            Sea Cargo
           </h1>
           <p className="text-muted-foreground text-sm lg:text-base mt-1">
-            Manage China-based sea cargo containers and shipping operations • Distinct from Ghana warehouse operations
+            Track and manage all sea freight shipments • All times shown in your
+            local time zone
           </p>
         </div>
         <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
@@ -502,7 +501,7 @@ export default function SeaCargo() {
               </DropdownMenuItem>
             </>
           )}
-          renderBulkBar={(_rows) => (
+          renderBulkBar={(rows) => (
             <div className="flex gap-2">
               <Button size="sm" variant="outline">
                 Update Status
