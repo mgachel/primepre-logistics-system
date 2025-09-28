@@ -2,6 +2,7 @@ from django.db import models
 from django.utils import timezone
 from django.core.validators import MinValueValidator
 from decimal import Decimal
+import uuid
 
 
 class GoodsReceivedChina(models.Model):
@@ -272,3 +273,204 @@ class GoodsReceivedGhana(models.Model):
         with transaction.atomic():
             self.status = "DELIVERED"
             self.save(update_fields=["status", "updated_at"])
+
+
+class GoodsReceivedContainer(models.Model):
+    """Container for organizing goods received items, separate from cargo containers."""
+    
+    CONTAINER_TYPE_CHOICES = (
+        ('air', 'Air Goods'),
+        ('sea', 'Sea Goods'),
+    )
+    
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('ready_for_delivery', 'Ready for Delivery'),
+        ('delivered', 'Delivered'),
+        ('flagged', 'Flagged'),
+    )
+    
+    LOCATION_CHOICES = (
+        ('china', 'China Warehouse'),
+        ('ghana', 'Ghana Warehouse'),
+    )
+    
+    container_id = models.CharField(max_length=100, unique=True, primary_key=True)
+    container_type = models.CharField(max_length=10, choices=CONTAINER_TYPE_CHOICES)
+    location = models.CharField(max_length=20, choices=LOCATION_CHOICES)
+    
+    # Container details
+    arrival_date = models.DateField()
+    expected_delivery_date = models.DateField(null=True, blank=True)
+    actual_delivery_date = models.DateField(null=True, blank=True)
+    
+    # Physical properties (calculated from items)
+    total_weight = models.FloatField(null=True, blank=True, help_text="Total weight calculated from items")
+    total_cbm = models.FloatField(null=True, blank=True, help_text="Total CBM calculated from items")
+    total_items_count = models.IntegerField(default=0, help_text="Total number of items in container")
+    
+    # Rate information
+    selected_rate_id = models.CharField(max_length=50, null=True, blank=True, help_text="Selected rate ID from rates system")
+    rates = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="CBM/Weight rate amount")
+    dollar_rate = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Dollar rate amount")
+    
+    # Status and notes
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    notes = models.TextField(blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"{self.container_id} - {self.get_container_type_display()} - {self.location}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-generate container ID if not provided
+        if not self.container_id:
+            today = timezone.now().strftime('%Y%m%d')
+            location_prefix = 'CHN' if self.location == 'china' else 'GHA'
+            type_prefix = 'AIR' if self.container_type == 'air' else 'SEA'
+            
+            # Find next sequential number
+            existing_count = GoodsReceivedContainer.objects.filter(
+                container_id__startswith=f"GR{location_prefix}{type_prefix}{today}"
+            ).count()
+            
+            self.container_id = f"GR{location_prefix}{type_prefix}{today}{existing_count + 1:04d}"
+            
+        super().save(*args, **kwargs)
+    
+    def update_totals(self):
+        """Update total weight, CBM and item count from related items."""
+        items = self.goods_items.all()
+        
+        self.total_weight = sum(item.weight or 0 for item in items)
+        self.total_cbm = sum(item.cbm or 0 for item in items)
+        self.total_items_count = items.count()
+        
+        self.save(update_fields=['total_weight', 'total_cbm', 'total_items_count'])
+
+
+class GoodsReceivedItem(models.Model):
+    """Individual items within a goods received container, grouped by shipping mark."""
+    
+    STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("READY_FOR_DELIVERY", "Ready for Delivery"),
+        ("FLAGGED", "Flagged"),
+        ("DELIVERED", "Delivered"),
+        ("CANCELLED", "Cancelled"),
+    ]
+    
+    # Core identifiers
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    container = models.ForeignKey(GoodsReceivedContainer, on_delete=models.CASCADE, related_name='goods_items')
+    
+    # Customer and tracking info
+    customer = models.ForeignKey(
+        "users.CustomerUser",
+        on_delete=models.CASCADE,
+        related_name="goods_received_items",
+        help_text="Customer who owns this item",
+        null=True,
+        blank=True,
+    )
+    shipping_mark = models.CharField(
+        max_length=20,
+        help_text="Customer's shipping mark identifier",
+        db_index=True,
+    )
+    supply_tracking = models.CharField(max_length=50, help_text="Supplier's tracking number")
+    
+    # Item details
+    description = models.TextField(blank=True, null=True)
+    quantity = models.PositiveIntegerField(help_text="Number of items/pieces")
+    
+    # Physical properties
+    weight = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Weight in kilograms",
+        null=True, blank=True,
+    )
+    cbm = models.DecimalField(
+        max_digits=10, decimal_places=3,
+        validators=[MinValueValidator(Decimal("0.001"))],
+        help_text="Cubic meters (CBM)",
+        null=True, blank=True,
+    )
+    
+    # Dimensions for auto-calculation
+    length = models.FloatField(null=True, blank=True, help_text="Length in centimeters")
+    breadth = models.FloatField(null=True, blank=True, help_text="Breadth/Width in centimeters")  
+    height = models.FloatField(null=True, blank=True, help_text="Height in centimeters")
+    
+    # Business fields
+    estimated_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    supplier_name = models.CharField(max_length=100, blank=True, null=True)
+    location = models.CharField(max_length=50, blank=True, null=True, help_text="Storage location within warehouse")
+    
+    # Status and dates
+    status = models.CharField(max_length=25, choices=STATUS_CHOICES, default="PENDING")
+    date_received = models.DateTimeField(auto_now_add=True)
+    delivery_date = models.DateField(null=True, blank=True)
+    
+    # Notes
+    notes = models.TextField(blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['shipping_mark']),
+            models.Index(fields=['supply_tracking']),
+            models.Index(fields=['container', 'shipping_mark']),
+        ]
+    
+    def __str__(self):
+        return f"{self.shipping_mark} - {self.supply_tracking} in {self.container.container_id}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-sync shipping mark from customer
+        if self.customer and not self.shipping_mark:
+            self.shipping_mark = self.customer.shipping_mark
+            
+        # Auto-calculate CBM if dimensions are provided
+        if (self.container.container_type == 'sea' and 
+            self.length and self.breadth and self.height and self.quantity):
+            # CBM = (length * breadth * height * quantity) / 1,000,000
+            # Convert all values to Decimal to avoid type mixing
+            length_decimal = Decimal(str(self.length))
+            breadth_decimal = Decimal(str(self.breadth))
+            height_decimal = Decimal(str(self.height))
+            quantity_decimal = Decimal(str(self.quantity))
+            self.cbm = (length_decimal * breadth_decimal * height_decimal * quantity_decimal) / Decimal('1000000')
+            
+        super().save(*args, **kwargs)
+        
+        # Update container totals
+        self.container.update_totals()
+    
+    def delete(self, *args, **kwargs):
+        container = self.container
+        super().delete(*args, **kwargs)
+        # Update container totals after deletion
+        container.update_totals()
+    
+    @property
+    def is_flagged(self):
+        """Returns True if status is FLAGGED."""
+        return self.status == "FLAGGED"
+    
+    @property
+    def days_in_warehouse(self):
+        """Returns the number of days item has been in warehouse."""
+        return (timezone.now() - self.date_received).days

@@ -27,8 +27,8 @@ import ChinaWarehouse from "./pages/ChinaWarehouse";
 import GhanaWarehouse from "./pages/GhanaWarehouse";
 import GoodsReceivedChinaSea from "./pages/GoodsReceivedChinaSea";
 import GoodsReceivedChinaAir from "./pages/GoodsReceivedChinaAir";
-import GhanaSeaContainers from "./pages/GhanaSeaContainers";
-import GhanaAirContainers from "./pages/GhanaAirContainers";
+import GoodsReceivedGhanaSea from "./pages/GoodsReceivedGhanaSea";
+import GoodsReceivedGhanaAir from "./pages/GoodsReceivedGhanaAir";
 import Claims from "./pages/Claims";
 import CustomerShipments from "./pages/CustomerShipments";
 import CustomerClaims from "./pages/CustomerClaims";
@@ -44,6 +44,7 @@ import ProfileSettings from "./pages/ProfileSettings";
 import Notifications from "./pages/Notifications";
 import Support from "./pages/Support";
 import ContainerDetailsPage from "./pages/ContainerDetailsPage";
+import GoodsReceivedContainerDetailsPage from "./pages/GoodsReceivedContainerDetailsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -222,7 +223,7 @@ const App = () => (
                   <RoleBasedRoute
                     adminComponent={
                       <AppLayout>
-                        <GhanaSeaContainers />
+                        <GoodsReceivedGhanaSea />
                       </AppLayout>
                     }
                     customerComponent={<Navigate to="/" replace />}
@@ -237,7 +238,7 @@ const App = () => (
                   <RoleBasedRoute
                     adminComponent={
                       <AppLayout>
-                        <GhanaAirContainers />
+                        <GoodsReceivedGhanaAir />
                       </AppLayout>
                     }
                     customerComponent={<Navigate to="/" replace />}
@@ -462,6 +463,21 @@ const App = () => (
                     adminComponent={
                       <AppLayout>
                         <ContainerDetailsPage />
+                      </AppLayout>
+                    }
+                    customerComponent={<Navigate to="/" replace />}
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/goods-received/:containerId"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={
+                      <AppLayout>
+                        <GoodsReceivedContainerDetailsPage />
                       </AppLayout>
                     }
                     customerComponent={<Navigate to="/" replace />}

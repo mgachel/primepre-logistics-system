@@ -15,7 +15,7 @@ from django.http import HttpResponse
 import io
 import logging
 
-from .models import GoodsReceivedChina, GoodsReceivedGhana
+from .models import GoodsReceivedChina, GoodsReceivedGhana, GoodsReceivedContainer, GoodsReceivedItem
 from users.models import CustomerUser
 from .serializers import (
     GoodsReceivedChinaSerializer,
@@ -25,7 +25,12 @@ from .serializers import (
     GoodsSearchSerializer,
     GoodsStatsSerializer,
     ExcelUploadSerializer,
-    BulkCreateResultSerializer
+    BulkCreateResultSerializer,
+    GoodsReceivedContainerSerializer,
+    GoodsReceivedItemSerializer,
+    CreateGoodsReceivedContainerSerializer,
+    CreateGoodsReceivedItemSerializer,
+    GoodsReceivedContainerStatsSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -919,3 +924,233 @@ class CustomerDashboardView(APIView):
         }
 
         return Response(dashboard)
+
+
+# ==========================================
+# NEW CONTAINER-BASED VIEWS
+# ==========================================
+
+class GoodsReceivedContainerViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing goods received containers (separate from cargo containers)."""
+    
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['container_type', 'location', 'status']
+    search_fields = ['container_id', 'notes']
+    ordering_fields = ['created_at', 'arrival_date', 'status']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        from .models import GoodsReceivedContainer
+        return GoodsReceivedContainer.objects.all().prefetch_related('goods_items')
+    
+    def get_serializer_class(self):
+        from .serializers import (
+            GoodsReceivedContainerSerializer, 
+            CreateGoodsReceivedContainerSerializer,
+            UpdateGoodsReceivedContainerSerializer
+        )
+        if self.action == 'create':
+            return CreateGoodsReceivedContainerSerializer
+        elif self.action in ['update', 'partial_update']:
+            return UpdateGoodsReceivedContainerSerializer
+        return GoodsReceivedContainerSerializer
+    
+    def update(self, request, *args, **kwargs):
+        """Override update to force partial=True for all updates."""
+        kwargs['partial'] = True
+        return super().update(request, *args, **kwargs)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Override partial_update to ensure it uses the update serializer."""
+        kwargs['partial'] = True
+        return super().partial_update(request, *args, **kwargs)
+    
+    @action(detail=True, methods=['get'])
+    def items(self, request, pk=None):
+        """Get all items in a specific container, grouped by shipping mark."""
+        container = self.get_object()
+        from .serializers import GoodsReceivedItemSerializer
+        
+        items = container.goods_items.all().order_by('shipping_mark', 'created_at')
+        
+        # Group by shipping mark
+        grouped_items = {}
+        for item in items:
+            mark = item.shipping_mark or "Unknown"
+            if mark not in grouped_items:
+                grouped_items[mark] = []
+            grouped_items[mark].append(GoodsReceivedItemSerializer(item).data)
+        
+        return Response({
+            'container': self.get_serializer(container).data,
+            'items_by_shipping_mark': grouped_items,
+            'total_items': items.count()
+        })
+    
+    @action(detail=True, methods=['post'])
+    def add_item(self, request, pk=None):
+        """Add a new item to this container."""
+        container = self.get_object()
+        from .serializers import CreateGoodsReceivedItemSerializer
+        
+        data = request.data.copy()
+        data['container'] = container.pk
+        
+        serializer = CreateGoodsReceivedItemSerializer(data=data)
+        if serializer.is_valid():
+            item = serializer.save()
+            from .serializers import GoodsReceivedItemSerializer
+            return Response(GoodsReceivedItemSerializer(item).data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Get statistics for goods received containers."""
+        from .models import GoodsReceivedContainer
+        from django.db.models import Q, Count, Sum
+        
+        containers = GoodsReceivedContainer.objects.all()
+        
+        # Filter by location if specified
+        location = request.query_params.get('location')
+        if location:
+            containers = containers.filter(location=location)
+        
+        # Filter by container type if specified
+        container_type = request.query_params.get('container_type')
+        if container_type:
+            containers = containers.filter(container_type=container_type)
+        
+        stats = {
+            'total_containers': containers.count(),
+            'pending_containers': containers.filter(status='pending').count(),
+            'processing_containers': containers.filter(status='processing').count(),
+            'ready_for_delivery': containers.filter(status='ready_for_delivery').count(),
+            'delivered_containers': containers.filter(status='delivered').count(),
+            'flagged_containers': containers.filter(status='flagged').count(),
+            
+            'total_items': sum(c.total_items_count or 0 for c in containers),
+            'total_weight': sum(c.total_weight or 0 for c in containers),
+            'total_cbm': sum(c.total_cbm or 0 for c in containers),
+            
+            'air_containers': containers.filter(container_type='air').count(),
+            'sea_containers': containers.filter(container_type='sea').count(),
+        }
+        
+        from .serializers import GoodsReceivedContainerStatsSerializer
+        return Response(GoodsReceivedContainerStatsSerializer(stats).data)
+
+
+class GoodsReceivedItemViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing individual goods received items."""
+    
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['container', 'shipping_mark', 'status', 'customer']
+    search_fields = ['shipping_mark', 'supply_tracking', 'description', 'supplier_name']
+    ordering_fields = ['created_at', 'date_received', 'status']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        from .models import GoodsReceivedItem
+        return GoodsReceivedItem.objects.all().select_related('container', 'customer')
+    
+    def get_serializer_class(self):
+        from .serializers import GoodsReceivedItemSerializer, CreateGoodsReceivedItemSerializer
+        if self.action in ['create', 'update', 'partial_update']:
+            return CreateGoodsReceivedItemSerializer
+        return GoodsReceivedItemSerializer
+    
+    @action(detail=True, methods=['post'])
+    def update_status(self, request, pk=None):
+        """Update the status of a specific item."""
+        item = self.get_object()
+        new_status = request.data.get('status')
+        
+        if not new_status:
+            return Response({'error': 'Status is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate status
+        from .models import GoodsReceivedItem
+        valid_statuses = [choice[0] for choice in GoodsReceivedItem.STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            return Response({'error': f'Invalid status. Valid options: {valid_statuses}'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        item.status = new_status
+        item.save()
+        
+        return Response(self.get_serializer(item).data)
+    
+    @action(detail=False, methods=['post'])
+    def bulk_status_update(self, request):
+        """Update status for multiple items."""
+        item_ids = request.data.get('item_ids', [])
+        new_status = request.data.get('status')
+        
+        if not item_ids or not new_status:
+            return Response({'error': 'item_ids and status are required'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        from .models import GoodsReceivedItem
+        valid_statuses = [choice[0] for choice in GoodsReceivedItem.STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            return Response({'error': f'Invalid status. Valid options: {valid_statuses}'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        updated_count = GoodsReceivedItem.objects.filter(id__in=item_ids).update(status=new_status)
+        
+        return Response({
+            'message': f'Updated {updated_count} items',
+            'updated_count': updated_count
+        })
+
+
+# ==========================================
+# LOCATION/TYPE SPECIFIC CONTAINER VIEWSETS
+# ==========================================
+
+class GhanaAirContainerViewSet(GoodsReceivedContainerViewSet):
+    """Ghana Air containers specifically - filters containers by location=ghana and container_type=air"""
+    
+    def get_queryset(self):
+        from .models import GoodsReceivedContainer
+        return GoodsReceivedContainer.objects.filter(
+            location='ghana', 
+            container_type='air'
+        ).prefetch_related('goods_items')
+
+
+class GhanaSeaContainerViewSet(GoodsReceivedContainerViewSet):
+    """Ghana Sea containers specifically - filters containers by location=ghana and container_type=sea"""
+    
+    def get_queryset(self):
+        from .models import GoodsReceivedContainer
+        return GoodsReceivedContainer.objects.filter(
+            location='ghana', 
+            container_type='sea'
+        ).prefetch_related('goods_items')
+
+
+class ChinaAirContainerViewSet(GoodsReceivedContainerViewSet):
+    """China Air containers specifically - filters containers by location=china and container_type=air"""
+    
+    def get_queryset(self):
+        from .models import GoodsReceivedContainer
+        return GoodsReceivedContainer.objects.filter(
+            location='china', 
+            container_type='air'
+        ).prefetch_related('goods_items')
+
+
+class ChinaSeaContainerViewSet(GoodsReceivedContainerViewSet):
+    """China Sea containers specifically - filters containers by location=china and container_type=sea"""
+    
+    def get_queryset(self):
+        from .models import GoodsReceivedContainer
+        return GoodsReceivedContainer.objects.filter(
+            location='china', 
+            container_type='sea'
+        ).prefetch_related('goods_items')

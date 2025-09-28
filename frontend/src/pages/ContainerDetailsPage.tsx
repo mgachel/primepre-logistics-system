@@ -131,6 +131,8 @@ export default function ContainerDetailsPage() {
     }
   };
 
+  // Invoice generation removed - only available for goods received containers
+
   // Cargo items table columns (for expanded view)
   const cargoColumns: Column<BackendCargoItem>[] = [
     {
@@ -165,6 +167,7 @@ export default function ContainerDetailsPage() {
       ),
       align: "right",
     },
+    // Amount column removed - only available for goods received containers
     {
       id: "status",
       header: "Status",
@@ -243,6 +246,8 @@ export default function ContainerDetailsPage() {
         {Object.entries(groupedByShippingMark).map(([mark, items]) => {
           const totalCBM = items.reduce((sum, i) => sum + (i.cbm || 0), 0);
           const totalQty = items.reduce((sum, i) => sum + (i.quantity || 0), 0);
+          
+          // Amount calculations removed - only available for goods received containers
 
           return (
             <div key={mark} className="logistics-card p-4">
@@ -270,6 +275,7 @@ export default function ContainerDetailsPage() {
                         </span>
                       )}
                       <span>Qty: {totalQty}</span>
+                      {/* Amount display and invoice functionality removed - only available for goods received */}
                     </div>
                   </div>
                 </div>

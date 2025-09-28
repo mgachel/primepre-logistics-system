@@ -74,7 +74,7 @@ export function NewGoodsDialog({
     weight: "",
     cbm: "",
     length: "",
-    width: "",
+    breadth: "",
     height: "",
     method_of_shipping: defaultShippingMethod as "AIR" | "SEA",
     notes: "",
@@ -127,9 +127,9 @@ export function NewGoodsDialog({
   const isChinaAir = targetWarehouse === "china" && defaultShippingMethod === "AIR";
 
   // Auto-calculate CBM from dimensions for Ghana Sea
-  const calculateCBM = (length: string, width: string, height: string) => {
+  const calculateCBM = (length: string, breadth: string, height: string) => {
     const l = parseFloat(length) || 0;
-    const w = parseFloat(width) || 0;
+    const b = parseFloat(breadth) || 0;
     const h = parseFloat(height) || 0;
     const q = parseFloat(formData.quantity) || 1;
     const cbm = (l * w * h * q) / 1000000; // Convert cubic cm to cubic meters
@@ -138,11 +138,11 @@ export function NewGoodsDialog({
   };
 
   // Update CBM when dimensions change for Ghana Sea
-  const handleDimensionChange = (field: 'length' | 'width' | 'height', value: string) => {
+  const handleDimensionChange = (field: 'length' | 'breadth' | 'height', value: string) => {
     const newFormData = { ...formData, [field]: value };
     
     if (isGhanaSea) {
-      const cbm = calculateCBM(newFormData.length, newFormData.width, newFormData.height);
+      const cbm = calculateCBM(newFormData.length, newFormData.breadth, newFormData.height);
       newFormData.cbm = cbm.toString();
     }
     
@@ -165,10 +165,10 @@ export function NewGoodsDialog({
     // Validate CBM or dimensions based on cargo type
     if (isGhanaSea) {
       // Ghana Sea requires dimensions
-      if (!formData.length || !formData.width || !formData.height) {
+      if (!formData.length || !formData.breadth || !formData.height) {
         toast({
           title: "Missing dimensions",
-          description: "Length, Width, and Height are required for Ghana Sea cargo.",
+          description: "Length, Breadth, and Height are required for Ghana Sea cargo.",
           variant: "destructive",
         });
         return;
@@ -256,11 +256,11 @@ export function NewGoodsDialog({
       <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            Add {formData.method_of_shipping} Cargo to{" "}
+            Add Goods Received ({formData.method_of_shipping}) - {" "}
             {targetWarehouse.charAt(0).toUpperCase() + targetWarehouse.slice(1)} Warehouse
           </DialogTitle>
           <DialogDescription>
-            Enter the goods details received at the warehouse
+            Enter the individual goods received details for warehouse inventory
           </DialogDescription>
         </DialogHeader>
 
@@ -395,13 +395,13 @@ export function NewGoodsDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="width">Width (m)</Label>
+                  <Label htmlFor="breadth">Breadth (m)</Label>
                   <Input
-                    id="width"
+                    id="breadth"
                     type="number"
                     step="0.01"
-                    value={formData.width}
-                    onChange={(e) => handleDimensionChange('width', e.target.value)}
+                    value={formData.breadth}
+                    onChange={(e) => handleDimensionChange('breadth', e.target.value)}
                     placeholder="1.2"
                     required
                   />

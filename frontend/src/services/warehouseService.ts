@@ -8,9 +8,14 @@ export interface WarehouseItem {
   supply_tracking: string;
 
   // Physical properties
-  cbm: number;
+  cbm?: number | null;
   weight?: number | null;
   quantity: number;
+  
+  // Dimension fields for sea cargo (Ghana specific)
+  length?: number | null;
+  breadth?: number | null;
+  height?: number | null;
 
   // Descriptive
   description?: string | null;
@@ -47,7 +52,7 @@ export interface WarehouseItem {
 export interface CreateWarehouseItemRequest {
   shipping_mark: string;
   supply_tracking: string;
-  cbm: number;
+  cbm?: number;
   quantity: number;
   weight?: number;
   description?: string;
@@ -56,6 +61,10 @@ export interface CreateWarehouseItemRequest {
   supplier_name?: string;
   estimated_value?: number;
   notes?: string;
+  // Dimension fields for auto-calculating CBM (Ghana sea cargo)
+  length?: number;
+  breadth?: number;
+  height?: number;
 }
 
 export interface UpdateWarehouseItemRequest {
@@ -70,6 +79,10 @@ export interface UpdateWarehouseItemRequest {
   supplier_name?: string;
   estimated_value?: number;
   notes?: string;
+  // Dimension fields for auto-calculating CBM (Ghana sea cargo)
+  length?: number;
+  breadth?: number;
+  height?: number;
   status?:
     | "PENDING"
     | "READY_FOR_SHIPPING"

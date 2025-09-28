@@ -206,12 +206,12 @@ export default function GoodsReceivedChinaAir() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">
-            China Warehouse - Air Cargo
+                <div>
+          <h1 className="text-xl lg:text-2xl font-semibold text-foreground">
+            China Goods Received - Air Shipments
           </h1>
-          <p className="text-muted-foreground">
-            Manage air cargo goods received in China warehouse
+          <p className="text-muted-foreground text-sm lg:text-base">
+            Manage individual goods received via air shipments in China warehouse
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -228,7 +228,7 @@ export default function GoodsReceivedChinaAir() {
             className="flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
-            Add Air Cargo
+            Add Goods Received
           </Button>
         </div>
       </div>
