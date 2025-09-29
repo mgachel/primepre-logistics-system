@@ -942,7 +942,22 @@ class GoodsReceivedContainerViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         from .models import GoodsReceivedContainer
-        return GoodsReceivedContainer.objects.all().prefetch_related('goods_items')
+        from django.db.models import Q
+        
+        queryset = GoodsReceivedContainer.objects.all().prefetch_related('goods_items')
+        
+        # Custom search functionality - search in both container fields and item fields
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(container_id__icontains=search) |
+                Q(notes__icontains=search) |
+                Q(goods_items__shipping_mark__icontains=search) |
+                Q(goods_items__supply_tracking__icontains=search) |
+                Q(goods_items__description__icontains=search)
+            ).distinct()
+        
+        return queryset
     
     def get_serializer_class(self):
         from .serializers import (
@@ -1116,22 +1131,26 @@ class GhanaAirContainerViewSet(GoodsReceivedContainerViewSet):
     """Ghana Air containers specifically - filters containers by location=ghana and container_type=air"""
     
     def get_queryset(self):
-        from .models import GoodsReceivedContainer
-        return GoodsReceivedContainer.objects.filter(
+        # Get the base queryset with search functionality from parent
+        queryset = super().get_queryset()
+        # Apply Ghana Air specific filters
+        return queryset.filter(
             location='ghana', 
             container_type='air'
-        ).prefetch_related('goods_items')
+        )
 
 
 class GhanaSeaContainerViewSet(GoodsReceivedContainerViewSet):
     """Ghana Sea containers specifically - filters containers by location=ghana and container_type=sea"""
     
     def get_queryset(self):
-        from .models import GoodsReceivedContainer
-        return GoodsReceivedContainer.objects.filter(
+        # Get the base queryset with search functionality from parent
+        queryset = super().get_queryset()
+        # Apply Ghana Sea specific filters
+        return queryset.filter(
             location='ghana', 
             container_type='sea'
-        ).prefetch_related('goods_items')
+        )
 
 
 class ChinaAirContainerViewSet(GoodsReceivedContainerViewSet):

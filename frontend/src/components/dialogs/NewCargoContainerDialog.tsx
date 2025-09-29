@@ -31,7 +31,6 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
     route: location === 'ghana' ? "Ghana Warehouse" : "China to Ghana",
     cbm: "",
     rates: "",
-    dollar_rate: "",
     location: location,
     warehouse_type: warehouse_type,
     status: "pending" as 'pending' | 'in_transit' | 'delivered' | 'demurrage',
@@ -90,7 +89,6 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
         unloading_date: form.unloading_date || null,
         route: form.route.trim(),
         rates: form.rates ? Number(form.rates) : null,
-        dollar_rate: form.dollar_rate ? Number(form.dollar_rate) : null,
         stay_days: 0,
         delay_days: 0,
         status: form.status,
@@ -109,7 +107,6 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
         route: location === 'ghana' ? "Ghana Warehouse" : "China to Ghana", 
         cbm: "", 
         rates: "", 
-        dollar_rate: "",
         location: location,
         warehouse_type: warehouse_type, 
         status: "pending" 
@@ -231,30 +228,6 @@ export function NewCargoContainerDialog({ open, onOpenChange, defaultType = 'sea
                       .filter(rate => rate.amount != null && rate.amount.toString() !== "")
                       .map((rate) => (
                         <SelectItem key={rate.id} value={rate.amount.toString()}>
-                          {rate.title} - ${rate.amount} ({rate.route})
-                        </SelectItem>
-                      ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dollar_rate">Dollar Rate (USD)</Label>
-              <Select value={form.dollar_rate} onValueChange={(v)=> setForm(f=> ({...f, dollar_rate: v}))}>
-                <SelectTrigger>
-                  <SelectValue placeholder={loadingRates ? "Loading rates..." : "Select a dollar rate"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {loadingRates ? (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading rates...</div>
-                  ) : rates.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">No rates available</div>
-                  ) : (
-                    rates
-                      .filter(rate => rate.amount != null && rate.amount.toString() !== "")
-                      .map((rate) => (
-                        <SelectItem key={`dollar_${rate.id}`} value={rate.amount.toString()}>
                           {rate.title} - ${rate.amount} ({rate.route})
                         </SelectItem>
                       ))

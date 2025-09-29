@@ -65,6 +65,11 @@ export interface CreateWarehouseItemRequest {
   length?: number;
   breadth?: number;
   height?: number;
+  // Container fields (only used for Ghana)
+  container_id?: string;
+  container_type?: string;
+  arrival_date?: string;
+  status?: string;
 }
 
 export interface UpdateWarehouseItemRequest {
@@ -296,22 +301,30 @@ export const warehouseService = {
   async createChinaWarehouseItem(
     data: CreateWarehouseItemRequest
   ): Promise<ApiResponse<WarehouseItem>> {
-    // Use specific endpoint based on shipping method like Ghana
-    const endpoint = data.method_of_shipping === 'SEA' 
-      ? "/api/goods/china/sea_cargo/" 
-      : "/api/goods/china/air_cargo/";
-    return apiClient.post<WarehouseItem>(endpoint, data);
+    // China uses individual items, not container architecture
+    // Use the legacy individual item endpoint for China
+    return apiClient.post<WarehouseItem>("/api/goods/china/", data);
   },
 
   // Create new Ghana warehouse item (admin/staff only)
   async createGhanaWarehouseItem(
     data: CreateWarehouseItemRequest
   ): Promise<ApiResponse<WarehouseItem>> {
-    // Use specific endpoint based on shipping method
+    // Ghana uses container architecture - add required fields
+    const payload = {
+      ...data,
+      container_id: data.container_id || `GHA-${Date.now()}`, // Generate container ID if not provided
+      container_type: data.method_of_shipping?.toLowerCase() || 'sea',
+      location: 'ghana',
+      arrival_date: data.arrival_date || new Date().toISOString().split('T')[0], // Today's date as default
+      status: 'pending', // Use valid status instead of "READY_FOR_SHIPPING"
+    };
+    
+    // Use container-based endpoint for Ghana based on shipping method
     const endpoint = data.method_of_shipping === 'SEA' 
       ? "/api/goods/ghana/sea_cargo/" 
       : "/api/goods/ghana/air_cargo/";
-    return apiClient.post<WarehouseItem>(endpoint, data);
+    return apiClient.post<WarehouseItem>(endpoint, payload);
   },
 
   // Update China warehouse item (admin/staff only)
@@ -435,12 +448,18 @@ export const warehouseService = {
     }>
   ): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
     const params = new URLSearchParams();
+    // Add method_of_shipping filter for China Sea
+    params.append('method_of_shipping', 'SEA');
     Object.entries(filters || {}).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== "")
-        params.append(k, String(v));
+      if (v !== undefined && v !== null && v !== "") {
+        // Map 'search' to 'q' for backend compatibility
+        const paramName = k === 'search' ? 'q' : k;
+        params.append(paramName, String(v));
+      }
     });
+    // Use legacy individual item endpoint for China
     return apiClient.get<PaginatedResponse<WarehouseItem>>(
-      `/api/goods/china/sea_cargo/?${params.toString()}`
+      `/api/goods/china/?${params.toString()}`
     );
   },
 
@@ -465,12 +484,18 @@ export const warehouseService = {
     }>
   ): Promise<ApiResponse<PaginatedResponse<WarehouseItem>>> {
     const params = new URLSearchParams();
+    // Add method_of_shipping filter for China Air
+    params.append('method_of_shipping', 'AIR');
     Object.entries(filters || {}).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== "")
-        params.append(k, String(v));
+      if (v !== undefined && v !== null && v !== "") {
+        // Map 'search' to 'q' for backend compatibility
+        const paramName = k === 'search' ? 'q' : k;
+        params.append(paramName, String(v));
+      }
     });
+    // Use legacy individual item endpoint for China
     return apiClient.get<PaginatedResponse<WarehouseItem>>(
-      `/api/goods/china/air_cargo/?${params.toString()}`
+      `/api/goods/china/?${params.toString()}`
     );
   },
 

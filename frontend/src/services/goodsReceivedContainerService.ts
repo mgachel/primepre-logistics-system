@@ -292,11 +292,14 @@ class GoodsReceivedContainerService {
       page_size: number;
     }>
   ): Promise<ApiResponse<PaginatedResponse<GoodsReceivedContainer>>> {
-    return this.getContainers({
-      ...filters,
-      location: "ghana",
-      container_type: "air"
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "")
+        params.append(k, String(v));
     });
+    return apiClient.get<PaginatedResponse<GoodsReceivedContainer>>(
+      `/api/goods/ghana/air_cargo/?${params.toString()}`
+    );
   }
 
   // Ghana Sea Containers
@@ -309,11 +312,14 @@ class GoodsReceivedContainerService {
       page_size: number;
     }>
   ): Promise<ApiResponse<PaginatedResponse<GoodsReceivedContainer>>> {
-    return this.getContainers({
-      ...filters,
-      location: "ghana",
-      container_type: "sea"
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "")
+        params.append(k, String(v));
     });
+    return apiClient.get<PaginatedResponse<GoodsReceivedContainer>>(
+      `/api/goods/ghana/sea_cargo/?${params.toString()}`
+    );
   }
 
   // China Air Containers
