@@ -16,7 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Package, Calendar, Eye, Truck, Ship, Plane, ChevronDown, ChevronUp } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { cargoService, SearchResult } from "@/services/cargoService";
-import { goodsReceivedService, GoodsReceivedGhana } from "@/services/goodsReceivedService";
+import { GoodsReceivedGhana } from "@/services/goodsReceivedService";
+import { goodsReceivedContainerService } from "@/services/goodsReceivedContainerService";
+import { warehouseService } from "@/services/warehouseService";
 import { formatDate } from "@/lib/date";
 
 // Component for GoodsReceived items
@@ -102,43 +104,86 @@ export function GlobalSearch() {
       }
       setLoading(true);
       try {
-        // Search both goods received (Ghana and China) and cargo simultaneously
-        const [ghanaGoodsRes, chinaGoodsRes, cargoRes] = await Promise.all([
-          goodsReceivedService.getGhanaGoods({
-            search: q,
-          }),
-          goodsReceivedService.getChinaGoods({
-            search: q,
-          }),
+        // Search both goods received (Ghana containers + China items) and cargo simultaneously
+        const [ghanaSeaRes, ghanaAirRes, chinaSeaRes, chinaAirRes, cargoRes] = await Promise.all([
+          // Ghana uses container architecture
+          goodsReceivedContainerService.getGhanaSeaContainers({ search: q, page_size: 100 }),
+          goodsReceivedContainerService.getGhanaAirContainers({ search: q, page_size: 100 }),
+          // China uses individual items
+          warehouseService.getChinaSeaGoods({ search: q, page_size: 100 }),
+          warehouseService.getChinaAirGoods({ search: q, page_size: 100 }),
           cargoService.searchShipments(q)
         ]);
 
         if (!ignore) {
-          console.log('Ghana Goods Received API Response:', ghanaGoodsRes);
-          console.log('China Goods Received API Response:', chinaGoodsRes);
-          console.log('Cargo API Response:', cargoRes);
+          console.log('🚢 GHANA SEA CONTAINERS API RESPONSE:', ghanaSeaRes);
+          console.log('✈️ GHANA AIR CONTAINERS API RESPONSE:', ghanaAirRes);
+          console.log('🇨🇳 CHINA SEA ITEMS API RESPONSE:', chinaSeaRes);
+          console.log('🇨🇳 CHINA AIR ITEMS API RESPONSE:', chinaAirRes);
+          console.log('📦 CARGO API RESPONSE:', cargoRes);
           
-          // Combine Ghana and China goods received results
-          const ghanaArray = Array.isArray(ghanaGoodsRes) ? ghanaGoodsRes : 
-                            ghanaGoodsRes?.results ? ghanaGoodsRes.results : 
-                            ghanaGoodsRes?.data?.results ? ghanaGoodsRes.data.results : [];
+          // Extract items from Ghana containers
+          const ghanaSeaContainers = ghanaSeaRes?.data?.results || [];
+          const ghanaAirContainers = ghanaAirRes?.data?.results || [];
           
-          const chinaArray = Array.isArray(chinaGoodsRes) ? chinaGoodsRes : 
-                            chinaGoodsRes?.results ? chinaGoodsRes.results : 
-                            chinaGoodsRes?.data?.results ? chinaGoodsRes.data.results : [];
+          console.log('🚢 GHANA SEA CONTAINERS COUNT:', ghanaSeaContainers.length);
+          console.log('✈️ GHANA AIR CONTAINERS COUNT:', ghanaAirContainers.length);
+          console.log('First Ghana Sea Container:', ghanaSeaContainers[0]);
+          console.log('First Ghana Air Container:', ghanaAirContainers[0]);
           
-          // Add warehouse location to each item
-          const ghanaWithLocation = ghanaArray.map((item: GoodsReceivedGhana) => ({
+          // Log the full structure of the first container to see the exact format
+          if (ghanaSeaContainers.length > 0) {
+            console.log('Full Ghana Sea Container structure:', JSON.stringify(ghanaSeaContainers[0], null, 2));
+          }
+          if (ghanaAirContainers.length > 0) {
+            console.log('Full Ghana Air Container structure:', JSON.stringify(ghanaAirContainers[0], null, 2));
+          }
+          
+          const ghanaSeaItems = ghanaSeaContainers.reduce((items: any[], container: any) => {
+            console.log('Processing Ghana Sea container:', container);
+            console.log('Container goods_items:', container.goods_items);
+            if (container.goods_items && Array.isArray(container.goods_items)) {
+              const itemsWithLocation = container.goods_items.map((item: any) => ({
+                ...item,
+                warehouseLocation: 'Ghana',
+                method_of_shipping: 'SEA'
+              }));
+              console.log('Added items from Ghana Sea container:', itemsWithLocation);
+              return [...items, ...itemsWithLocation];
+            }
+            return items;
+          }, []);
+          
+          const ghanaAirItems = ghanaAirContainers.reduce((items: any[], container: any) => {
+            console.log('Processing Ghana Air container:', container);
+            console.log('Container goods_items:', container.goods_items);
+            if (container.goods_items && Array.isArray(container.goods_items)) {
+              const itemsWithLocation = container.goods_items.map((item: any) => ({
+                ...item,
+                warehouseLocation: 'Ghana', 
+                method_of_shipping: 'AIR'
+              }));
+              console.log('Added items from Ghana Air container:', itemsWithLocation);
+              return [...items, ...itemsWithLocation];
+            }
+            return items;
+          }, []);
+          
+          // Extract China items directly
+          const chinaSeaItems = (chinaSeaRes?.data?.results || []).map((item: any) => ({
             ...item,
-            warehouseLocation: 'Ghana'
+            warehouseLocation: 'China',
+            method_of_shipping: 'SEA'
           }));
           
-          const chinaWithLocation = chinaArray.map((item: GoodsReceivedGhana) => ({
+          const chinaAirItems = (chinaAirRes?.data?.results || []).map((item: any) => ({
             ...item,
-            warehouseLocation: 'China'
+            warehouseLocation: 'China',
+            method_of_shipping: 'AIR'
           }));
           
-          const allGoodsArray = [...ghanaWithLocation, ...chinaWithLocation];
+          // Combine all goods received items
+          const allGoodsArray = [...ghanaSeaItems, ...ghanaAirItems, ...chinaSeaItems, ...chinaAirItems];
           
           if (allGoodsArray.length > 0) {
             console.log('First goods received item structure:', allGoodsArray[0]);
@@ -148,22 +193,28 @@ export function GlobalSearch() {
 
           // Handle goods received results
           
-          // Filter goods received by search query (only match tracking numbers)
-          const filteredGoods = allGoodsArray.filter((item: GoodsReceivedGhana & { warehouseLocation: string }) => {
+          // Filter goods received by search query (match tracking numbers, shipping marks, and descriptions)
+          const filteredGoods = allGoodsArray.filter((item: any) => {
             const searchLower = q.toLowerCase();
-            // Only search in supply_tracking (tracking number) field
+            // Search in supply_tracking, shipping_mark, and description fields
             const supplyTrackingMatch = item.supply_tracking?.toLowerCase().includes(searchLower);
+            const shippingMarkMatch = item.shipping_mark?.toLowerCase().includes(searchLower);
+            const descriptionMatch = item.description?.toLowerCase().includes(searchLower);
             
             console.log('Filtering goods received item:', {
               item: item,
               searchTerm: searchLower,
               supply_tracking: item.supply_tracking,
+              shipping_mark: item.shipping_mark,
+              description: item.description,
               warehouseLocation: item.warehouseLocation,
               supplyTrackingMatch,
-              willInclude: supplyTrackingMatch
+              shippingMarkMatch,
+              descriptionMatch,
+              willInclude: supplyTrackingMatch || shippingMarkMatch || descriptionMatch
             });
             
-            return supplyTrackingMatch;
+            return supplyTrackingMatch || shippingMarkMatch || descriptionMatch;
           });
 
           // Filter cargo results to only show items that match the search query

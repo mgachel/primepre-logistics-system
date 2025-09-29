@@ -312,22 +312,19 @@ export default function GoodsReceivedContainerDetailsPage() {
             <tbody>
               ${items.map(item => {
                 const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
-                // TODO: Get actual rate from rates system using selected_rate_id
-                // For now using a default rate of 2.5 (you should replace this with actual rate lookup)
-                const rateField = 2.5; // Default CBM/Weight rate
-                console.log('Invoice calculation:', { dollarRate, rateField, selected_rate_id: container?.selected_rate_id });
+                const cbmRate = parseFloat(container?.rates?.toString() || '0');
                 let amount = 0;
                 let measurementValue = 0;
                 
                 if (container?.container_type === 'air') {
-                  // Air cargo: Weight * Dollar Rate * Rate Field
+                  // Ghana Air: Weight * Dollar Rate * Rate
                   const weight = parseFloat(item.weight?.toString() || '0') || 0;
-                  amount = weight * dollarRate * rateField;
+                  amount = weight * dollarRate * cbmRate;
                   measurementValue = weight;
                 } else {
-                  // Sea cargo: CBM * Dollar Rate * CBM Rate Field
+                  // Ghana Sea: CBM * Dollar Rate * CBM Rate
                   const cbm = parseFloat(item.cbm?.toString() || '0') || 0;
-                  amount = cbm * dollarRate * rateField;
+                  amount = cbm * dollarRate * cbmRate;
                   measurementValue = cbm;
                 }
                 
@@ -429,27 +426,23 @@ export default function GoodsReceivedContainerDetailsPage() {
             align: "right" as const,
           },
         ]),
-    // Amount column - show only if dollar_rate is set
-    ...(container?.dollar_rate ? [{
+    // Amount column - show only if dollar_rate and rates are set
+    ...(container?.dollar_rate && container?.rates ? [{
       id: "amount",
       header: "Amount (₵)",
       accessor: (item: GoodsReceivedItem) => {
         const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
+        const cbmRate = parseFloat(container?.rates?.toString() || '0');
         let amount = 0;
         
-        // TODO: Get actual rate from rates system using selected_rate_id
-        // For now using a default rate of 2.5 (you should replace this with actual rate lookup)
-        const rateField = 2.5; // Default CBM/Weight rate
-        console.log('Item calculation:', { dollarRate, rateField, selected_rate_id: container?.selected_rate_id });
-        
         if (container?.container_type === 'air') {
-          // Air: Weight * Dollar Rate * Rate Field
+          // Ghana Air: Weight * Dollar Rate * Rate
           const weight = parseFloat(item.weight?.toString() || '0') || 0;
-          amount = weight * dollarRate * rateField;
+          amount = weight * dollarRate * cbmRate;
         } else {
-          // Sea: CBM * Dollar Rate * CBM Rate Field
+          // Ghana Sea: CBM * Dollar Rate * CBM Rate
           const cbm = parseFloat(item.cbm?.toString() || '0') || 0;
-          amount = cbm * dollarRate * rateField;
+          amount = cbm * dollarRate * cbmRate;
         }
         
         return (
@@ -523,8 +516,10 @@ export default function GoodsReceivedContainerDetailsPage() {
       {/* Container Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="logistics-card p-4">
-          <div className="text-sm text-muted-foreground">Status</div>
-          <StatusBadge status={mapStatus(container.status)} />
+          <div className="text-sm text-muted-foreground">Rate</div>
+          <div className="font-medium">
+            {container.rates ? `₵${container.rates}` : "Not set"}
+          </div>
         </div>
         <div className="logistics-card p-4">
           <div className="text-sm text-muted-foreground">Offloading Date</div>
@@ -566,20 +561,19 @@ export default function GoodsReceivedContainerDetailsPage() {
           const totalQty = items.reduce((sum, i) => sum + (parseInt(i.quantity?.toString() || '0') || 0), 0);
           
           // Calculate total amount
-          const totalAmount = container?.dollar_rate
+          const totalAmount = container?.dollar_rate && container?.rates
             ? items.reduce((sum, i) => {
                 const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
-                // Get the rate field value (this would come from the rates system)
-                const rateField = parseFloat(container?.selected_rate_id?.toString() || '1'); // Default to 1 if no rate
+                const cbmRate = parseFloat(container?.rates?.toString() || '0');
                 
                 if (container?.container_type === 'sea') {
-                  // Sea: CBM * Dollar Rate * CBM Rate Field
+                  // Ghana Sea: CBM * Dollar Rate * CBM Rate
                   const cbm = parseFloat(i.cbm?.toString() || '0') || 0;
-                  return sum + (cbm * dollarRate * rateField);
+                  return sum + (cbm * dollarRate * cbmRate);
                 } else if (container?.container_type === 'air') {
-                  // Air: Weight * Dollar Rate * Rate Field
+                  // Ghana Air: Weight * Dollar Rate * Rate
                   const weight = parseFloat(i.weight?.toString() || '0') || 0;
-                  return sum + (weight * dollarRate * rateField);
+                  return sum + (weight * dollarRate * cbmRate);
                 }
                 
                 return sum;

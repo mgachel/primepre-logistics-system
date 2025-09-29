@@ -29,19 +29,17 @@ import {
   Loader2,
 } from "lucide-react";
 import {
-  goodsReceivedService,
-  GoodsReceivedGhana,
-  GoodsFilters,
-  GoodsStats,
-} from "@/services/goodsReceivedService";
+  goodsReceivedContainerService,
+  GoodsReceivedItem,
+} from "@/services/goodsReceivedContainerService";
 
 export default function CustomerShipments() {
   const { user } = useAuthStore();
   const { toast } = useToast();
 
   // State management
-  const [shipments, setShipments] = useState<GoodsReceivedGhana[]>([]);
-  const [stats, setStats] = useState<GoodsStats | null>(null);
+  const [shipments, setShipments] = useState<(GoodsReceivedItem & { containerType: 'air' | 'sea' })[]>([]);
+  const [stats, setStats] = useState<{ total: number; pending: number; ready_for_delivery: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [pagination, setPagination] = useState({
@@ -52,7 +50,7 @@ export default function CustomerShipments() {
   });
 
   // Filters state
-  const [filters, setFilters] = useState<GoodsFilters>({
+  const [filters, setFilters] = useState({
     search: "",
     page: 1,
     page_size: 20,
@@ -68,31 +66,57 @@ export default function CustomerShipments() {
   };
 
   // Fetch shipments
-  const fetchShipments = async (newFilters?: GoodsFilters, showLoading = true) => {
+  const fetchShipments = async (newFilters?: typeof filters, showLoading = true) => {
     if (showLoading) setLoading(true);
     else setSearchLoading(true);
 
     try {
       const currentFilters = newFilters || filters;
       
-      // For initial load, get shipments for customer
-      const response = await goodsReceivedService.getGhanaGoods(currentFilters);
+      // Get both Ghana Sea and Air containers for the customer
+      const [seaResponse, airResponse] = await Promise.all([
+        goodsReceivedContainerService.getGhanaSeaContainers({
+          search: currentFilters.search || undefined,
+          page: currentFilters.page,
+          page_size: currentFilters.page_size,
+        }),
+        goodsReceivedContainerService.getGhanaAirContainers({
+          search: currentFilters.search || undefined,
+          page: currentFilters.page,
+          page_size: currentFilters.page_size,
+        }),
+      ]);
 
-      if (response.success && response.data) {
-        setShipments(response.data.results || []);
-        setPagination({
-          count: response.data.count || 0,
-          next: response.data.next,
-          previous: response.data.previous,
-          current_page: currentFilters.page || 1,
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: response.message || "Failed to fetch shipments",
-          variant: "destructive",
-        });
-      }
+      // Combine containers from both responses
+      const allContainers = [
+        ...(seaResponse.data?.results || []),
+        ...(airResponse.data?.results || []),
+      ];
+      
+      // Flatten all items from all containers and add container type info
+      const allItems = allContainers.reduce((items, container) => {
+        if (container.goods_items) {
+          // Add container type to each item for display purposes
+          const itemsWithType = container.goods_items.map(item => ({
+            ...item,
+            containerType: container.container_type, // Add this for easy access
+          }));
+          return [...items, ...itemsWithType];
+        }
+        return items;
+      }, [] as (GoodsReceivedItem & { containerType: 'air' | 'sea' })[]);
+
+      setShipments(allItems);
+      
+      // Use sea response pagination for now (could be improved)
+      const totalCount = (seaResponse.data?.count || 0) + (airResponse.data?.count || 0);
+      setPagination({
+        count: totalCount,
+        next: seaResponse.data?.next || airResponse.data?.next,
+        previous: seaResponse.data?.previous || airResponse.data?.previous,
+        current_page: currentFilters.page || 1,
+      });
+      
     } catch (error) {
       console.error("Error fetching shipments:", error);
       toast({
@@ -109,12 +133,14 @@ export default function CustomerShipments() {
   // Fetch statistics
   const fetchStats = async () => {
     try {
-      const response = await goodsReceivedService.getGoodsStats();
-      if (response.success) {
-        setStats(response.data);
-      }
+      // Calculate stats from current shipments
+      const total = shipments.length;
+      const pending = shipments.filter(item => item.status === 'pending').length;
+      const ready_for_delivery = shipments.filter(item => item.status === 'in_transit' || item.status === 'delivered').length;
+      
+      setStats({ total, pending, ready_for_delivery });
     } catch (error) {
-      console.error("Error fetching stats:", error);
+      console.error("Error calculating stats:", error);
     }
   };
 
@@ -146,8 +172,16 @@ export default function CustomerShipments() {
   // Initial load
   useEffect(() => {
     fetchShipments();
-    fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  // Update stats when shipments change
+  useEffect(() => {
+    if (shipments.length > 0) {
+      fetchStats();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shipments]);
 
   if (!user || user.user_role !== 'CUSTOMER') {
     return (
@@ -293,7 +327,9 @@ export default function CustomerShipments() {
                     <TableRow>
                       <TableHead>Shipping Mark</TableHead>
                       <TableHead>Tracking ID</TableHead>
+                      <TableHead>Type</TableHead>
                       <TableHead>Quantity</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Received On</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -304,7 +340,29 @@ export default function CustomerShipments() {
                           {shipment.shipping_mark}
                         </TableCell>
                         <TableCell>{shipment.supply_tracking}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            shipment.containerType === 'sea' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {shipment.containerType === 'sea' ? 'Sea Cargo' : 'Air Cargo'}
+                          </span>
+                        </TableCell>
                         <TableCell>{shipment.quantity}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded text-xs capitalize ${
+                            shipment.status === 'pending' 
+                              ? 'bg-yellow-100 text-yellow-800' 
+                              : shipment.status === 'in_transit'
+                              ? 'bg-blue-100 text-blue-800'
+                              : shipment.status === 'delivered'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {shipment.status}
+                          </span>
+                        </TableCell>
                         <TableCell>{formatDate(shipment.date_received)}</TableCell>
                       </TableRow>
                     ))}
@@ -313,7 +371,7 @@ export default function CustomerShipments() {
               </div>
 
               {/* Pagination */}
-              {pagination.count > filters.page_size! && (
+              {pagination.count > (filters.page_size || 20) && (
                 <div className="flex items-center justify-between mt-4">
                   <div className="text-sm text-gray-600">
                     Showing {((pagination.current_page - 1) * (filters.page_size || 20)) + 1} to{" "}
