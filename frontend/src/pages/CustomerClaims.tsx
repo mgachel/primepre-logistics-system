@@ -13,7 +13,9 @@ import {
   Loader2,
   RefreshCw,
   Image as ImageIcon,
-  Camera
+  Camera,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,11 +47,15 @@ export default function CustomerClaims() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingClaim, setEditingClaim] = useState<Claim | null>(null);
 
   // Form state for creating new claim
   const [newClaim, setNewClaim] = useState<CreateClaimData>({
@@ -141,6 +147,97 @@ export default function CustomerClaims() {
       }
     } finally {
       setCreating(false);
+    }
+  };
+
+  // Edit claim
+  const handleEditClaim = (claim: Claim) => {
+    setEditingClaim(claim);
+    setNewClaim({
+      tracking_id: claim.tracking_id,
+      item_name: claim.item_name,
+      item_description: claim.item_description,
+      image_1: undefined, // Reset images - they can upload new ones if needed
+      image_2: undefined,
+      image_3: undefined,
+    });
+    setShowEditModal(true);
+  };
+
+  // Update claim
+  const handleUpdateClaim = async () => {
+    if (!editingClaim || !newClaim.tracking_id || !newClaim.item_name || !newClaim.item_description) {
+      setError('Please fill in all required fields.');
+      return;
+    }
+
+    try {
+      setEditing(true);
+      setError(null);
+      setSuccess(null);
+
+      const response = await claimsService.updateClaim(editingClaim.id, newClaim);
+      
+      if (response.success && response.data) {
+        // Update the claim in the list
+        setClaims(prev => prev.map(claim => 
+          claim.id === editingClaim.id ? response.data : claim
+        ));
+        
+        // Reset form and close modal
+        setNewClaim({
+          tracking_id: '',
+          item_name: '',
+          item_description: '',
+          image_1: undefined,
+          image_2: undefined,
+          image_3: undefined,
+        });
+        setEditingClaim(null);
+        setShowEditModal(false);
+        setSuccess('Claim updated successfully!');
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError('Failed to update claim. Please try again.');
+      }
+    } catch (err: unknown) {
+      console.error('Failed to update claim:', err);
+      setError('Failed to update claim. Please try again.');
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  // Delete claim
+  const handleDeleteClaim = async (claimId: number) => {
+    if (!confirm('Are you sure you want to delete this claim? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setDeleting(claimId);
+      setError(null);
+      setSuccess(null);
+
+      const response = await claimsService.deleteClaim(claimId);
+      
+      if (response.success) {
+        // Remove the claim from the list
+        setClaims(prev => prev.filter(claim => claim.id !== claimId));
+        setSuccess('Claim deleted successfully!');
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError('Failed to delete claim. Please try again.');
+      }
+    } catch (err: unknown) {
+      console.error('Failed to delete claim:', err);
+      setError('Failed to delete claim. Please try again.');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -312,6 +409,119 @@ export default function CustomerClaims() {
                     </>
                   ) : (
                     'Submit Claim'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Claim Modal */}
+        <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Claim</DialogTitle>
+              <DialogDescription>
+                Update your claim details. You can only edit pending claims.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-tracking-id">Tracking ID *</Label>
+                <Input
+                  id="edit-tracking-id"
+                  value={newClaim.tracking_id}
+                  onChange={(e) => setNewClaim(prev => ({ ...prev, tracking_id: e.target.value }))}
+                  placeholder="Enter tracking ID or number"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-item-name">Item Name *</Label>
+                <Input
+                  id="edit-item-name"
+                  value={newClaim.item_name}
+                  onChange={(e) => setNewClaim(prev => ({ ...prev, item_name: e.target.value }))}
+                  placeholder="Enter item name"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-description">Description *</Label>
+                <Textarea
+                  id="edit-description"
+                  value={newClaim.item_description}
+                  onChange={(e) => setNewClaim(prev => ({ ...prev, item_description: e.target.value }))}
+                  placeholder="Describe the issue with your item in detail..."
+                  className="min-h-[100px]"
+                  required
+                />
+              </div>
+
+              {/* Image Upload Section */}
+              <div className="space-y-3">
+                <Label>Supporting Images (Optional - Upload new images to replace existing ones)</Label>
+                <div className="space-y-3">
+                  <FileUpload
+                    id="edit-image-1"
+                    label="Upload Image 1"
+                    accept="image/*"
+                    onChange={(file) => setNewClaim(prev => ({ ...prev, image_1: file }))}
+                    icon={<Camera className="h-5 w-5" />}
+                  />
+                  <FileUpload
+                    id="edit-image-2"
+                    label="Upload Image 2"
+                    accept="image/*"
+                    onChange={(file) => setNewClaim(prev => ({ ...prev, image_2: file }))}
+                    icon={<Camera className="h-5 w-5" />}
+                  />
+                  <FileUpload
+                    id="edit-image-3"
+                    label="Upload Image 3"
+                    accept="image/*"
+                    onChange={(file) => setNewClaim(prev => ({ ...prev, image_3: file }))}
+                    icon={<Camera className="h-5 w-5" />}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingClaim(null);
+                    setNewClaim({
+                      tracking_id: '',
+                      item_name: '',
+                      item_description: '',
+                      image_1: undefined,
+                      image_2: undefined,
+                      image_3: undefined,
+                    });
+                  }}
+                  disabled={editing}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateClaim}
+                  disabled={editing || !newClaim.tracking_id || !newClaim.item_name || !newClaim.item_description}
+                  className="flex-1"
+                >
+                  {editing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Claim'
                   )}
                 </Button>
               </div>
@@ -498,6 +708,34 @@ export default function CustomerClaims() {
                     <div className="mt-3 p-3 bg-muted rounded-lg">
                       <h4 className="font-medium text-sm mb-1">Admin Notes</h4>
                       <p className="text-sm">{claim.admin_notes}</p>
+                    </div>
+                  )}
+
+                  {/* Action Buttons - Only show for pending claims */}
+                  {(claim.status === 'PENDING') && (
+                    <div className="flex justify-end gap-2 pt-3 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditClaim(claim)}
+                        disabled={editing || deleting !== null}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteClaim(claim.id)}
+                        disabled={editing || deleting !== null}
+                      >
+                        {deleting === claim.id ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-1" />
+                        )}
+                        {deleting === claim.id ? 'Deleting...' : 'Delete'}
+                      </Button>
                     </div>
                   )}
                 </div>

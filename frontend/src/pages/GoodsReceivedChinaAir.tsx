@@ -9,6 +9,9 @@ import {
   Flag,
   Plane,
   Trash2,
+  Edit,
+  Save,
+  X,
 } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +50,9 @@ export default function GoodsReceivedChinaAir() {
   >("all");
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<WarehouseItem[]>([]);
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editingData, setEditingData] = useState<Partial<WarehouseItem>>({});
+  const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [stats, setStats] = useState<AdminWarehouseStatistics | null>(null);
@@ -95,6 +101,57 @@ export default function GoodsReceivedChinaAir() {
     } catch (error) {
       console.error("Failed to fetch China air statistics:", error);
     }
+  };
+
+  // Edit functions
+  const handleEditStart = (item: WarehouseItem) => {
+    setEditingItem(item.id);
+    setEditingData({
+      shipping_mark: item.shipping_mark,
+      supply_tracking: item.supply_tracking,
+      description: item.description,
+      quantity: item.quantity,
+      weight: item.weight,
+      status: item.status,
+    });
+  };
+
+  const handleEditCancel = () => {
+    setEditingItem(null);
+    setEditingData({});
+  };
+
+  const handleEditSave = async () => {
+    if (!editingItem || !editingData) return;
+
+    try {
+      setSaving(true);
+      await warehouseService.updateChinaWarehouseItem(editingItem, editingData);
+      await fetchData(1, true);
+      await fetchStats();
+      setEditingItem(null);
+      setEditingData({});
+      toast({
+        title: "Success",
+        description: "Item updated successfully",
+      });
+    } catch (error) {
+      console.error('Failed to update item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update item",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFieldChange = (field: keyof WarehouseItem, value: any) => {
+    setEditingData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   useEffect(() => {
@@ -150,45 +207,107 @@ export default function GoodsReceivedChinaAir() {
     {
       id: "shipping_mark",
       header: "Shipping Mark",
-      accessor: (item) => item.shipping_mark || "-",
+      accessor: (item) => 
+        editingItem === item.id ? (
+          <Input
+            value={editingData.shipping_mark || ""}
+            onChange={(e) => handleFieldChange("shipping_mark", e.target.value)}
+            className="w-full"
+          />
+        ) : (
+          item.shipping_mark || "-"
+        ),
       sort: (a, b) => (a.shipping_mark || "").localeCompare(b.shipping_mark || ""),
       sticky: true,
     },
     {
       id: "supply_tracking",
       header: "Supply Tracking",
-      accessor: (item) => (
-        <code className="text-xs bg-muted px-2 py-1 rounded">
-          {item.supply_tracking}
-        </code>
-      ),
+      accessor: (item) =>
+        editingItem === item.id ? (
+          <Input
+            value={editingData.supply_tracking || ""}
+            onChange={(e) => handleFieldChange("supply_tracking", e.target.value)}
+            className="w-full"
+          />
+        ) : (
+          <code className="text-xs bg-muted px-2 py-1 rounded">
+            {item.supply_tracking}
+          </code>
+        ),
       sort: (a, b) => a.supply_tracking.localeCompare(b.supply_tracking),
     },
     {
       id: "description",
       header: "Description",
-      accessor: (item) => (
-        <div className="max-w-xs truncate" title={item.description || ""}>
-          {item.description || "-"}
-        </div>
-      ),
+      accessor: (item) =>
+        editingItem === item.id ? (
+          <Input
+            value={editingData.description || ""}
+            onChange={(e) => handleFieldChange("description", e.target.value)}
+            className="w-full"
+          />
+        ) : (
+          <div className="max-w-xs truncate" title={item.description || ""}>
+            {item.description || "-"}
+          </div>
+        ),
     },
     {
       id: "quantity",
       header: "Quantity",
-      accessor: (item) => item.quantity?.toString() || "-",
+      accessor: (item) =>
+        editingItem === item.id ? (
+          <Input
+            type="number"
+            value={editingData.quantity || ""}
+            onChange={(e) => handleFieldChange("quantity", parseInt(e.target.value) || 0)}
+            className="w-full"
+          />
+        ) : (
+          item.quantity?.toString() || "-"
+        ),
       sort: (a, b) => (a.quantity || 0) - (b.quantity || 0),
     },
     {
       id: "weight",
       header: "Weight (kg)",
-      accessor: (item) => item.weight?.toString() || "-",
+      accessor: (item) =>
+        editingItem === item.id ? (
+          <Input
+            type="number"
+            step="0.01"
+            value={editingData.weight || ""}
+            onChange={(e) => handleFieldChange("weight", parseFloat(e.target.value) || 0)}
+            className="w-full"
+          />
+        ) : (
+          item.weight?.toString() || "-"
+        ),
       sort: (a, b) => (a.weight || 0) - (b.weight || 0),
     },
     {
       id: "status",
       header: "Status",
-      accessor: (item) => <StatusBadge status={item.status} />,
+      accessor: (item) =>
+        editingItem === item.id ? (
+          <Select
+            value={editingData.status || item.status}
+            onValueChange={(value) => handleFieldChange("status", value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="CLEARED">Cleared</SelectItem>
+              <SelectItem value="READY_FOR_DELIVERY">Ready for Delivery</SelectItem>
+              <SelectItem value="DELIVERED">Delivered</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : (
+          <StatusBadge status={item.status} />
+        ),
       sort: (a, b) => a.status.localeCompare(b.status),
     },
     {
@@ -199,6 +318,40 @@ export default function GoodsReceivedChinaAir() {
       sort: (a, b) =>
         new Date(a.date_received).getTime() -
         new Date(b.date_received).getTime(),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      accessor: (item) =>
+        editingItem === item.id ? (
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={handleEditSave}
+              disabled={saving}
+              className="h-8 w-8 p-0"
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleEditCancel}
+              className="h-8 w-8 p-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleEditStart(item)}
+            className="h-8 w-8 p-0"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+        ),
     },
   ];
 

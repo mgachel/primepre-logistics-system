@@ -40,44 +40,34 @@ export function EditCargoContainerDialog({
   const [loadingRates, setLoadingRates] = useState(false);
 
   // Local form state seeded from container
+  const [containerId, setContainerId] = useState("");
+  const [cargoType, setCargoType] = useState<'sea' | 'air'>('sea');
   const [route, setRoute] = useState("");
   const [loadDate, setLoadDate] = useState("");
   const [eta, setEta] = useState("");
-  const [unloadingDate, setUnloadingDate] = useState<string | "">("");
-  const [weight, setWeight] = useState<string | "">("");
-  const [cbm, setCbm] = useState<string | "">("");
   const [rates, setRates] = useState<string | "">("");
-  const [dollarRate, setDollarRate] = useState<string | "">("");
-  const [stayDays, setStayDays] = useState<string | "">("");
-  const [delayDays, setDelayDays] = useState<string | "">("");
   const [status, setStatus] =
     useState<BackendCargoContainer["status"]>("pending");
 
   useEffect(() => {
     if (!open || !container) return;
+    setContainerId(container.container_id || "");
+    setCargoType(container.cargo_type || 'sea');
     setRoute(container.route || "");
     setLoadDate(container.load_date || "");
     setEta(container.eta || "");
-    setUnloadingDate(container.unloading_date || "");
-    setWeight(container.cargo_type === 'air' && container.weight != null ? String(container.weight) : "");
-    setCbm(""); // CBM not used for any cargo type
     setRates(container.rates != null ? String(container.rates) : "");
-    setDollarRate(container.dollar_rate != null ? String(container.dollar_rate) : "");
-    setStayDays(container.stay_days != null ? String(container.stay_days) : "");
-    setDelayDays(
-      container.delay_days != null ? String(container.delay_days) : ""
-    );
     setStatus(container.status);
   }, [open, container]);
 
-  // Load available rates when dialog opens and container type is known
+  // Load available rates when dialog opens and cargo type changes
   useEffect(() => {
-    if (!open || !container?.cargo_type) return;
+    if (!open || !cargoType) return;
     
     const loadRates = async () => {
       setLoadingRates(true);
       try {
-        const rateType = container.cargo_type === 'sea' ? 'SEA_RATES' : 'AIR_RATES';
+        const rateType = cargoType === 'sea' ? 'SEA_RATES' : 'AIR_RATES';
         const response = await ratesService.getRates({ rate_type: rateType });
         if (response.success && response.data?.results) {
           setAvailableRates(response.data.results);
@@ -91,11 +81,11 @@ export function EditCargoContainerDialog({
     };
 
     loadRates();
-  }, [open, container?.cargo_type]);
+  }, [open, cargoType]);
 
   const canSave = useMemo(
-    () => !!container && !!route && !!loadDate && !!eta,
-    [container, route, loadDate, eta]
+    () => !!container && !!containerId && !!cargoType && !!route && !!loadDate && !!eta,
+    [container, containerId, cargoType, route, loadDate, eta]
   );
 
   const handleClose = (next: boolean) => {
@@ -109,20 +99,17 @@ export function EditCargoContainerDialog({
     try {
       const payload: Parameters<typeof cargoService.updateBackendContainer>[1] =
         {
+          container_id: containerId.trim(),
+          cargo_type: cargoType,
           route: route.trim(),
           load_date: loadDate,
           eta,
-          unloading_date: unloadingDate || undefined,
-          ...(container.cargo_type === 'air' && { weight: weight === "" ? null : parseFloat(weight) }),
           rates: rates === "" ? null : parseFloat(rates),
-          dollar_rate: dollarRate === "" ? null : parseFloat(dollarRate),
-          stay_days: stayDays === "" ? 0 : parseInt(stayDays, 10),
-          delay_days: delayDays === "" ? 0 : parseInt(delayDays, 10),
           status,
         };
 
       const res = await cargoService.updateBackendContainer(
-        container.container_id,
+        container.container_id, // Use original container ID as identifier
         payload
       );
       if (res.data) {
@@ -151,7 +138,7 @@ export function EditCargoContainerDialog({
         <DialogHeader>
           <DialogTitle>Edit Cargo Container</DialogTitle>
           <DialogDescription>
-            Update all editable details for container {container?.container_id}{" "}
+            Update all details for container {container?.container_id}{" "}
             ({container?.cargo_type})
           </DialogDescription>
         </DialogHeader>
@@ -159,12 +146,26 @@ export function EditCargoContainerDialog({
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label>Container ID</Label>
-              <Input value={container?.container_id || ""} disabled />
+              <Label htmlFor="container_id">Container/AWB ID</Label>
+              <Input 
+                id="container_id"
+                value={containerId} 
+                onChange={(e) => setContainerId(e.target.value)}
+                placeholder="e.g., MSKU7823456 or 000-12345678"
+                required
+              />
             </div>
             <div>
-              <Label>Cargo Type</Label>
-              <Input value={container?.cargo_type || ""} disabled />
+              <Label>Shipment Type</Label>
+              <Select value={cargoType} onValueChange={(v) => setCargoType(v as 'sea' | 'air')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select shipment type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sea">Sea Cargo</SelectItem>
+                  <SelectItem value="air">Air Cargo</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="md:col-span-2">
               <Label>Route</Label>
@@ -191,26 +192,7 @@ export function EditCargoContainerDialog({
               />
             </div>
             <div>
-              <Label>Unloading Date</Label>
-              <Input
-                type="date"
-                value={unloadingDate || ""}
-                onChange={(e) => setUnloadingDate(e.target.value)}
-              />
-            </div>
-            {container?.cargo_type === 'air' && (
-              <div>
-                <Label>Weight (kg)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
-                />
-              </div>
-            )}
-            <div>
-              <Label>Rates</Label>
+              <Label>Rates (USD)</Label>
               <Select value={rates} onValueChange={setRates} disabled={loadingRates}>
                 <SelectTrigger>
                   <SelectValue 
@@ -227,53 +209,12 @@ export function EditCargoContainerDialog({
                       .filter(rate => rate.amount != null && rate.amount.toString() !== "")
                       .map((rate) => (
                         <SelectItem key={rate.id} value={String(rate.amount)}>
-                          {rate.name} - ${rate.amount}
-                        </SelectItem>
-                      ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Dollar Rate</Label>
-              <Select value={dollarRate} onValueChange={setDollarRate} disabled={loadingRates}>
-                <SelectTrigger>
-                  <SelectValue 
-                    placeholder={loadingRates ? "Loading rates..." : "Select a dollar rate"}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {loadingRates ? (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading rates...</div>
-                  ) : availableRates.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">No rates available</div>
-                  ) : (
-                    availableRates
-                      .filter(rate => rate.amount != null && rate.amount.toString() !== "")
-                      .map((rate) => (
-                        <SelectItem key={`dollar_${rate.id}`} value={String(rate.amount)}>
                           {rate.title} - ${rate.amount} ({rate.route})
                         </SelectItem>
                       ))
                   )}
                 </SelectContent>
               </Select>
-            </div>
-            <div>
-              <Label>Stay Days</Label>
-              <Input
-                type="number"
-                value={stayDays}
-                onChange={(e) => setStayDays(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Delay Days</Label>
-              <Input
-                type="number"
-                value={delayDays}
-                onChange={(e) => setDelayDays(e.target.value)}
-              />
             </div>
             <div>
               <Label>Status</Label>

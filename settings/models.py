@@ -297,7 +297,7 @@ class ShippingMarkFormattingRule(models.Model):
     # Format Configuration
     format_template = models.CharField(
         max_length=100,
-        default="PM{prefix}{name}",
+        default="PM{prefix} {name}",
         help_text="Format template: {prefix}, {name}, {counter}"
     )
     
@@ -325,12 +325,44 @@ class ShippingMarkFormattingRule(models.Model):
     def __str__(self):
         return f"{self.rule_name} ({self.country}, {self.region}) → PM{self.prefix_value}..."
     
-    def generate_shipping_mark(self, client_name, counter=None):
+    def generate_shipping_mark(self, client_name, counter=None, first_name=None, last_name=None):
         """Generate shipping mark using this rule"""
+        # If we have both first and last names, generate random combination
+        if first_name and last_name:
+            import random
+            import hashlib
+            
+            # Create deterministic seed from names for consistency
+            seed = f"{first_name}{last_name}"
+            random.seed(hashlib.md5(seed.encode()).hexdigest())
+            
+            # Generate different combinations
+            combinations = []
+            if len(first_name) >= 2 and len(last_name) >= 2:
+                combinations = [
+                    f"{first_name[:2]}{last_name[:2]}",  # JODO
+                    f"{first_name[:3]}{last_name[:1]}",  # JOHD
+                    f"{first_name[:1]}{last_name[:3]}",  # JDOE
+                    f"{first_name[:2]}{last_name[:1]}",  # JOD
+                    f"{first_name[:1]}{last_name[:2]}",  # JDO
+                ]
+            elif first_name and last_name:
+                combinations = [
+                    f"{first_name[:min(3, len(first_name))]}{last_name[:min(3, len(last_name))]}",
+                    f"{first_name[:1]}{last_name}",
+                    first_name,
+                ]
+            else:
+                combinations = [first_name] if first_name else ['USER']
+            
+            # Remove duplicates and pick random one
+            combinations = list(set(combinations))
+            client_name = random.choice(combinations) if combinations else first_name
+        
         # Clean client name (remove spaces, special chars, convert to uppercase)
         clean_name = ''.join(c.upper() for c in client_name if c.isalnum())[:6]
         
-        # Apply format template
+        # Apply format template with space between prefix and name
         shipping_mark = self.format_template.format(
             prefix=self.prefix_value,
             name=clean_name,
@@ -383,7 +415,7 @@ class ShippingMarkFormatSettings(models.Model):
     # Default Format
     default_format_template = models.CharField(
         max_length=100,
-        default="PM{name}",
+        default="PM {name}",
         help_text="Default format when no rules match"
     )
     
@@ -453,7 +485,36 @@ class ShippingMarkFormatSettings(models.Model):
         if self.use_nickname_if_available and nickname:
             name_to_use = nickname
         else:
-            name_to_use = first_name
+            # Generate random combination of first and last names
+            import random
+            import hashlib
+            
+            # Create deterministic seed from names for consistency
+            seed = f"{first_name}{last_name}"
+            random.seed(hashlib.md5(seed.encode()).hexdigest())
+            
+            # Generate different combinations
+            combinations = []
+            if len(first_name) >= 2 and len(last_name) >= 2:
+                combinations = [
+                    f"{first_name[:2]}{last_name[:2]}",  # JODO
+                    f"{first_name[:3]}{last_name[:1]}",  # JOHD
+                    f"{first_name[:1]}{last_name[:3]}",  # JDOE
+                    f"{first_name[:2]}{last_name[:1]}",  # JOD
+                    f"{first_name[:1]}{last_name[:2]}",  # JDO
+                ]
+            elif first_name and last_name:
+                combinations = [
+                    f"{first_name[:min(3, len(first_name))]}{last_name[:min(3, len(last_name))]}",
+                    f"{first_name[:1]}{last_name}",
+                    first_name,
+                ]
+            else:
+                combinations = [first_name] if first_name else ['USER']
+            
+            # Remove duplicates and pick random one
+            combinations = list(set(combinations))
+            name_to_use = random.choice(combinations) if combinations else first_name
         
         # Clean name
         clean_name = ''.join(c.upper() for c in name_to_use if c.isalnum())

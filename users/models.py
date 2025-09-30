@@ -226,36 +226,57 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
     def generate_shipping_mark_suggestions(cls, first_name, last_name, company_name=None):
         """
         Generate 5 unique shipping mark suggestions with PM prefix.
-        Derived from user's details (name, company) ensuring uniqueness.
+        Uses random combinations of first and last names with spaces.
         """
         suggestions = []
         first_name = first_name.strip().upper()
         last_name = last_name.strip().upper()
         
-        # Base patterns derived from name
-        base_patterns = [
-            f"PM-{first_name[:2]}{last_name[:2]}",      # PM-JODO (John Doe)
-            f"PM-{first_name[:1]}{last_name[:3]}",      # PM-JDOE
-            f"PM-{first_name[:3]}{last_name[:1]}",      # PM-JOHD
-            f"PM-{first_name[:2]}{last_name[:1]}",      # PM-JOD
-            f"PM-{first_name[:1]}{last_name[:2]}",      # PM-JDO
-        ]
+        # Generate random combinations of first and last names
+        import random
+        import hashlib
         
-        # Add company-based patterns if provided
+        # Create deterministic seed from names for consistency
+        seed = f"{first_name}{last_name}"
+        random.seed(hashlib.md5(seed.encode()).hexdigest())
+        
+        # Generate different name combinations
+        name_combinations = []
+        if len(first_name) >= 2 and len(last_name) >= 2:
+            name_combinations = [
+                f"{first_name[:2]}{last_name[:2]}",      # JODO (John Doe)
+                f"{first_name[:3]}{last_name[:1]}",      # JOHD
+                f"{first_name[:1]}{last_name[:3]}",      # JDOE
+                f"{first_name[:2]}{last_name[:1]}",      # JOD
+                f"{first_name[:1]}{last_name[:2]}",      # JDO
+            ]
+        elif first_name and last_name:
+            name_combinations = [
+                f"{first_name[:min(3, len(first_name))]}{last_name[:min(3, len(last_name))]}",
+                f"{first_name[:1]}{last_name}",
+                first_name,
+            ]
+        else:
+            name_combinations = [first_name] if first_name else ['USER']
+        
+        # Base patterns with spaces between prefix and name
+        base_patterns = [f"PM {combo}" for combo in name_combinations]
+        
+        # Add company-based patterns if provided (with space)
         if company_name and company_name.strip():
             company_clean = ''.join(c.upper() for c in company_name if c.isalnum())
             if len(company_clean) >= 2:
                 base_patterns.extend([
-                    f"PM-{company_clean[:3]}",              # PM-ABC (ABC Corp)
-                    f"PM-{first_name[:1]}{company_clean[:2]}", # PM-JAB (John @ ABC)
-                    f"PM-{company_clean[:2]}{first_name[:1]}", # PM-ABJ
+                    f"PM {company_clean[:3]}",              # PM ABC (ABC Corp)
+                    f"PM {first_name[:1]}{company_clean[:2]}", # PM JAB (John @ ABC)
+                    f"PM {company_clean[:2]}{first_name[:1]}", # PM ABJ
                 ])
         
-        # Additional creative patterns
+        # Additional creative patterns with spaces
         initials = f"{first_name[:1]}{last_name[:1]}"
         base_patterns.extend([
-            f"PM-{initials}",                           # PM-JD
-            f"PM-{initials}{len(first_name + last_name):02d}", # PM-JD07
+            f"PM {initials}",                           # PM JD
+            f"PM {initials}{len(first_name + last_name):02d}", # PM JD07
         ])
         
         # Generate unique suggestions from patterns
@@ -284,7 +305,7 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
             hash_obj = hashlib.md5(seed.encode())
             random_suffix = hash_obj.hexdigest()[:3].upper()
             
-            candidate = f"PM-{random_suffix}"
+            candidate = f"PM {random_suffix}"
             if not cls.objects.filter(shipping_mark=candidate).exists() and candidate not in suggestions:
                 suggestions.append(candidate)
         
@@ -322,7 +343,7 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
             # Add more creative patterns if needed
             if len(suggestions) < 5:
                 for i in range(attempt * 5, (attempt + 1) * 5):
-                    candidate = f"PM-{secrets.token_hex(2).upper()}{i:02d}"
+                    candidate = f"PM {secrets.token_hex(2).upper()}{i:02d}"
                     if (candidate not in exclude_taken and 
                         candidate not in suggestions and 
                         not cls.objects.filter(shipping_mark=candidate).exists()):
@@ -376,8 +397,8 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
         if len(clean_name) < 2:
             clean_name = clean_name.ljust(2, 'X')  # Pad with X if name too short
         
-        # Generate base shipping mark
-        base_mark = f"{default_prefix}{regional_prefix}{clean_name}"
+        # Generate base shipping mark with space between prefix and regional prefix + name
+        base_mark = f"{default_prefix}{regional_prefix} {clean_name}"
         
         # Ensure uniqueness by adding counter if needed
         shipping_mark = base_mark

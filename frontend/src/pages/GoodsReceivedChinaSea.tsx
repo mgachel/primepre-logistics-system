@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Ship, Package, Search, Filter, RefreshCcw, Plus, CheckCircle2, Flag, Trash2 } from 'lucide-react';
+import { Ship, Package, Search, Filter, RefreshCcw, Plus, CheckCircle2, Flag, Trash2, Edit, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -18,7 +18,6 @@ import { DataTable, Column } from '@/components/data-table/DataTable';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { warehouseService, WarehouseItem } from '@/services/warehouseService';
 import { formatDate } from '@/lib/date';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 interface SeaCargoStats {
@@ -37,39 +36,35 @@ export default function GoodsReceivedChinaSea() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [stats, setStats] = useState<SeaCargoStats | null>(null);
   const [showNewGoodsDialog, setShowNewGoodsDialog] = useState(false);
-  const { isCustomer } = useAuth();
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editingData, setEditingData] = useState<Partial<WarehouseItem>>({});
+  const [saving, setSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      console.log('🔍 Loading China Sea data, isCustomer:', isCustomer());
+      console.log('🔍 Loading China Sea data');
       
-      // Use different service methods based on user role
-      const response = isCustomer() 
-        ? await warehouseService.getChinaWarehouseItems()
-        : await warehouseService.getAdminChinaItems({});
+      // Use dedicated China Sea service method
+      const response = await warehouseService.getChinaSeaGoods({
+        search: searchTerm || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      });
       
       console.log('📦 Warehouse response:', response);
       
       if (response.success && response.data) {
-        console.log('📊 Total items:', response.data.results.length);
-        
-        // Filter for SEA shipments only
-        const seaItems = response.data.results.filter(
-          item => item.method_of_shipping === 'SEA'
-        );
-        
-        console.log('🚢 SEA items:', seaItems.length);
+        console.log('📊 Total SEA items:', response.data.results.length);
         
         // Debug: Log first item structure
-        if (seaItems.length > 0) {
-          console.log('🔍 First SEA item structure:', seaItems[0]);
-          console.log('🔍 Available properties:', Object.keys(seaItems[0]));
+        if (response.data.results.length > 0) {
+          console.log('🔍 First SEA item structure:', response.data.results[0]);
+          console.log('🔍 Available properties:', Object.keys(response.data.results[0]));
         }
         
-        setItems(seaItems);
+        setItems(response.data.results);
       } else {
         setError('Failed to load warehouse data');
       }
@@ -79,26 +74,72 @@ export default function GoodsReceivedChinaSea() {
     } finally {
       setLoading(false);
     }
-  }, [isCustomer]);
+  }, [searchTerm, statusFilter]);
+
+  // Edit functions
+  const handleEditStart = (item: WarehouseItem) => {
+    setEditingItem(item.id);
+    setEditingData({
+      shipping_mark: item.shipping_mark,
+      supply_tracking: item.supply_tracking,
+      description: item.description,
+      quantity: item.quantity,
+      cbm: item.cbm,
+      status: item.status,
+    });
+  };
+
+  const handleEditCancel = () => {
+    setEditingItem(null);
+    setEditingData({});
+  };
+
+  const handleEditSave = async () => {
+    if (!editingItem || !editingData) return;
+
+    try {
+      setSaving(true);
+      await warehouseService.updateChinaWarehouseItem(editingItem, editingData);
+      await loadData();
+      await fetchStats();
+      setEditingItem(null);
+      setEditingData({});
+      toast({
+        title: "Success",
+        description: "Item updated successfully",
+      });
+    } catch (error) {
+      console.error('Failed to update item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update item",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFieldChange = (field: keyof WarehouseItem, value: any) => {
+    setEditingData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   // Fetch statistics for SEA cargo
   const fetchStats = useCallback(async () => {
     try {
-      // For now, calculate stats from loaded items since we don't have a specific SEA stats endpoint
-      const response = isCustomer() 
-        ? await warehouseService.getChinaWarehouseItems()
-        : await warehouseService.getAdminChinaItems({});
+      // Use dedicated China Sea statistics endpoint
+      const response = await warehouseService.getChinaSeaStatistics();
       
       if (response.success && response.data) {
-        const seaItems = response.data.results.filter(
-          item => item.method_of_shipping === 'SEA'
-        );
-        
+        // Map AdminWarehouseStatistics to SeaCargoStats format
         const stats: SeaCargoStats = {
-          total_count: seaItems.length,
-          pending_count: seaItems.filter(item => item.status === 'PENDING').length,
-          ready_for_shipping_count: seaItems.filter(item => item.status === 'READY_FOR_SHIPPING').length,
-          flagged_count: seaItems.filter(item => item.status === 'FLAGGED').length,
+          total_count: response.data.total_count,
+          pending_count: response.data.pending_count,
+          ready_for_shipping_count: response.data.ready_for_shipping_count || 0,
+          flagged_count: response.data.flagged_count || 0,
         };
         
         setStats(stats);
@@ -106,7 +147,7 @@ export default function GoodsReceivedChinaSea() {
     } catch (error) {
       console.error('Failed to fetch China sea statistics:', error);
     }
-  }, [isCustomer]);
+  }, []);
 
   const handleStatusUpdate = async (item: WarehouseItem, newStatus: string) => {
     try {
@@ -212,36 +253,114 @@ export default function GoodsReceivedChinaSea() {
     {
       id: 'shipping_mark',
       header: 'Shipping Mark',
-      accessor: (r) => <span className="font-medium">{r.shipping_mark}</span>,
+      accessor: (r) => {
+        const isEditing = editingItem === r._raw.id;
+        return isEditing ? (
+          <Input
+            value={editingData.shipping_mark || ''}
+            onChange={(e) => handleFieldChange('shipping_mark', e.target.value)}
+            className="h-8 text-sm"
+          />
+        ) : (
+          <span className="font-medium">{r.shipping_mark}</span>
+        );
+      },
       sort: (a, b) => a.shipping_mark.localeCompare(b.shipping_mark),
     },
     {
       id: 'supply_tracking',
       header: 'Tracking ID',
-      accessor: (r) => <span className="text-sm">{r.supply_tracking}</span>,
+      accessor: (r) => {
+        const isEditing = editingItem === r._raw.id;
+        return isEditing ? (
+          <Input
+            value={editingData.supply_tracking || ''}
+            onChange={(e) => handleFieldChange('supply_tracking', e.target.value)}
+            className="h-8 text-sm"
+          />
+        ) : (
+          <span className="text-sm">{r.supply_tracking}</span>
+        );
+      },
       sort: (a, b) => a.supply_tracking.localeCompare(b.supply_tracking),
     },
     {
       id: 'description',
       header: 'Description',
-      accessor: (r) => <span className="text-sm">{r.description}</span>,
+      accessor: (r) => {
+        const isEditing = editingItem === r._raw.id;
+        return isEditing ? (
+          <Input
+            value={editingData.description || ''}
+            onChange={(e) => handleFieldChange('description', e.target.value)}
+            className="h-8 text-sm"
+          />
+        ) : (
+          <span className="text-sm">{r.description}</span>
+        );
+      },
     },
     {
       id: 'quantity',
       header: 'Quantity',
-      accessor: (r) => <span className="text-sm">{r.quantity}</span>,
+      accessor: (r) => {
+        const isEditing = editingItem === r._raw.id;
+        return isEditing ? (
+          <Input
+            type="number"
+            value={editingData.quantity || ''}
+            onChange={(e) => handleFieldChange('quantity', parseInt(e.target.value))}
+            className="h-8 text-sm w-20"
+          />
+        ) : (
+          <span className="text-sm">{r.quantity}</span>
+        );
+      },
       sort: (a, b) => a.quantity - b.quantity,
     },
     {
       id: 'cbm',
       header: 'CBM',
-      accessor: (r) => <span className="text-sm">{Number(r.cbm).toFixed(2)}</span>,
+      accessor: (r) => {
+        const isEditing = editingItem === r._raw.id;
+        return isEditing ? (
+          <Input
+            type="number"
+            step="0.01"
+            value={editingData.cbm || ''}
+            onChange={(e) => handleFieldChange('cbm', parseFloat(e.target.value))}
+            className="h-8 text-sm w-20"
+          />
+        ) : (
+          <span className="text-sm">{Number(r.cbm).toFixed(2)}</span>
+        );
+      },
       sort: (a, b) => Number(a.cbm) - Number(b.cbm),
     },
     {
       id: 'status',
       header: 'Status',
-      accessor: (r) => <StatusBadge status={r.status} />,
+      accessor: (r) => {
+        const isEditing = editingItem === r._raw.id;
+        return isEditing ? (
+          <Select
+            value={editingData.status || r.status}
+            onValueChange={(value) => handleFieldChange('status', value)}
+          >
+            <SelectTrigger className="h-8 text-sm w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="READY_FOR_SHIPPING">Ready for Shipping</SelectItem>
+              <SelectItem value="FLAGGED">Flagged</SelectItem>
+              <SelectItem value="DELIVERED">Delivered</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : (
+          <StatusBadge status={r.status} />
+        );
+      },
       sort: (a, b) => a.status.localeCompare(b.status),
     },
     {
@@ -259,6 +378,49 @@ export default function GoodsReceivedChinaSea() {
       header: 'Days in Warehouse',
       accessor: (r) => <span className="text-sm">{r.days_in_warehouse}</span>,
       sort: (a, b) => a.days_in_warehouse - b.days_in_warehouse,
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      accessor: (r) => {
+        const isEditing = editingItem === r._raw.id;
+        return (
+          <div className="flex gap-1">
+            {isEditing ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleEditSave}
+                  disabled={saving}
+                  className="h-8 w-8 p-0"
+                >
+                  <Save className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleEditCancel}
+                  disabled={saving}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleEditStart(r._raw)}
+                className="h-8 w-8 p-0"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        );
+      },
+      width: "100px",
     },
   ];
 
@@ -496,7 +658,7 @@ export default function GoodsReceivedChinaSea() {
       <NewGoodsDialog
         open={showNewGoodsDialog}
         onOpenChange={setShowNewGoodsDialog}
-        warehouse="china"
+        warehouseType="china"
         defaultShippingMethod="SEA"
         onSuccess={() => {
           const refreshData = async () => {

@@ -670,6 +670,9 @@ class GoodsReceivedChinaViewSet(BaseGoodsReceivedViewSet):
     warehouse_type = 'china'
     template_filename = 'china_goods_template.xlsx'
     template_sheet_name = 'China Goods Template'
+    
+    # Add method_of_shipping to filterset_fields to enable proper filtering
+    filterset_fields = ['status', 'shipping_mark', 'supply_tracking', 'method_of_shipping']
 
     def get_template_data(self):
         current_date = timezone.now().strftime('%d/%m/%Y')

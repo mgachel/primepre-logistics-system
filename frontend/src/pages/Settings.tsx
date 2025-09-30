@@ -473,14 +473,35 @@ export default function Settings() {
   };
 
   const handleAddRegionalRule = () => {
-    const maxPrefixValue = regionalRules.length > 0 ? Math.max(...regionalRules.map(r => parseInt(r.prefix_value))) : 0;
+    // Generate next prefix value (can be character or number)
+    const existingPrefixes = regionalRules.map(r => r.prefix_value);
+    let nextPrefix = '1';
+    
+    // Try numbers first
+    for (let i = 1; i <= 99; i++) {
+      if (!existingPrefixes.includes(i.toString())) {
+        nextPrefix = i.toString();
+        break;
+      }
+    }
+    
+    // If all numbers are taken, use letters
+    if (existingPrefixes.includes(nextPrefix)) {
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      for (let i = 0; i < letters.length; i++) {
+        if (!existingPrefixes.includes(letters[i])) {
+          nextPrefix = letters[i];
+          break;
+        }
+      }
+    }
     setEditingRegionalRule({
       id: 0,
       rule_name: "",
       description: "",
       country: "Ghana",
       region: "",
-      prefix_value: (maxPrefixValue + 1).toString(),
+      prefix_value: nextPrefix,
       format_template: "PM{prefix}{name}",
       priority: 1,
       is_active: true,
@@ -1018,13 +1039,16 @@ export default function Settings() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-medium mb-2">Default Format</h4>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Shipping Mark = <strong>Prefix</strong> + <strong>Client Name/Nickname</strong>
+                  Shipping Mark = <strong>Prefix</strong> + <strong>Space</strong> + <strong>Random Name Combination</strong>
                 </p>
                 <div className="bg-white rounded border p-3">
                   <code className="text-sm">
-                    Default: <span className="text-blue-600">{shippingMarkRules.defaultPrefix}</span> + <span className="text-green-600">ACHEL</span> = <strong>{shippingMarkRules.defaultPrefix}ACHEL</strong>
+                    Example: <span className="text-blue-600">{shippingMarkRules.defaultPrefix}</span><span className="text-gray-400"> </span><span className="text-green-600">JODO</span> = <strong>{shippingMarkRules.defaultPrefix} JODO</strong>
                   </code>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Name combinations are randomly generated from first and last names (e.g., John Doe → JODO, JOHD, JDOE, etc.)
+                </p>
               </div>
 
               <div className="space-y-4">
@@ -1421,11 +1445,11 @@ export default function Settings() {
                 <Label htmlFor="rulePrefixValue">Prefix Value</Label>
                 <Input
                   id="rulePrefixValue"
-                  type="number"
-                  min="1"
+                  type="text"
+                  maxLength={3}
                   value={editingRegionalRule.prefix_value}
                   onChange={(e) => setEditingRegionalRule({...editingRegionalRule, prefix_value: e.target.value})}
-                  placeholder="e.g., 1"
+                  placeholder="e.g., 1, 2, A, GA, NR"
                 />
               </div>
               <div className="space-y-2">
@@ -1439,8 +1463,8 @@ export default function Settings() {
                 </div>
               </div>
               <div className="text-xs text-muted-foreground p-3 bg-muted rounded-lg">
-                <strong>How it works:</strong> The system will use "PM{`{prefix value}`}" as the shipping mark prefix. 
-                For example, if Prefix Value is "1", shipping marks will start with "PM1".
+                <strong>How it works:</strong> The system will use "PM{`{prefix value}`} {`{name}`}" as the shipping mark format. 
+                For example, if Prefix Value is "1", shipping marks will be "PM1 JODO" (with space).
               </div>
             </div>
           )}
