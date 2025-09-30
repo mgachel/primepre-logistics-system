@@ -129,6 +129,48 @@ class ClaimsService {
     }
   }
 
+  async updateClaim(id: number, claimData: CreateClaimData): Promise<{ success: boolean; data: Claim }> {
+    try {
+      // Create FormData to handle file uploads
+      const formData = new FormData();
+      formData.append('tracking_id', claimData.tracking_id);
+      formData.append('item_name', claimData.item_name);
+      formData.append('item_description', claimData.item_description);
+      
+      // Append image files if they exist
+      if (claimData.image_1) {
+        formData.append('image_1', claimData.image_1);
+      }
+      if (claimData.image_2) {
+        formData.append('image_2', claimData.image_2);
+      }
+      if (claimData.image_3) {
+        formData.append('image_3', claimData.image_3);
+      }
+
+      const response = await apiClient.put<Claim>(`/api/claims/my-claims/${id}/`, formData);
+      return {
+        success: response.success,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to update claim:', error);
+      throw error;
+    }
+  }
+
+  async deleteClaim(id: number): Promise<{ success: boolean }> {
+    try {
+      const response = await apiClient.delete(`/api/claims/my-claims/${id}/`);
+      return {
+        success: response.success
+      };
+    } catch (error) {
+      console.error('Failed to delete claim:', error);
+      throw error;
+    }
+  }
+
   // Admin endpoints
   async getAllClaims(params?: {
     status?: string;

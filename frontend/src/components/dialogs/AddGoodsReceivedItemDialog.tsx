@@ -196,6 +196,7 @@ export function AddGoodsReceivedItemDialog({
         supply_tracking: supplyTracking.trim(),
         quantity: parseInt(quantity, 10),
         location: location || 'ghana',
+        status: 'READY_FOR_DELIVERY',
         ...(description.trim() && { description: description.trim() }),
         ...(notes.trim() && { notes: notes.trim() }),
         ...(containerType === 'air' && weight && { weight: parseFloat(weight) }),

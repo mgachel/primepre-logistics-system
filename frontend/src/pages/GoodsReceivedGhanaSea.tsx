@@ -251,7 +251,7 @@ export default function GoodsReceivedGhanaSea() {
       header: "Rates",
       accessor: (row) => (
         <div className="text-sm font-medium">
-          {row.dollar_rate ? `$${row.dollar_rate}` : "Not set"}
+          {row.rates ? `$${row.rates}` : "Not set"}
         </div>
       ),
       width: "100px",

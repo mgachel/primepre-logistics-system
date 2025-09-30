@@ -29,6 +29,7 @@ import {
 } from "@/services/goodsReceivedContainerService";
 import { EditGoodsReceivedContainerDialog } from "@/components/dialogs/EditGoodsReceivedContainerDialog";
 import { AddGoodsReceivedItemDialog } from "@/components/dialogs/AddGoodsReceivedItemDialog";
+import { ExcelUploadButton } from "@/components/ui/ExcelUploadButton";
 import { formatDate } from "@/lib/date";
 
 export default function GoodsReceivedContainerDetailsPage() {
@@ -507,6 +508,12 @@ export default function GoodsReceivedContainerDetailsPage() {
           <Button variant="outline" size="sm" onClick={() => setShowEditContainerDialog(true)}>
             <Edit className="h-4 w-4" /> Edit Container
           </Button>
+          <ExcelUploadButton
+            onUpload={(file) => {
+              // TODO: Implement Excel upload for goods received items
+              console.log('Excel upload for goods received container:', containerId, file);
+            }}
+          />
           <Button size="sm" onClick={() => setShowAddItemDialog(true)}>
             <Plus className="h-4 w-4" /> Add Item
           </Button>

@@ -145,12 +145,12 @@ class PhoneSignupStep2View(APIView):
                 'message': 'Please select one of the suggested shipping marks.'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Validate shipping mark format (must start with PM-)
-        if not shipping_mark.startswith('PM-'):
+        # Validate shipping mark format (must start with PM followed by space or dash)
+        if not (shipping_mark.startswith('PM ') or shipping_mark.startswith('PM-')):
             return Response({
                 'success': False,
                 'error': 'Invalid shipping mark format',
-                'message': 'Shipping mark must start with "PM-" prefix.'
+                'message': 'Shipping mark must start with "PM " or "PM-" prefix.'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Check for real-time uniqueness (critical for concurrency)
