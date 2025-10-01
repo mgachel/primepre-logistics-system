@@ -2,26 +2,25 @@ from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
-# Create your models here.
 class DailyUpdate(models.Model):
     PRIORITY_CHOICES = [
         ('low', 'Low'),
-        ('medium', 'Medium'),
+        ('medium', 'Medium'), 
         ('high', 'High'),
     ]
 
     title = models.CharField(max_length=200, help_text="Brief title for the daily update")
     content = models.TextField(help_text="Detailed content of the update")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
     priority = models.CharField(
-        max_length=10, 
-        choices=PRIORITY_CHOICES, 
+        max_length=10,
+        choices=PRIORITY_CHOICES,
         default='medium',
         help_text="Priority level of the update"
     )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     expires_at = models.DateTimeField(
-        null=True, 
+        null=True,
         blank=True,
         help_text="When this update should expire (optional)"
     )
@@ -30,11 +29,6 @@ class DailyUpdate(models.Model):
         ordering = ['-created_at']
         verbose_name = "Daily Update"
         verbose_name_plural = "Daily Updates"
-        indexes = [
-            models.Index(fields=['priority', '-created_at']),
-            models.Index(fields=['expires_at']),
-            models.Index(fields=['-created_at']),
-        ]
 
     def __str__(self):
         return f"{self.title} ({self.get_priority_display()})"
@@ -51,11 +45,6 @@ class DailyUpdate(models.Model):
             raise ValidationError({
                 'title': 'Title must be at least 3 characters long.'
             })
-
-    def save(self, *args, **kwargs):
-        """Override save to run validation"""
-        self.full_clean()
-        super().save(*args, **kwargs)
 
     @property
     def is_expired(self):
