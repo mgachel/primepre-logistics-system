@@ -11,6 +11,7 @@ import {
   ShieldX,
   ShieldCheck,
   MessageSquare,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { NewClientDialog } from "@/components/dialogs/NewClientDialog";
 import { SendMessageDialog } from "@/components/dialogs/SendMessageDialog";
+import { CustomerExcelUploadDialog } from "@/components/dialogs/CustomerExcelUploadDialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { adminService } from "@/services/adminService";
 import type { User } from "@/services/authService";
@@ -56,6 +58,7 @@ export default function Clients() {
     "all" | "active" | "inactive"
   >(persistGet("clients:filterStatus", "all"));
   const [showNewClientDialog, setShowNewClientDialog] = useState(false);
+  const [showExcelUploadDialog, setShowExcelUploadDialog] = useState(false);
   const [showSendMessageDialog, setShowSendMessageDialog] = useState(false);
   const [selectedUserForMessage, setSelectedUserForMessage] =
     useState<User | null>(null);
@@ -320,6 +323,13 @@ export default function Clients() {
           <Button onClick={() => setShowNewClientDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Client
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowExcelUploadDialog(true)}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Upload Excel
           </Button>
           <Button variant="outline" onClick={handleRefresh}>
             <RefreshCcw className="h-4 w-4 mr-2" />
@@ -675,6 +685,15 @@ export default function Clients() {
       <NewClientDialog
         open={showNewClientDialog}
         onOpenChange={setShowNewClientDialog}
+      />
+
+      <CustomerExcelUploadDialog
+        open={showExcelUploadDialog}
+        onOpenChange={setShowExcelUploadDialog}
+        onUploadComplete={() => {
+          handleRefresh();
+          setShowExcelUploadDialog(false);
+        }}
       />
     </div>
   );

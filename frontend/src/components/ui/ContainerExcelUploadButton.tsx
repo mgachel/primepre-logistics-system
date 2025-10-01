@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FileSpreadsheet, Upload } from 'lucide-react';
-import { ExcelUploadDialog } from '@/components/dialogs/ExcelUploadDialog';
-import { ExcelUploadResponse } from '@/services/excelUploadService';
+import { ContainerExcelUploadDialog } from '@/components/dialogs/ContainerExcelUploadDialog';
+import { ContainerExcelUploadResponse } from '@/services/containerExcelService';
 
 interface ContainerExcelUploadButtonProps {
   containerId: string;
-  onUploadComplete?: (response: ExcelUploadResponse) => void;
+  onUploadComplete?: (response: ContainerExcelUploadResponse) => void;
   variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive';
   size?: 'sm' | 'default' | 'lg';
   className?: string;
@@ -23,7 +23,7 @@ export function ContainerExcelUploadButton({
 }: ContainerExcelUploadButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const handleUploadComplete = (response: ExcelUploadResponse) => {
+  const handleUploadComplete = (response: ContainerExcelUploadResponse) => {
     onUploadComplete?.(response);
     setDialogOpen(false);
   };
@@ -38,18 +38,17 @@ export function ContainerExcelUploadButton({
       >
         {children || (
           <>
-            <Upload className="h-4 w-4 mr-1" />
-            Excel Upload
+            <FileSpreadsheet className="h-4 w-4 mr-1" />
+            Import Items
           </>
         )}
       </Button>
 
-      <ExcelUploadDialog
+      <ContainerExcelUploadDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onUploadComplete={handleUploadComplete}
-        defaultUploadType="sea_cargo"
         containerId={containerId}
+        onUploadComplete={handleUploadComplete}
       />
     </>
   );

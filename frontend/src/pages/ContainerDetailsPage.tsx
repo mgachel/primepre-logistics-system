@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { DataTable, Column } from "@/components/data-table/DataTable";
 import { AddCargoItemDialog } from "@/components/dialogs/AddCargoItemDialog";
 import { EditCargoContainerDialog } from "@/components/dialogs/EditCargoContainerDialog";
-import { ExcelUploadButton } from "@/components/ui/ExcelUploadButton";
+import { ContainerExcelUploadButton } from "@/components/ui/ContainerExcelUploadButton";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -222,10 +222,12 @@ export default function ContainerDetailsPage() {
           <Button variant="outline" size="sm" onClick={() => setShowEditContainerDialog(true)}>
             <Edit className="h-4 w-4" /> Edit Container
           </Button>
-          <ExcelUploadButton
-            onUpload={(file) => {
-              // TODO: Implement Excel upload for cargo items
-              console.log('Excel upload for cargo container:', containerId, file);
+          <ContainerExcelUploadButton
+            containerId={containerId!}
+            onUploadComplete={(response) => {
+              // Refresh cargo items after successful upload
+              console.log('Excel upload completed:', response);
+              // TODO: Reload cargo items
             }}
           />
           <Button size="sm" onClick={() => setShowAddItemDialog(true)}>
