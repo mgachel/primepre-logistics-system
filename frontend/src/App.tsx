@@ -45,6 +45,8 @@ import Notifications from "./pages/Notifications";
 import Support from "./pages/Support";
 import ContainerDetailsPage from "./pages/ContainerDetailsPage";
 import GoodsReceivedContainerDetailsPage from "./pages/GoodsReceivedContainerDetailsPage";
+import DailyUpdates from "./pages/DailyUpdates";
+import DailyUpdatesAdmin from "./pages/DailyUpdatesAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -302,6 +304,38 @@ const App = () => (
                       </AppLayout>
                     }
                     customerComponent={<Navigate to="/" replace />}
+                  />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Daily Updates - Role-based routing */}
+            <Route
+              path="/daily-updates"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/admin/daily-updates" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <DailyUpdates />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/daily-updates"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={
+                      <AppLayout>
+                        <DailyUpdatesAdmin />
+                      </AppLayout>
+                    }
+                    customerComponent={<Navigate to="/daily-updates" replace />}
                   />
                 </ProtectedRoute>
               }

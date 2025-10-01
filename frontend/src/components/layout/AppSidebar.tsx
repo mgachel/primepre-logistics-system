@@ -13,7 +13,8 @@ import {
   X,
   ChevronDown,
   FileText,
-  StickyNote
+  StickyNote,
+  Bell
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
@@ -31,6 +32,7 @@ interface SidebarProps {
 // Admin/Super Admin Navigation
 const adminNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Daily Updates", href: "/admin/daily-updates", icon: Bell },
   { name: "Clients", href: "/clients", icon: Users },
   {
     name: "Cargo",
@@ -60,6 +62,7 @@ const adminNavigation = [
 // Customer Navigation
 const customerNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Daily Updates", href: "/daily-updates", icon: Bell },
   { name: "My Goods", href: "/my-shipments", icon: Ship },
   { name: "My Claims", href: "/my-claims", icon: FileText },
   { name: "My Notes", href: "/my-notes", icon: StickyNote },
