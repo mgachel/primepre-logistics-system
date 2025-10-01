@@ -96,6 +96,7 @@ urlpatterns = [
     path('api/notes/', include('notes.urls')),
     path('api/claims/', include('claims.urls')),  # Claims endpoints
     path('api/settings/', include('settings.urls')),  # Settings endpoints
+    path('api/daily-updates/', include('daily_updates.urls')),  # Daily updates endpoints
 ]
 
 # Serve media files in development
