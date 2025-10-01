@@ -29,7 +29,6 @@ export function DailyUpdatesView({ className }: DailyUpdatesViewProps) {
   // Filter states
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [priorityFilter, setPriorityFilter] = useState(searchParams.get('priority') || 'all');
-  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'active');
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || '-created_at');
 
   // Load daily updates
@@ -52,19 +51,8 @@ export function DailyUpdatesView({ className }: DailyUpdatesViewProps) {
         filters.priority = priorityFilter as 'low' | 'medium' | 'high';
       }
 
-      let response;
-      if (statusFilter === 'active') {
-        response = await dailyUpdatesService.getActiveDailyUpdates(filters);
-      } else if (statusFilter === 'expired') {
-        response = await dailyUpdatesService.getExpiredDailyUpdates(filters);
-      } else {
-        if (statusFilter === 'expired-only') {
-          filters.expired = true;
-        } else if (statusFilter === 'active-only') {
-          filters.expired = false;
-        }
-        response = await dailyUpdatesService.getDailyUpdates(filters);
-      }
+      // Use the main daily updates endpoint
+      const response = await dailyUpdatesService.getDailyUpdates(filters);
 
       // Ensure we have valid data structure
       if (response && response.results && Array.isArray(response.results)) {
@@ -99,7 +87,6 @@ export function DailyUpdatesView({ className }: DailyUpdatesViewProps) {
     const params = new URLSearchParams();
     if (searchTerm) params.set('search', searchTerm);
     if (priorityFilter !== 'all') params.set('priority', priorityFilter);
-    if (statusFilter !== 'active') params.set('status', statusFilter);
     if (sortBy !== '-created_at') params.set('sort', sortBy);
     setSearchParams(params);
   };
@@ -116,9 +103,6 @@ export function DailyUpdatesView({ className }: DailyUpdatesViewProps) {
       case 'priority':
         setPriorityFilter(value);
         break;
-      case 'status':
-        setStatusFilter(value);
-        break;
       case 'sort':
         setSortBy(value);
         break;
@@ -133,7 +117,7 @@ export function DailyUpdatesView({ className }: DailyUpdatesViewProps) {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [priorityFilter, statusFilter, sortBy]);
+  }, [priorityFilter, sortBy]);
 
   // Initial load
   useEffect(() => {
@@ -236,21 +220,6 @@ export function DailyUpdatesView({ className }: DailyUpdatesViewProps) {
               </Select>
             </div>
 
-            {/* Status Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Status</label>
-              <Select value={statusFilter} onValueChange={(value) => handleFilterChange('status', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active Only</SelectItem>
-                  <SelectItem value="expired">Expired Only</SelectItem>
-                  <SelectItem value="all">All Updates</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Sort */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Sort By</label>
@@ -269,7 +238,7 @@ export function DailyUpdatesView({ className }: DailyUpdatesViewProps) {
             </div>
           </div>
 
-          {(searchTerm || priorityFilter !== 'all' || statusFilter !== 'active') && (
+          {(searchTerm || priorityFilter !== 'all') && (
             <div className="mt-4 pt-4 border-t">
               <Button onClick={handleSearch} className="mr-2">
                 <Search className="h-4 w-4 mr-2" />
@@ -280,7 +249,6 @@ export function DailyUpdatesView({ className }: DailyUpdatesViewProps) {
                 onClick={() => {
                   setSearchTerm('');
                   setPriorityFilter('all');
-                  setStatusFilter('active');
                   setSortBy('-created_at');
                   setSearchParams(new URLSearchParams());
                   loadDailyUpdates(1);
@@ -308,7 +276,7 @@ export function DailyUpdatesView({ className }: DailyUpdatesViewProps) {
             <Bell className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Updates Found</h3>
             <p className="text-muted-foreground text-center">
-              {searchTerm || priorityFilter !== 'all' || statusFilter !== 'active' 
+              {searchTerm || priorityFilter !== 'all' 
                 ? 'Try adjusting your filters to see more updates.'
                 : 'There are no daily updates available at the moment.'
               }

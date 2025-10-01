@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .customer_shipments_views import CustomerShipmentsView, CustomerShipmentStatsView, customer_shipment_tracking
 from .excel_upload_views import ExcelUploadView, ExcelTemplateView, ContainerExcelUploadView, ContainerExcelTemplateView
+from .container_excel_views import ContainerExcelUploadView as NewContainerExcelUploadView, ContainerItemsCreateView, CustomerSearchView
 
 # Create router for ViewSets (Admin/Staff)
 router = DefaultRouter()
@@ -43,7 +44,12 @@ urlpatterns = [
     path('excel/enhanced-upload/', views.EnhancedExcelUploadView.as_view(), name='enhanced-excel-upload'),
     path('excel/download-template/', views.ExcelTemplateDownloadView.as_view(), name='excel-download-template'),
     
-    # Container-specific excel upload endpoints
+    # Container-specific excel upload endpoints (NEW)
+    path('containers/<str:container_id>/excel/upload-new/', NewContainerExcelUploadView.as_view(), name='container-excel-upload-new'),
+    path('containers/items/create/', ContainerItemsCreateView.as_view(), name='container-items-create'),
+    path('customers/search/', CustomerSearchView.as_view(), name='customer-search'),
+    
+    # Container-specific excel upload endpoints (EXISTING)
     path('containers/<str:container_id>/excel/upload/', ContainerExcelUploadView.as_view(), name='container-excel-upload'),
     path('containers/<str:container_id>/excel/template/', ContainerExcelTemplateView.as_view(), name='container-excel-template'),
     path('excel/container-template/', ContainerExcelTemplateView.as_view(), name='container-excel-template-general'),
