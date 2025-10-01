@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'Shipments',
     'claims',  # Add claims app
     'settings',  # Add settings app
+    'daily_updates.apps.DailyUpdatesConfig',  # Add daily updates app with full config path
     
     # Third party apps
     'rest_framework',
