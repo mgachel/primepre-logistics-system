@@ -19,10 +19,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { config } from '@/lib/config';
-
-const API_BASE_URL = config.apiBaseUrl.replace(/\/+$/, '');
-const buildApiUrl = (path: string) => `${API_BASE_URL}/${path.replace(/^\/+/, '')}`;
+import { buildApiUrl } from '@/lib/apiUrl';
 
 interface CustomerExcelUploadDialogProps {
   open: boolean;

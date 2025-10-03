@@ -1,4 +1,4 @@
-import { config } from '@/lib/config';
+import { buildApiUrl } from '@/lib/apiUrl';
 
 // Excel upload types
 export interface ExcelUploadRequest {
@@ -47,12 +47,6 @@ export type ExcelTemplateType = 'goods_received' | 'sea_cargo';
 export type WarehouseLocation = 'China' | 'Ghana';
 
 class ExcelUploadService {
-  private readonly apiBaseUrl = config.apiBaseUrl.replace(/\/+$/, '');
-
-  private buildApiUrl(path: string): string {
-    return `${this.apiBaseUrl}/${path.replace(/^\/+/, '')}`;
-  }
-
   /**
    * Check if user has a valid access token
    */
@@ -95,7 +89,7 @@ class ExcelUploadService {
       const token = this.getAuthToken();
       const warehouse = request.warehouse_location?.toLowerCase() || 'ghana';
       
-      const response = await fetch(this.buildApiUrl(`/api/goods/${warehouse}/upload_excel/`), {
+  const response = await fetch(buildApiUrl(`/api/goods/${warehouse}/upload_excel/`), {
         method: 'POST',
         body: formData,
         headers: {
@@ -195,7 +189,7 @@ class ExcelUploadService {
     try {
       const token = this.getAuthToken();
       
-      const response = await fetch(this.buildApiUrl('/api/cargo/excel/upload/'), {
+  const response = await fetch(buildApiUrl('/api/cargo/excel/upload/'), {
         method: 'POST',
         body: formData,
         headers: {
@@ -245,7 +239,7 @@ class ExcelUploadService {
     try {
       const token = this.getAuthToken();
       
-      const response = await fetch(this.buildApiUrl(`/api/cargo/containers/${containerId}/excel/upload/`), {
+  const response = await fetch(buildApiUrl(`/api/cargo/containers/${containerId}/excel/upload/`), {
         method: 'POST',
         body: formData,
         headers: {
@@ -292,7 +286,7 @@ class ExcelUploadService {
     try {
       const token = this.getAuthToken();
       
-      let path: string;
+  let path: string;
       
       if (type === 'goods_received') {
         // Route to goods received template endpoints
@@ -307,7 +301,7 @@ class ExcelUploadService {
         path = `/api/cargo/excel/template/?${params}`;
       }
       
-      const response = await fetch(this.buildApiUrl(path), {
+  const response = await fetch(buildApiUrl(path), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -348,7 +342,7 @@ class ExcelUploadService {
         ? `/api/cargo/containers/${containerId}/excel/template/`
         : '/api/cargo/excel/container-template/';
       
-      const response = await fetch(this.buildApiUrl(path), {
+  const response = await fetch(buildApiUrl(path), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -379,7 +373,7 @@ class ExcelUploadService {
     }
 
     try {
-      const response = await fetch(this.buildApiUrl('/api/cargo/excel/enhanced-upload/'), {
+  const response = await fetch(buildApiUrl('/api/cargo/excel/enhanced-upload/'), {
         method: 'POST',
         body: formData,
         headers: {
