@@ -128,10 +128,20 @@ export function CustomerExcelUploadDialog({
         body: formData,
       });
 
-      const data = await response.json();
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        // Server returned HTML (likely an error page)
+        const text = await response.text();
+        throw new Error(`Server error: ${response.status} ${response.statusText}. The server returned an HTML page instead of JSON. Please check the server logs.`);
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || 'Upload failed');
+        throw new Error(data.message || data.error || 'Upload failed');
       }
 
       setUploadResults(data);
@@ -171,12 +181,23 @@ export function CustomerExcelUploadDialog({
         }),
       });
 
-      const data = await response.json();
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.error('Bulk create failed with non-JSON response:', response.status, text);
+        throw new Error(`Server error: ${response.status} ${response.statusText}. The server returned an HTML page. Please check server logs.`);
+      }
+
       console.log('Bulk create response:', data);
 
       if (!response.ok) {
         console.error('Bulk create failed:', response.status, data);
-        throw new Error(data.message || `Creation failed with status ${response.status}`);
+        throw new Error(data.message || data.error || `Creation failed with status ${response.status}`);
       }
 
       setCreateResults(data);
