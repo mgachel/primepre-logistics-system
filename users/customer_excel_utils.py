@@ -298,39 +298,96 @@ class CustomerDuplicateChecker:
             'unique_candidates': []     # Clean candidates ready for creation
         }
         
-        # Check against existing database records
+        if not candidates:
+            return results
+
+        # Build lookup sets for batch queries
+        shipping_marks = set()
+        phones = set()
+        emails = set()
+
         for candidate in candidates:
-            existing_shipping_mark = CustomerUser.objects.filter(
-                shipping_mark=candidate['shipping_mark_normalized']
-            ).first()
-            
-            existing_phone = CustomerUser.objects.filter(
-                phone=candidate['phone_normalized']
-            ).first()
-            
-            existing_email = None
-            if candidate['email']:
-                existing_email = CustomerUser.objects.filter(
-                    email=candidate['email']
-                ).first()
-            
-            if existing_shipping_mark or existing_phone or existing_email:
-                duplicate_reasons = []
-                if existing_shipping_mark:
-                    duplicate_reasons.append('shipping mark')
-                if existing_phone:
-                    duplicate_reasons.append('phone number')
-                if existing_email:
-                    duplicate_reasons.append('email')
-                
+            shipping_mark = (candidate.get('shipping_mark') or '').strip()
+            if shipping_mark:
+                shipping_marks.add(shipping_mark)
+
+            phone = candidate.get('phone_normalized')
+            if phone:
+                phones.add(phone)
+
+            email = candidate.get('email')
+            if email:
+                emails.add(email.strip())
+
+        from django.db.models import Q
+
+        query_filter = Q()
+        if shipping_marks:
+            query_filter |= Q(shipping_mark__in=list(shipping_marks))
+        if phones:
+            query_filter |= Q(phone__in=list(phones))
+        if emails:
+            query_filter |= Q(email__in=list(emails))
+
+        existing_records: List[Dict[str, Any]] = []
+        if query_filter:
+            existing_records = list(
+                CustomerUser.objects.filter(query_filter)
+                .values('id', 'shipping_mark', 'phone', 'email')
+            )
+
+        # Prepare quick lookup maps
+        def normalize_shipping(value: Optional[str]) -> Optional[str]:
+            return re.sub(r'\s+', ' ', value.strip().upper()) if value else None
+
+        def normalize_email(value: Optional[str]) -> Optional[str]:
+            return value.strip().lower() if value else None
+
+        existing_by_shipping = {}
+        existing_by_phone = {}
+        existing_by_email = {}
+
+        for record in existing_records:
+            shipping_key = normalize_shipping(record.get('shipping_mark'))
+            phone_key = clean_phone_value(record.get('phone'))
+            email_key = normalize_email(record.get('email'))
+
+            if shipping_key and shipping_key not in existing_by_shipping:
+                existing_by_shipping[shipping_key] = record['id']
+            if phone_key and phone_key not in existing_by_phone:
+                existing_by_phone[phone_key] = record['id']
+            if email_key and email_key not in existing_by_email:
+                existing_by_email[email_key] = record['id']
+
+        # Check against existing database records using prepared lookups
+        for candidate in candidates:
+            duplicate_reasons = []
+            existing_matches = {
+                'shipping_mark_match': None,
+                'phone_match': None,
+                'email_match': None,
+            }
+
+            shipping_key = normalize_shipping(candidate.get('shipping_mark'))
+            if shipping_key and shipping_key in existing_by_shipping:
+                duplicate_reasons.append('shipping mark')
+                existing_matches['shipping_mark_match'] = existing_by_shipping[shipping_key]
+
+            phone_key = candidate.get('phone_normalized')
+            if phone_key and phone_key in existing_by_phone:
+                duplicate_reasons.append('phone number')
+                existing_matches['phone_match'] = existing_by_phone[phone_key]
+
+            email_key = normalize_email(candidate.get('email'))
+            if email_key and email_key in existing_by_email:
+                duplicate_reasons.append('email')
+                existing_matches['email_match'] = existing_by_email[email_key]
+
+            if duplicate_reasons:
                 results['existing_duplicates'].append({
                     'candidate': candidate,
                     'reason': f"Duplicate {', '.join(duplicate_reasons)}",
-                    'existing_customers': {
-                        'shipping_mark_match': existing_shipping_mark.id if existing_shipping_mark else None,
-                        'phone_match': existing_phone.id if existing_phone else None,
-                        'email_match': existing_email.id if existing_email else None
-                    }
+                    'existing_customers': existing_matches,
                 })
             else:
                 results['unique_candidates'].append(candidate)
