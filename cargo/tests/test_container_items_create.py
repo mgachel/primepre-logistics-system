@@ -91,7 +91,7 @@ class ContainerItemsCreateViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         data = response.data
 
-        self.assertTrue(data["success"])  # Request succeeded overall
+        self.assertTrue(data["success"])
         self.assertEqual(data["statistics"]["total_created"], 1)
         self.assertGreaterEqual(len(data["errors"]), 1)
 
@@ -101,7 +101,6 @@ class ContainerItemsCreateViewTests(APITestCase):
             msg=f"Expected integrity error message in {error_messages}",
         )
 
-        # Ensure the successfully created item exists
         self.assertTrue(
             CargoItem.objects.filter(
                 container=self.container,
