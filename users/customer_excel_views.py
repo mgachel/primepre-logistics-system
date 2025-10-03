@@ -7,6 +7,7 @@ Handles file upload, validation, duplicate checking, and bulk customer creation.
 
 import tempfile
 import os
+import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, serializers
@@ -20,6 +21,9 @@ from users.customer_excel_utils import (
     process_customer_excel_upload,
     create_customer_from_data,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class CustomerExcelUploadSerializer(serializers.Serializer):
@@ -103,6 +107,10 @@ class CustomerExcelUploadView(APIView):
         # Validate input
         serializer = CustomerExcelUploadSerializer(data=request.data)
         if not serializer.is_valid():
+            logger.debug("Customer Excel upload validation failed", extra={
+                "errors": serializer.errors,
+                "user_id": getattr(request.user, "id", None),
+            })
             return Response({
                 'success': False,
                 'errors': serializer.errors
@@ -120,9 +128,26 @@ class CustomerExcelUploadView(APIView):
                 temp_file_path = temp_file.name
             
             # Process the Excel file
+            logger.info(
+                "Processing customer Excel upload",
+                extra={
+                    "user_id": getattr(request.user, "id", None),
+                    "file_name": getattr(uploaded_file, "name", "unknown"),
+                    "file_size": getattr(uploaded_file, "size", None),
+                }
+            )
+
             results = process_customer_excel_upload(temp_file_path)
             
             if not results['success']:
+                logger.warning(
+                    "Customer Excel upload returned unsuccessful parse",
+                    extra={
+                        "user_id": getattr(request.user, "id", None),
+                        "message": results.get('message'),
+                        "parsing_summary": results.get('parsing_results', {}),
+                    }
+                )
                 return Response({
                     'success': False,
                     'message': results['message'],
@@ -141,6 +166,13 @@ class CustomerExcelUploadView(APIView):
             return Response(response_data, status=status.HTTP_200_OK)
             
         except Exception as e:
+            logger.exception(
+                "Customer Excel upload processing failed",
+                extra={
+                    "user_id": getattr(request.user, "id", None),
+                    "file_name": getattr(uploaded_file, "name", "unknown"),
+                }
+            )
             return Response({
                 'success': False,
                 'message': f'File processing failed: {str(e)}'
@@ -301,11 +333,14 @@ class CustomerBulkCreateView(APIView):
             # Log the specific error for debugging
             import traceback
             error_msg = f"Customer creation failed: {str(e)}"
-            print(error_msg)
-            print(f"Customer data: {customer_data}")
-            print(f"Customer fields: {customer_fields}")
-            print(f"Phone: {phone}")
-            print(f"Traceback: {traceback.format_exc()}")
+            logger.exception(
+                error_msg,
+                extra={
+                    "customer_data": customer_data,
+                    "payload": payload,
+                    "created_by": getattr(created_by_user, "id", None),
+                }
+            )
             raise ValueError(error_msg)
 
 
