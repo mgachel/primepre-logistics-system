@@ -210,54 +210,79 @@ class ContainerItemsCreateView(APIView):
             "resolved_mappings": [...] // Admin resolution for unmatched items
         }
         """
-        container_id = request.data.get('container_id')
-        matched_items = request.data.get('matched_items', [])
-        resolved_mappings = request.data.get('resolved_mappings', [])
-        
-        if not container_id:
-            return Response({
-                'success': False,
-                'error': 'Container ID is required'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
+        logger.info(
+            "ContainerItemsCreateView received request from user %s",
+            getattr(request.user, 'id', 'anonymous')
+        )
         try:
+            container_id = request.data.get('container_id')
+            matched_items = request.data.get('matched_items', [])
+            resolved_mappings = request.data.get('resolved_mappings', [])
+            
+            # Validate request size to prevent memory issues
+            total_items = len(matched_items) + len(resolved_mappings)
+            if total_items > 1000:
+                return Response({
+                    'success': False,
+                    'error': f'Too many items ({total_items}). Maximum 1000 items per request.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not container_id:
+                return Response({
+                    'success': False,
+                    'error': 'Container ID is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
             # Validate container exists
-            container = CargoContainer.objects.get(container_id=container_id)
-        except CargoContainer.DoesNotExist:
-            return Response({
-                'success': False,
-                'error': f'Container {container_id} not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        
-        created_items = []
-        errors = []
-        
-        with transaction.atomic():
-            # Process automatically matched items
+            try:
+                container = CargoContainer.objects.get(container_id=container_id)
+            except CargoContainer.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'error': f'Container {container_id} not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            created_items = []
+            errors = []
+            
+            # Process automatically matched items (without nested transaction)
             if matched_items:
-                from .shipping_mark_matcher import ShippingMarkMatcher
-                matcher = ShippingMarkMatcher(container_id)
-                create_results = matcher.create_cargo_items(matched_items)
-                created_items.extend(create_results['created_items'])
-                errors.extend(create_results['errors'])
-
-            # Process resolved mappings
-            for mapping in resolved_mappings:
-                action = (mapping or {}).get('action')
-                if action == 'skip':
-                    continue
-
-                candidate = (mapping or {}).get('candidate') or {}
-                source_row = candidate.get('source_row_number')
-
-                if not candidate:
-                    errors.append({
-                        'error': 'Missing candidate data in resolved mapping',
-                        'mapping': mapping
-                    })
-                    continue
-
                 try:
+                    from .shipping_mark_matcher import ShippingMarkMatcher
+                    matcher = ShippingMarkMatcher(container_id)
+                    create_results = matcher.create_cargo_items(matched_items)
+                    created_items.extend(create_results.get('created_items', []))
+                    errors.extend(create_results.get('errors', []))
+                except Exception as exc:
+                    logger.error(
+                        "Error processing matched items for container %s: %s",
+                        container_id,
+                        exc,
+                        exc_info=True
+                    )
+                    errors.append({
+                        'error': f'Failed to process matched items: {str(exc)}',
+                        'type': 'matched_items_batch_error'
+                    })
+
+            # Process resolved mappings (each in its own transaction)
+            for idx, mapping in enumerate(resolved_mappings):
+                try:
+                    action = (mapping or {}).get('action')
+                    if action == 'skip':
+                        continue
+
+                    candidate = (mapping or {}).get('candidate') or {}
+                    source_row = candidate.get('source_row_number')
+
+                    if not candidate:
+                        errors.append({
+                            'error': 'Missing candidate data in resolved mapping',
+                            'mapping': mapping
+                        })
+                        continue
+
+                    # Each mapping gets its own transaction to prevent deadlocks
                     with transaction.atomic():
                         if action == 'map_existing':
                             customer_id = mapping.get('customer_id')
@@ -326,13 +351,14 @@ class ContainerItemsCreateView(APIView):
                         )
                         summary.update_totals()
 
-                    created_items.append({
-                        'cargo_item_id': str(cargo_item.id),
-                        'tracking_id': cargo_item.tracking_id,
-                        'source_row_number': source_row,
-                        'customer_name': customer.get_full_name() or customer.phone,
-                        'action_taken': action
-                    })
+                        created_items.append({
+                            'cargo_item_id': str(cargo_item.id),
+                            'tracking_id': cargo_item.tracking_id,
+                            'source_row_number': source_row,
+                            'customer_name': customer.get_full_name() or customer.phone,
+                            'action_taken': action
+                        })
+
                 except IntegrityError as exc:
                     logger.warning(
                         "Integrity error while creating cargo item for container %s row %s: %s",
@@ -359,16 +385,28 @@ class ContainerItemsCreateView(APIView):
                         'mapping': mapping,
                         'source_row_number': source_row
                     })
-        
-        return Response({
-            'success': True,
-            'created_items': created_items,
-            'errors': errors,
-            'statistics': {
-                'total_created': len(created_items),
-                'total_errors': len(errors)
-            }
-        }, status=status.HTTP_201_CREATED)
+            
+            return Response({
+                'success': True,
+                'created_items': created_items,
+                'errors': errors,
+                'statistics': {
+                    'total_created': len(created_items),
+                    'total_errors': len(errors)
+                }
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as exc:
+            logger.error(
+                "Unexpected error in ContainerItemsCreateView: %s",
+                exc,
+                exc_info=True
+            )
+            return Response({
+                'success': False,
+                'error': 'Internal server error occurred while processing items',
+                'details': str(exc)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CustomerSearchView(APIView):
