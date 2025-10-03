@@ -22,6 +22,9 @@ from .views import (
     # Single endpoint versions for frontend compatibility
     SingleSignupView, SinglePhoneVerificationView, SingleResendVerificationView,
     
+    # Shipping mark verification views
+    ShippingMarkVerificationView, ShippingMarkConfirmationView, ShippingMarksListView,
+    
     # Development helpers
     DevelopmentPinsView
 )
@@ -58,6 +61,15 @@ urlpatterns = [
     
     # Development helpers (only works when DEBUG=True)
     path('dev/pins/', DevelopmentPinsView.as_view(), name='development_pins'),
+    
+    # ============================================================================
+    # SHIPPING MARK VERIFICATION (NEW)
+    # ============================================================================
+    
+    # Shipping mark verification for uploaded customers
+    path('verify/shipping-mark/', ShippingMarkVerificationView.as_view(), name='shipping_mark_verification'),
+    path('verify/shipping-mark/confirm/', ShippingMarkConfirmationView.as_view(), name='shipping_mark_confirmation'),
+    path('shipping-marks/', ShippingMarksListView.as_view(), name='shipping_marks_list'),
     
     # ============================================================================
     # PHONE-BASED AUTHENTICATION API ENDPOINTS (MULTI-STEP)

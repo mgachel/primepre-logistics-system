@@ -1584,3 +1584,211 @@ class DevelopmentPinsView(APIView):
                 'error': 'Failed to retrieve PINs',
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================================================
+# SHIPPING MARK VERIFICATION VIEWS (NEW)
+# ============================================================================
+
+class ShippingMarkVerificationView(APIView):
+    """
+    API endpoint to verify customer account using shipping mark
+    Step 1: Customer provides phone and indicates if they have a shipping mark
+    """
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        """Verify shipping mark and return matching cargo items"""
+        from .serializers import ShippingMarkVerificationSerializer
+        from cargo.models import CargoItem
+        
+        serializer = ShippingMarkVerificationSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response({
+                'success': False,
+                'error': 'Validation failed',
+                'details': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        validated_data = serializer.validated_data
+        phone = validated_data['phone']
+        has_shipping_mark = validated_data['has_shipping_mark']
+        shipping_mark = validated_data.get('shipping_mark', '').strip()
+        
+        try:
+            # Get the unverified user
+            user = CustomerUser.objects.get(phone=phone, is_verified=False)
+            
+            # Case 1: User doesn't have a shipping mark
+            if not has_shipping_mark:
+                return Response({
+                    'success': True,
+                    'has_shipping_mark': False,
+                    'message': 'No shipping mark verification needed',
+                    'user': {
+                        'phone': user.phone,
+                        'name': user.get_full_name(),
+                        'email': user.email,
+                        'shipping_mark': user.shipping_mark
+                    },
+                    'instructions': 'You can proceed to set your password and verify your account.',
+                    'verification_required': True
+                }, status=status.HTTP_200_OK)
+            
+            # Case 2: User has a shipping mark - verify it matches their account
+            if not shipping_mark:
+                return Response({
+                    'success': False,
+                    'error': 'Please provide your shipping mark'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if the provided shipping mark matches the user's registered mark
+            if not user.shipping_mark or user.shipping_mark.strip().lower() != shipping_mark.lower():
+                return Response({
+                    'success': False,
+                    'error': 'Shipping mark does not match',
+                    'message': f'The shipping mark you provided does not match the one registered with your phone number. Please check and try again.',
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Shipping mark matches! User can proceed to set password
+            return Response({
+                'success': True,
+                'has_shipping_mark': True,
+                'shipping_mark_verified': True,
+                'message': 'Shipping mark verified successfully!',
+                'user': {
+                    'phone': user.phone,
+                    'name': user.get_full_name(),
+                    'email': user.email,
+                    'shipping_mark': user.shipping_mark
+                },
+                'instructions': 'Please set your password to complete account verification.'
+            }, status=status.HTTP_200_OK)
+            
+        except CustomerUser.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'User not found or already verified'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Shipping mark verification error: {str(e)}")
+            return Response({
+                'success': False,
+                'error': 'Verification failed',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ShippingMarkConfirmationView(APIView):
+    """
+    API endpoint to confirm shipping mark match and verify account
+    Step 2: Customer confirms the shipping mark and sets password
+    """
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        """Confirm shipping mark and verify account"""
+        from .serializers import ShippingMarkConfirmationSerializer
+        
+        serializer = ShippingMarkConfirmationSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response({
+                'success': False,
+                'error': 'Validation failed',
+                'details': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        validated_data = serializer.validated_data
+        phone = validated_data['phone']
+        shipping_mark = validated_data.get('shipping_mark', '').strip()
+        password = validated_data['password']
+        
+        try:
+            # Get the unverified user
+            user = CustomerUser.objects.get(phone=phone, is_verified=False)
+            
+            # Verify the shipping mark matches (if user has one)
+            if shipping_mark and user.shipping_mark:
+                if user.shipping_mark.lower() != shipping_mark.lower():
+                    return Response({
+                        'success': False,
+                        'error': 'Shipping mark does not match your account'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Set password and verify account
+            user.set_password(password)
+            user.is_verified = True
+            user.save()
+            
+            logger.info(f"Account verified via shipping mark: {user.phone}")
+            
+            # Generate JWT tokens for auto-login
+            from rest_framework_simplejwt.tokens import RefreshToken
+            refresh = RefreshToken.for_user(user)
+            
+            return Response({
+                'success': True,
+                'message': 'Account verified successfully!',
+                'user': {
+                    'id': user.id,
+                    'phone': user.phone,
+                    'email': user.email,
+                    'name': user.get_full_name(),
+                    'shipping_mark': user.shipping_mark,
+                    'is_verified': user.is_verified,
+                    'user_role': user.user_role
+                },
+                'tokens': {
+                    'refresh': str(refresh),
+                    'access': str(refresh.access_token)
+                },
+                'instructions': 'Your account is now active. You can login and track your shipments.'
+            }, status=status.HTTP_200_OK)
+            
+        except CustomerUser.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'User not found or already verified'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Confirmation error: {str(e)}")
+            return Response({
+                'success': False,
+                'error': 'Confirmation failed',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ShippingMarksListView(APIView):
+    """
+    API endpoint to get all unique shipping marks from the database
+    Used for dropdown selection in verification flow
+    """
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        """Return all unique shipping marks"""
+        try:
+            # Get all unique shipping marks from customers that have cargo items
+            shipping_marks = CustomerUser.objects.filter(
+                cargo_items__isnull=False
+            ).values_list('shipping_mark', flat=True).distinct().order_by('shipping_mark')
+            
+            # Filter out None and empty values
+            shipping_marks = [mark for mark in shipping_marks if mark and mark.strip()]
+            
+            return Response({
+                'success': True,
+                'shipping_marks': shipping_marks,
+                'total': len(shipping_marks)
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching shipping marks: {str(e)}")
+            return Response({
+                'success': False,
+                'error': 'Failed to fetch shipping marks',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

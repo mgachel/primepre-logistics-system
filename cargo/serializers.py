@@ -101,6 +101,7 @@ class ClientShipmentSummarySerializer(serializers.ModelSerializer):
 
 class CargoContainerSerializer(serializers.ModelSerializer):
     """Basic container list serializer"""
+    total_cargo_items = serializers.ReadOnlyField()
     total_clients = serializers.ReadOnlyField()
     total_cbm = serializers.FloatField(source='cbm', read_only=True)
     total_weight = serializers.FloatField(source='weight', read_only=True)
@@ -110,10 +111,10 @@ class CargoContainerSerializer(serializers.ModelSerializer):
         model = CargoContainer
         fields = [
             'container_id', 'cargo_type', 'load_date', 'eta', 'route',
-            'rates', 'dollar_rate', 'cbm', 'weight', 'status', 'total_clients', 'total_cbm', 'total_weight', 'rate',
+            'rates', 'dollar_rate', 'cbm', 'weight', 'status', 'total_cargo_items', 'total_clients', 'total_cbm', 'total_weight', 'rate',
             'location', 'warehouse_type'
         ]
-        read_only_fields = ['total_clients', 'total_cbm', 'total_weight', 'rate']
+        read_only_fields = ['total_cargo_items', 'total_clients', 'total_cbm', 'total_weight', 'rate']
 
 
 class CargoContainerDetailSerializer(serializers.ModelSerializer):

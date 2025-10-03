@@ -239,11 +239,18 @@ export default function Login() {
             </CardContent>
           </Card>
 
-          <div className="flex items-center justify-between text-sm">
-            <Link to="/forgot-password" className="text-primary hover:underline">Forgot password?</Link>
-            <div>
-              Don't have an account?{' '}
-              <Link to="/signup" className="text-primary hover:underline">Sign up</Link>
+          <div className="flex flex-col gap-2 text-sm">
+            <div className="flex items-center justify-between">
+              <Link to="/forgot-password" className="text-primary hover:underline">Forgot password?</Link>
+              <div>
+                Don't have an account?{' '}
+                <Link to="/signup" className="text-primary hover:underline">Sign up</Link>
+              </div>
+            </div>
+            <div className="text-center">
+              <Link to="/verify-account" className="text-primary hover:underline">
+                Need to verify your account?
+              </Link>
             </div>
           </div>
 

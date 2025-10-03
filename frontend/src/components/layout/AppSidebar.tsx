@@ -48,7 +48,11 @@ const adminNavigation = [
       { name: "China (All)", href: "/goods/china", icon: Package },
       { name: "China Sea", href: "/goods/china/sea", icon: Ship },
       { name: "China Air", href: "/goods/china/air", icon: Plane },
-      { name: "Ghana (All)", href: "/goods/ghana", icon: MapPin },
+    ],
+  },
+  {
+    name: "Local Warehouse",
+    children: [
       { name: "Ghana Sea", href: "/goods/ghana/sea", icon: Ship },
       { name: "Ghana Air", href: "/goods/ghana/air", icon: Plane },
     ],
@@ -62,8 +66,20 @@ const adminNavigation = [
 // Customer Navigation
 const customerNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Daily Updates", href: "/daily-updates", icon: Bell },
-  { name: "My Goods", href: "/my-shipments", icon: Ship },
+  {
+    name: "Daily Updates",
+    children: [
+      { name: "Air Goods Received", href: "/daily-updates/air-goods", icon: Plane },
+      { name: "Sea Goods Received", href: "/daily-updates/sea-goods", icon: Ship },
+    ],
+  },
+  {
+    name: "Shipments",
+    children: [
+      { name: "Air Containers", href: "/shipments/air-containers", icon: Plane },
+      { name: "Sea Containers", href: "/shipments/sea-containers", icon: Ship },
+    ],
+  },
   { name: "My Claims", href: "/my-claims", icon: FileText },
   { name: "My Notes", href: "/my-notes", icon: StickyNote },
   { name: "Rates", href: "/my-rates", icon: Calculator },
