@@ -1,11 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,45 +12,55 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command';
 import {
   Users,
   UserPlus,
   UserX,
   Search,
+  Loader2,
   CheckCircle,
   AlertTriangle,
 } from 'lucide-react';
 import { containerExcelService } from '@/services/containerExcelService';
 import { useToast } from '@/hooks/use-toast';
 
+interface CandidateData {
+  source_row_number: number;
+  shipping_mark_normalized: string;
+  original_shipping_mark_raw: string;
+  description: string;
+  quantity: number;
+  cbm: number | null;
+  tracking_number: string;
+}
+
+interface SearchCustomer {
+  id: number;
+  shipping_mark: string;
+  name: string;
+  phone: string;
+  email: string;
+}
+
+interface ShippingMarkSuggestion {
+  customer: SearchCustomer;
+  similarity_type: string;
+  similarity_score?: number;
+}
+
 interface UnmatchedItem {
-  candidate: {
-    source_row_number: number;
-    shipping_mark_normalized: string;
-    original_shipping_mark_raw: string;
-    description: string;
-    quantity: number;
-    cbm: number | null;
-    tracking_number: string;
-  };
-  suggestions: Array<{
-    customer: {
-      id: number;
-      shipping_mark: string;
-      name: string;
-      phone: string;
-      email: string;
-    };
-    similarity_type: string;
-    similarity_score?: number;
-  }>;
+  candidate: CandidateData;
+  suggestions: ShippingMarkSuggestion[];
 }
 
 interface ResolvedMapping {
@@ -66,7 +75,7 @@ interface ResolvedMapping {
     first_name: string;
     last_name: string;
   };
-  candidate: any;
+  candidate: CandidateData;
 }
 
 interface ShippingMarkMappingDialogProps {
@@ -84,10 +93,6 @@ export function ShippingMarkMappingDialog({
 }: ShippingMarkMappingDialogProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [resolvedMappings, setResolvedMappings] = useState<ResolvedMapping[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [newCustomerData, setNewCustomerData] = useState({
     username: '',
@@ -97,52 +102,136 @@ export function ShippingMarkMappingDialog({
     first_name: '',
     last_name: '',
   });
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [customerSearchResults, setCustomerSearchResults] = useState<SearchCustomer[]>([]);
+  const [isCustomerSearching, setIsCustomerSearching] = useState(false);
+  const [isCustomerLoadingMore, setIsCustomerLoadingMore] = useState(false);
+  const [customerSearchPage, setCustomerSearchPage] = useState(1);
+  const [customerSearchHasMore, setCustomerSearchHasMore] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<SearchCustomer | null>(null);
 
   const { toast } = useToast();
 
   const currentItem = unmatchedItems[currentIndex];
   const isLastItem = currentIndex === unmatchedItems.length - 1;
+  const suggestions = useMemo(
+    () => currentItem?.suggestions ?? [],
+    [currentItem]
+  );
+  const suggestionIds = useMemo(
+    () => new Set(suggestions.map((suggestion) => suggestion.customer.id)),
+    [suggestions]
+  );
 
-  const searchCustomers = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
+  useEffect(() => {
+    if (!currentItem) {
       return;
     }
 
-    setIsSearching(true);
-    try {
-      const response = await containerExcelService.searchCustomers(query, 20);
-      console.log('Search response:', response);
-      setSearchResults(response?.customers || []);
-      if (response?.customers && response.customers.length > 0) {
-        setShowSearchDropdown(true);
+    const defaultTerm = currentItem.candidate.shipping_mark_normalized || '';
+    setCustomerSearchTerm(defaultTerm);
+    setCustomerSearchResults([]);
+    setSelectedCustomer(null);
+    setCustomerSearchOpen(false);
+    setShowNewCustomerForm(false);
+    setIsCustomerSearching(false);
+    setIsCustomerLoadingMore(false);
+    setCustomerSearchPage(1);
+    setCustomerSearchHasMore(false);
+  }, [currentItem]);
+
+  const fetchCustomers = useCallback(async (
+    query: string,
+    options: { page?: number; append?: boolean } = {}
+  ) => {
+    const { page = 1, append = false } = options;
+    const trimmedQuery = query.trim();
+
+    if (!append) {
+      setIsCustomerSearching(true);
+      setCustomerSearchPage(1);
+      setCustomerSearchHasMore(false);
+      if (page === 1) {
+        setCustomerSearchResults([]);
       }
-    } catch (error) {
-      console.error('Search error:', error);
-      toast({
-        title: "Search Failed",
-        description: "Failed to search customers",
-        variant: "destructive",
+    } else {
+      setIsCustomerLoadingMore(true);
+    }
+
+    try {
+      const response = await containerExcelService.searchCustomers(trimmedQuery, 100, page);
+      const customers = response?.customers ?? [];
+      const pagination = response?.pagination;
+
+      setCustomerSearchPage(pagination?.page ?? page);
+      setCustomerSearchHasMore(Boolean(pagination?.has_more));
+
+      setCustomerSearchResults((prev) => {
+        if (append) {
+          const existingIds = new Set(prev.map((customer) => customer.id));
+          const merged = customers.filter((customer) => !existingIds.has(customer.id));
+          return [...prev, ...merged];
+        }
+        return customers;
       });
-      setSearchResults([]);
-      setShowSearchDropdown(false);
+    } catch (error) {
+      console.error('Customer search error:', error);
+      toast({
+        title: 'Search Failed',
+        description: 'Unable to load customers. Please try again.',
+        variant: 'destructive',
+      });
+      if (!append) {
+        setCustomerSearchResults([]);
+      }
     } finally {
-      setIsSearching(false);
+      if (!append) {
+        setIsCustomerSearching(false);
+      } else {
+        setIsCustomerLoadingMore(false);
+      }
     }
   }, [toast]);
 
-  const handleSearchQueryChange = useCallback((query: string) => {
-    setSearchQuery(query);
-    if (query.trim()) {
-      searchCustomers(query);
-      setShowSearchDropdown(true);
-    } else {
-      setSearchResults([]);
-      setShowSearchDropdown(false);
+  useEffect(() => {
+    if (!customerSearchOpen) {
+      return;
     }
-  }, [searchCustomers]);
 
-  const resolveAsExisting = (customer: any) => {
+    const handler = setTimeout(() => {
+      fetchCustomers(customerSearchTerm, { page: 1, append: false });
+    }, 250);
+
+    return () => clearTimeout(handler);
+  }, [customerSearchOpen, customerSearchTerm, fetchCustomers, currentItem]);
+
+  const filteredSearchResults = useMemo(
+    () => customerSearchResults.filter((customer) => !suggestionIds.has(customer.id)),
+    [customerSearchResults, suggestionIds]
+  );
+
+  const loadMoreCustomers = useCallback(() => {
+    if (isCustomerLoadingMore || !customerSearchHasMore) {
+      return;
+    }
+    const nextPage = customerSearchPage + 1;
+    fetchCustomers(customerSearchTerm, { page: nextPage, append: true });
+  }, [
+    customerSearchHasMore,
+    customerSearchPage,
+    customerSearchTerm,
+    fetchCustomers,
+    isCustomerLoadingMore
+  ]);
+
+  const resolveAsExisting = (customer: SearchCustomer) => {
+    if (!currentItem) {
+      return;
+    }
+
+    setSelectedCustomer(customer);
+    setCustomerSearchTerm(customer.shipping_mark || '');
     const mapping: ResolvedMapping = {
       unmatched_item_id: `row_${currentItem.candidate.source_row_number}`,
       action: 'map_existing',
@@ -150,20 +239,23 @@ export function ShippingMarkMappingDialog({
       candidate: currentItem.candidate,
     };
 
-    setResolvedMappings(prev => [
-      ...prev.filter(m => m.unmatched_item_id !== mapping.unmatched_item_id),
-      mapping
-    ]);
-
-    proceedToNext();
+    setResolvedMappings(prev => {
+      const next = [
+        ...prev.filter(m => m.unmatched_item_id !== mapping.unmatched_item_id),
+        mapping
+      ];
+      proceedToNext(next);
+      return next;
+    });
+    setCustomerSearchOpen(false);
   };
 
   const resolveAsNew = () => {
     // Validate new customer form
-    if (!newCustomerData.username.trim() || !newCustomerData.shipping_mark.trim()) {
+    if (!newCustomerData.username.trim() || !newCustomerData.shipping_mark.trim() || !newCustomerData.phone.trim()) {
       toast({
         title: "Validation Error",
-        description: "Username and shipping mark are required",
+        description: "Username, phone number, and shipping mark are required",
         variant: "destructive",
       });
       return;
@@ -176,22 +268,26 @@ export function ShippingMarkMappingDialog({
       candidate: currentItem.candidate,
     };
 
-    setResolvedMappings(prev => [
-      ...prev.filter(m => m.unmatched_item_id !== mapping.unmatched_item_id),
-      mapping
-    ]);
+    setResolvedMappings(prev => {
+      const next = [
+        ...prev.filter(m => m.unmatched_item_id !== mapping.unmatched_item_id),
+        mapping
+      ];
+      proceedToNext(next);
+      return next;
+    });
 
     setShowNewCustomerForm(false);
+    setCustomerSearchOpen(false);
+    setSelectedCustomer(null);
     setNewCustomerData({
       username: '',
       email: '',
-      shipping_mark: '',
+      shipping_mark: currentItem?.candidate.shipping_mark_normalized || '',
       phone: '',
       first_name: '',
       last_name: '',
     });
-
-    proceedToNext();
   };
 
   const resolveAsSkip = () => {
@@ -201,34 +297,40 @@ export function ShippingMarkMappingDialog({
       candidate: currentItem.candidate,
     };
 
-    setResolvedMappings(prev => [
-      ...prev.filter(m => m.unmatched_item_id !== mapping.unmatched_item_id),
-      mapping
-    ]);
-
-    proceedToNext();
+    setResolvedMappings(prev => {
+      const next = [
+        ...prev.filter(m => m.unmatched_item_id !== mapping.unmatched_item_id),
+        mapping
+      ];
+      proceedToNext(next);
+      return next;
+    });
+    setCustomerSearchOpen(false);
+    setSelectedCustomer(null);
   };
 
-  const proceedToNext = () => {
+  const proceedToNext = (nextMappings?: ResolvedMapping[]) => {
+    const mappingsToUse = nextMappings ?? resolvedMappings;
     if (isLastItem) {
-      // Complete the mapping process
-      onMappingComplete(resolvedMappings);
+      onMappingComplete(mappingsToUse);
     } else {
       setCurrentIndex(prev => prev + 1);
-      setSearchQuery('');
-      setSearchResults([]);
-      setShowSearchDropdown(false);
       setShowNewCustomerForm(false);
+      setCustomerSearchTerm('');
+      setCustomerSearchResults([]);
+      setCustomerSearchOpen(false);
+      setSelectedCustomer(null);
     }
   };
 
   const goToPrevious = () => {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
-      setSearchQuery('');
-      setSearchResults([]);
-      setShowSearchDropdown(false);
       setShowNewCustomerForm(false);
+      setCustomerSearchTerm('');
+      setCustomerSearchResults([]);
+      setCustomerSearchOpen(false);
+      setSelectedCustomer(null);
     }
   };
 
@@ -296,13 +398,13 @@ export function ShippingMarkMappingDialog({
           </Card>
 
           {/* Suggestions */}
-          {currentItem.suggestions.length > 0 && (
+          {suggestions.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Similar Customers Found</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {currentItem.suggestions.map((suggestion, index) => (
+                {suggestions.map((suggestion, index) => (
                   <div
                     key={index}
                     className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
@@ -334,66 +436,144 @@ export function ShippingMarkMappingDialog({
             </Card>
           )}
 
-          {/* Search for Customer */}
+          {/* Map to Existing Customer */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Search Existing Customers</CardTitle>
+              <CardTitle className="text-sm">Map to Existing Customer</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="relative">
-                <div className="flex gap-2">
-                  <div className="flex-1 relative">
-                    <Input
-                      placeholder="Search by name, shipping mark, email, or phone..."
-                      value={searchQuery}
-                      onChange={(e) => handleSearchQueryChange(e.target.value)}
-                      onFocus={() => setShowSearchDropdown(true)}
-                    />
-                    {/* Search Dropdown */}
-                    {showSearchDropdown && searchResults && searchResults.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                        {searchResults.map((customer) => (
-                          <div
-                            key={customer.id}
-                            className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                            onClick={() => {
-                              resolveAsExisting(customer);
-                              setShowSearchDropdown(false);
-                            }}
-                          >
-                            <div className="flex-1">
-                              <p className="font-medium text-sm">{customer.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {customer.shipping_mark} • {customer.email}
-                              </p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                resolveAsExisting(customer);
-                                setShowSearchDropdown(false);
-                              }}
-                            >
-                              Select
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <Button variant="outline" size="icon" disabled={isSearching}>
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </div>
-                {/* Click outside handler */}
-                {showSearchDropdown && (
-                  <div 
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowSearchDropdown(false)}
-                  />
-                )}
+              <div className="grid gap-2">
+                <Label className="text-xs text-muted-foreground">Excel Shipping Mark</Label>
+                <Input
+                  value={currentItem.candidate.original_shipping_mark_raw || currentItem.candidate.shipping_mark_normalized}
+                  readOnly
+                  className="bg-muted/20"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Search &amp; Select Customer</Label>
+                <Popover
+                  open={customerSearchOpen}
+                  onOpenChange={(open) => {
+                    setCustomerSearchOpen(open);
+                    if (open && !customerSearchTerm) {
+                      setCustomerSearchTerm(currentItem.candidate.shipping_mark_normalized || '');
+                    }
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={customerSearchOpen}
+                      className="w-full justify-between"
+                    >
+                      {selectedCustomer
+                        ? `${selectedCustomer.shipping_mark} — ${selectedCustomer.name}`
+                        : customerSearchTerm
+                        ? `Search: ${customerSearchTerm}`
+                        : 'Search by shipping mark, name, email, or phone'}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[420px] p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        value={customerSearchTerm}
+                        onValueChange={(value) => setCustomerSearchTerm(value)}
+                        placeholder="Type to search customers..."
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {isCustomerSearching ? (
+                            <span className="flex items-center justify-center gap-2 text-sm">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Searching...
+                            </span>
+                          ) : (
+                            'No customers found.'
+                          )}
+                        </CommandEmpty>
+                        {suggestions.length > 0 && (
+                          <CommandGroup heading="Suggested matches">
+                            {suggestions.map((suggestion) => (
+                              <CommandItem
+                                key={`suggestion-${suggestion.customer.id}`}
+                                value={`${suggestion.customer.shipping_mark} ${suggestion.customer.name}`}
+                                onSelect={() => {
+                                  resolveAsExisting(suggestion.customer);
+                                  setCustomerSearchOpen(false);
+                                }}
+                              >
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="font-medium">
+                                    {suggestion.customer.shipping_mark}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {suggestion.customer.name} • {suggestion.customer.phone}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                        {suggestions.length > 0 && filteredSearchResults.length > 0 && (
+                          <CommandSeparator />
+                        )}
+                        {filteredSearchResults.length > 0 && (
+                          <CommandGroup heading="Search results">
+                            {filteredSearchResults.map((customer) => (
+                                <CommandItem
+                                  key={customer.id}
+                                  value={`${customer.shipping_mark} ${customer.name}`}
+                                  onSelect={() => {
+                                    resolveAsExisting(customer);
+                                    setCustomerSearchOpen(false);
+                                  }}
+                                >
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="font-medium">{customer.shipping_mark}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {customer.name} • {customer.phone}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            {customerSearchHasMore && (
+                              <div className="px-3 py-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full justify-center"
+                                  onClick={loadMoreCustomers}
+                                  disabled={isCustomerLoadingMore}
+                                >
+                                  {isCustomerLoadingMore ? (
+                                    <span className="flex items-center gap-2 text-xs">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      Loading more…
+                                    </span>
+                                  ) : (
+                                    'Load more results'
+                                  )}
+                                </Button>
+                              </div>
+                            )}
+                            {isCustomerSearching && !customerSearchHasMore && (
+                              <div className="flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Updating results…
+                              </div>
+                            )}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-muted-foreground">
+                  Map this Excel shipping mark to an existing customer by searching their shipping mark, name, email, or phone number.
+                </p>
               </div>
             </CardContent>
           </Card>

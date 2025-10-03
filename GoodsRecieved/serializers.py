@@ -3,7 +3,8 @@ from .models import GoodsReceivedChina, GoodsReceivedGhana, GoodsReceivedContain
 from users.models import CustomerUser
 import pandas as pd
 import io
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import uuid
 
 # Config
 CHINA_DEFAULT_LOCATION = "GUANGZHOU"
@@ -13,6 +14,7 @@ MAX_CBM_LIMIT = 10000  # Increased temporarily for debugging
 MAX_WEIGHT_LIMIT = 50000
 MAX_QUANTITY_LIMIT = 100000
 MAX_VALUE_LIMIT = 1000000
+MAX_SHIPPING_MARK_LENGTH = 100
 
 
 class BaseGoodsReceivedSerializer(serializers.ModelSerializer):
@@ -264,164 +266,219 @@ class ExcelUploadSerializer(serializers.Serializer):
             )
 
     def validate_excel_data(self, df, warehouse_type):
-        """Validate Excel data according to specific column structure A,B,C,D,E,G,H."""
+        """Validate Excel data according to specific column structure."""
+        if warehouse_type == "china":
+            return self._process_china_rows(df)
+        return self._process_ghana_rows(df)
+
+    def _process_china_rows(self, df):
+        """Leniently process China warehouse rows (columns A-F)."""
+        valid_rows = []
+
+        for index, row in df.iterrows():
+            shipping_mark_raw = row.iloc[0] if len(row) > 0 else None
+            shipping_mark = str(shipping_mark_raw).strip() if shipping_mark_raw is not None else ""
+            if not shipping_mark or shipping_mark.lower() in ["nan", "none", ""]:
+                shipping_mark = "UNKNOWN"
+
+            date_value = row.iloc[1] if len(row) > 1 else None
+            try:
+                date_receipt = self.parse_date(date_value, index, "Date of Receipt")
+            except serializers.ValidationError:
+                date_receipt = None
+
+            if date_receipt is None:
+                from django.utils import timezone
+                date_receipt = timezone.now().date()
+
+            description_raw = row.iloc[2] if len(row) > 2 else None
+            description = str(description_raw).strip() if description_raw is not None else ""
+            if not description or description.lower() in ["nan", "none", ""]:
+                description = "No description"
+
+            quantity_value = row.iloc[3] if len(row) > 3 else None
+            quantity = self._coerce_int(quantity_value, default=1)
+            if quantity <= 0:
+                quantity = 1
+            elif quantity > MAX_QUANTITY_LIMIT:
+                quantity = MAX_QUANTITY_LIMIT
+
+            cbm_value = row.iloc[4] if len(row) > 4 else None
+            cbm = self._coerce_decimal(cbm_value, default=Decimal("0"))
+            if cbm < 0:
+                cbm = Decimal("0")
+            elif cbm > MAX_CBM_LIMIT:
+                cbm = Decimal(str(MAX_CBM_LIMIT))
+
+            tracking_raw = row.iloc[5] if len(row) > 5 else None
+            tracking_value = str(tracking_raw).strip() if tracking_raw is not None else ""
+            if not tracking_value or tracking_value.lower() in ["nan", "none", ""]:
+                tracking_value = f"UNTRACKED-{uuid.uuid4().hex[:10].upper()}"
+
+            valid_rows.append({
+                "shipping_mark": shipping_mark[:MAX_SHIPPING_MARK_LENGTH],
+                "date_receipt": date_receipt,
+                "description": description,
+                "quantity": quantity,
+                "cbm": cbm,
+                "supply_tracking": tracking_value[:50],
+                "status": "PENDING",
+                "method_of_shipping": "SEA"
+            })
+
+        return valid_rows
+
+    def _process_ghana_rows(self, df):
+        """Validate Ghana warehouse rows with stricter requirements."""
         errors = []
-        
-        # Ensure we have the minimum required number of columns
-        if len(df.columns) < 8:
-            errors.append(f"Excel file must have at least 8 columns (A-H). Found {len(df.columns)} columns.")
-            
-        # Define expected column mapping based on position
+        row_errors = []
+
+        # Expected columns using Excel notation A-H (0-indexed positions)
         expected_columns = {
-            0: "shipping_mark",      # Column A: SHIPPING MARK/CLIENT
-            1: "date_receipt",       # Column B: DATE OF RECEIPT  
-            2: "date_loading",       # Column C: DATE OF LOADING
-            3: "description",        # Column D: DESCRIPTION
-            4: "quantity",           # Column E: CTNS (quantity)
-            6: "cbm",               # Column G: CBM  
-            7: "supply_tracking"     # Column H: SUPPLIERS TRACKING NO
+            0: "shipping_mark",
+            1: "date_receipt",
+            2: "date_loading",
+            3: "description",
+            4: "quantity",
+            6: "cbm",
+            7: "supply_tracking",
         }
-        
-        # Check if we have required columns by position
+
+        required_column_count = max(expected_columns.keys()) + 1
+        if len(df.columns) < required_column_count:
+            errors.append(
+                f"Excel file must have at least {required_column_count} columns. Found {len(df.columns)} columns."
+            )
+
         missing_columns = []
         for col_idx, field_name in expected_columns.items():
             if col_idx >= len(df.columns):
                 missing_columns.append(f"Column {chr(65 + col_idx)} ({field_name})")
-        
+
         if missing_columns:
             errors.append(f"Missing required columns: {', '.join(missing_columns)}")
-            
+
         if errors:
             raise serializers.ValidationError({"excel_errors": errors})
 
         valid_rows = []
-        row_errors = []
-        
+
         for index, row in df.iterrows():
             row_data = {}
             row_error_list = []
-            
+
             try:
-                # Column A: Shipping Mark (Required)
                 shipping_mark = str(row.iloc[0] if len(row) > 0 else "").strip()
                 if not shipping_mark or shipping_mark.lower() in ["nan", "none", ""]:
                     row_error_list.append(f"Row {index + 2}: Shipping Mark (Column A) is required")
                 else:
-                    row_data["shipping_mark"] = shipping_mark[:20]
-                
-                # Column B: Date of Receipt (Required)
+                    row_data["shipping_mark"] = shipping_mark[:MAX_SHIPPING_MARK_LENGTH]
+
                 try:
                     date_receipt = self.parse_date(row.iloc[1] if len(row) > 1 else None, index, "Date of Receipt")
                     if date_receipt is None:
                         row_error_list.append(f"Row {index + 2}: Date of Receipt (Column B) is required")
                     else:
                         row_data["date_receipt"] = date_receipt
-                except serializers.ValidationError as e:
-                    row_error_list.extend(e.detail)
-                
-                # Column C: Date of Loading (Optional)
+                except serializers.ValidationError as exc:
+                    detail = exc.detail if isinstance(exc.detail, list) else [str(exc.detail)]
+                    row_error_list.extend(detail)
+
                 try:
                     date_loading = self.parse_date(row.iloc[2] if len(row) > 2 else None, index, "Date of Loading")
                     if date_loading:
                         row_data["date_loading"] = date_loading
-                except serializers.ValidationError as e:
-                    row_error_list.extend(e.detail)
-                
-                # Column D: Description (Required)
+                except serializers.ValidationError as exc:
+                    detail = exc.detail if isinstance(exc.detail, list) else [str(exc.detail)]
+                    row_error_list.extend(detail)
+
                 description = str(row.iloc[3] if len(row) > 3 else "").strip()
                 if not description or description.lower() in ["nan", "none", ""]:
                     row_error_list.append(f"Row {index + 2}: Description (Column D) is required")
                 else:
                     row_data["description"] = description
-                
-                # Column E: CTNS/Quantity (Required)
-                try:
-                    qty_value = row.iloc[4] if len(row) > 4 else None
-                    if pd.isna(qty_value) or qty_value in (None, "", "nan"):
-                        row_error_list.append(f"Row {index + 2}: Quantity/CTNS (Column E) is required")
-                    else:
-                        qty = int(float(qty_value))
-                        if qty <= 0:
-                            row_error_list.append(f"Row {index + 2}: Quantity/CTNS must be greater than 0")
-                        elif qty > MAX_QUANTITY_LIMIT:
-                            row_error_list.append(f"Row {index + 2}: Quantity/CTNS too large (max {MAX_QUANTITY_LIMIT})")
-                        else:
-                            row_data["quantity"] = qty
-                except (ValueError, TypeError):
-                    row_error_list.append(f"Row {index + 2}: Invalid Quantity/CTNS format in Column E")
-                
-                # Column G: CBM (Required for Ghana/Sea cargo)
-                try:
-                    cbm_value = row.iloc[6] if len(row) > 6 else None
-                    if pd.isna(cbm_value) or cbm_value in (None, "", "nan"):
-                        if warehouse_type == "ghana":  # CBM required for Ghana warehouse
-                            row_error_list.append(f"Row {index + 2}: CBM (Column G) is required for Ghana warehouse")
-                    else:
-                        cbm = Decimal(str(cbm_value))
-                        if cbm <= 0:
-                            row_error_list.append(f"Row {index + 2}: CBM must be greater than 0")
-                        elif cbm > MAX_CBM_LIMIT:
-                            row_error_list.append(f"Row {index + 2}: CBM too large (max {MAX_CBM_LIMIT})")
-                        else:
-                            row_data["cbm"] = cbm
-                except (ValueError, TypeError, InvalidOperation):
-                    row_error_list.append(f"Row {index + 2}: Invalid CBM format in Column G")
-                
-                # Column H: Suppliers Tracking No (Required)
+
+                quantity = self._coerce_int(row.iloc[4] if len(row) > 4 else None)
+                if quantity is None:
+                    row_error_list.append(f"Row {index + 2}: Quantity (Column E) is required")
+                elif quantity <= 0:
+                    row_error_list.append(f"Row {index + 2}: Quantity must be greater than 0")
+                elif quantity > MAX_QUANTITY_LIMIT:
+                    row_error_list.append(f"Row {index + 2}: Quantity too large (max {MAX_QUANTITY_LIMIT})")
+                else:
+                    row_data["quantity"] = quantity
+
+                cbm = self._coerce_decimal(row.iloc[6] if len(row) > 6 else None)
+                if cbm is None:
+                    row_error_list.append(f"Row {index + 2}: CBM (Column G) is required for Ghana warehouse")
+                elif cbm <= 0:
+                    row_error_list.append(f"Row {index + 2}: CBM must be greater than 0")
+                elif cbm > MAX_CBM_LIMIT:
+                    row_error_list.append(f"Row {index + 2}: CBM too large (max {MAX_CBM_LIMIT})")
+                else:
+                    row_data["cbm"] = cbm
+
                 supply_tracking = str(row.iloc[7] if len(row) > 7 else "").strip()
                 if not supply_tracking or supply_tracking.lower() in ["nan", "none", ""]:
                     row_error_list.append(f"Row {index + 2}: Suppliers Tracking No (Column H) is required")
                 else:
                     row_data["supply_tracking"] = supply_tracking[:50]
-                
-                # Set default status
-                row_data["status"] = "PENDING" if warehouse_type == "china" else "READY_FOR_DELIVERY"
-                
-                # Set method of shipping based on warehouse and CBM
-                if warehouse_type == "ghana":
-                    # For Ghana: if CBM is provided, it's likely sea cargo
-                    row_data["method_of_shipping"] = "SEA" if row_data.get("cbm") else "AIR"
-                else:
-                    # For China: default to SEA, but this can be overridden
-                    row_data["method_of_shipping"] = "SEA"
-                
-                # Only add to valid rows if no errors
+
+                row_data["status"] = "READY_FOR_DELIVERY"
+                row_data["method_of_shipping"] = "SEA" if row_data.get("cbm") else "AIR"
+
                 if not row_error_list:
                     valid_rows.append(row_data)
                 else:
                     row_errors.extend(row_error_list)
-                    
-            except Exception as e:
-                row_errors.append(f"Row {index + 2}: Unexpected error - {str(e)}")
 
-        if errors or row_errors:
-            raise serializers.ValidationError({"excel_errors": errors + row_errors})
-            
+            except Exception as exc:
+                row_errors.append(f"Row {index + 2}: Unexpected error - {str(exc)}")
+
+        if row_errors:
+            raise serializers.ValidationError({"excel_errors": row_errors})
+
         return valid_rows
+
+    def _coerce_int(self, value, default=None):
+        if pd.isna(value) or value in (None, "", "nan"):
+            return default
+        try:
+            return int(float(str(value).strip()))
+        except (ValueError, TypeError):
+            return default
+
+    def _coerce_decimal(self, value, default=None):
+        def normalize(val):
+            if val is None:
+                return None
+            if pd.isna(val) or val in ("", "nan"):
+                return None
+            if not isinstance(val, Decimal):
+                val = Decimal(str(val).strip())
+            return val.quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP)
+
+        if pd.isna(value) or value in (None, "", "nan"):
+            return normalize(default)
+        try:
+            return normalize(value)
+        except (InvalidOperation, ValueError, TypeError):
+            return normalize(default)
 
     def process_excel_file(self):
         file = self.validated_data["file"]
         warehouse_type = self.validated_data["warehouse"]
         
         try:
-            # Read Excel file
-            df = pd.read_excel(io.BytesIO(file.read()))
-            
-            # Skip header row if it exists (check if first row contains text headers)
-            if len(df) > 0:
-                first_row = df.iloc[0]
-                # If first row contains header-like text, skip it
-                if any(isinstance(val, str) and any(header_word in str(val).upper() 
-                      for header_word in ['SHIPPING', 'DATE', 'DESCRIPTION', 'CTNS', 'CBM', 'TRACKING']) 
-                      for val in first_row):
-                    df = df.iloc[1:].reset_index(drop=True)
-            
+            # Read Excel file without assuming headers
+            df = pd.read_excel(io.BytesIO(file.read()), header=None)
+
             # Remove completely empty rows
             df = df.dropna(how='all').reset_index(drop=True)
-            
+
             if len(df) == 0:
                 raise serializers.ValidationError({"excel_errors": ["No data found in Excel file"]})
-            
+
             valid_rows = self.validate_excel_data(df, warehouse_type)
             
             return {
@@ -588,6 +645,9 @@ class CreateGoodsReceivedItemSerializer(serializers.ModelSerializer):
             'description', 'quantity', 'weight', 'cbm', 'length', 'breadth', 
             'height', 'estimated_value', 'supplier_name', 'location', 'notes'
         ]
+        extra_kwargs = {
+            'customer': {'required': False, 'allow_null': True},
+        }
     
     def create(self, validated_data):
         print(f"DEBUG: Creating goods received item with data: {validated_data}")

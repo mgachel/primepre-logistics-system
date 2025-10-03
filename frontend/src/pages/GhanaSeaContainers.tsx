@@ -246,7 +246,7 @@ export default function GhanaSeaContainers() {
       accessor: (c) => {
         const totalCbm = c.cbm || 0;
         return totalCbm > 0 ? (
-          <span className="text-sm">{totalCbm.toFixed(3)} m³</span>
+          <span className="text-sm">{totalCbm.toFixed(5)} m³</span>
         ) : (
           <span className="text-sm text-muted-foreground">-</span>
         );

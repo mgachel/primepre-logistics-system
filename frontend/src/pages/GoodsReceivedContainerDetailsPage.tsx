@@ -412,7 +412,7 @@ export default function GoodsReceivedContainerDetailsPage() {
             id: "cbm",
             header: "CBM",
             accessor: (item: GoodsReceivedItem) => (
-              <div className="text-right">{(parseFloat(item.cbm?.toString() || '0') || 0).toFixed(3)}</div>
+              <div className="text-right">{(parseFloat(item.cbm?.toString() || '0') || 0).toFixed(5)}</div>
             ),
             align: "right" as const,
           },
@@ -606,7 +606,7 @@ export default function GoodsReceivedContainerDetailsPage() {
                     </div>
                     <div className="flex gap-8">
                       {container?.container_type === "sea" ? (
-                        <span>CBM: {totalCBM.toFixed(3)}</span>
+                        <span>CBM: {totalCBM.toFixed(5)}</span>
                       ) : (
                         <span>Weight: {totalWeight.toFixed(1)} kg</span>
                       )}

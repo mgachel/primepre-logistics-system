@@ -5,8 +5,11 @@ from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.filters import SearchFilter, OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
+from django.utils import timezone
 
 from .models import CargoContainer, CargoItem, ClientShipmentSummary
 from users.models import CustomerUser
@@ -468,33 +471,139 @@ class ExcelTemplateDownloadView(APIView):
 # ================================================================
 
 class CustomerCargoContainerViewSet(viewsets.ReadOnlyModelViewSet):
-    """Customer-specific read-only ViewSet for their containers"""
+    """Customer-facing viewset that exposes recent cargo containers."""
     permission_classes = [IsAuthenticated]
     serializer_class = CargoContainerSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['cargo_type', 'status', 'location', 'warehouse_type']
+    search_fields = ['container_id', 'route']
+    ordering_fields = ['load_date', 'eta', 'created_at', 'stay_days', 'delay_days']
+    ordering = ['-load_date', '-created_at']
+
+    def _parse_date(self, value):
+        if not value:
+            return None
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            return None
 
     def get_queryset(self):
         user = self.request.user
-        if user.user_role == 'CUSTOMER':
-            # Filter containers by customer user or shipping mark
-            return CargoContainer.objects.filter(
-                Q(customer_user=user) | Q(shipping_mark=user.shipping_mark)
-            ).order_by('-created_at')
-        return CargoContainer.objects.none()
+        if getattr(user, 'user_role', None) != 'CUSTOMER':
+            return CargoContainer.objects.none()
+
+        qs = CargoContainer.objects.all()
+
+        today = timezone.now().date()
+        default_start = today - timedelta(days=30)
+
+        requested_start = self._parse_date(self.request.query_params.get('date_from'))
+        requested_end = self._parse_date(self.request.query_params.get('date_to'))
+
+        start_date = requested_start or default_start
+        qs = qs.filter(load_date__gte=start_date)
+
+        if requested_end:
+            qs = qs.filter(load_date__lte=requested_end)
+
+        cargo_type = self.request.query_params.get('type') or self.request.query_params.get('cargo_type')
+        if cargo_type:
+            mapped_type = {
+                'sea': 'sea',
+                'air': 'air',
+                'SEA': 'sea',
+                'AIR': 'air'
+            }.get(cargo_type, cargo_type.lower())
+            qs = qs.filter(cargo_type=mapped_type)
+
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            status_map = {
+                'PENDING': 'pending',
+                'IN_TRANSIT': 'in_transit',
+                'DELIVERED': 'delivered',
+                'DELAYED': 'demurrage',
+                'DEMURRAGE': 'demurrage',
+                'pending': 'pending',
+                'in_transit': 'in_transit',
+                'delivered': 'delivered',
+                'delayed': 'demurrage',
+                'demurrage': 'demurrage'
+            }
+            mapped_status = status_map.get(status_param, status_param.lower())
+            qs = qs.filter(status=mapped_status)
+
+        location_param = self.request.query_params.get('location')
+        if location_param:
+            location_map = {
+                'china': 'china',
+                'ghana': 'ghana',
+                'transit': 'transit',
+                'CHINA': 'china',
+                'GHANA': 'ghana',
+                'TRANSIT': 'transit',
+                'guangzhou': 'china',
+                'accra': 'ghana',
+            }
+            mapped_location = location_map.get(location_param, location_param.lower())
+            qs = qs.filter(location=mapped_location)
+
+        warehouse_type = self.request.query_params.get('warehouse_type')
+        if warehouse_type:
+            qs = qs.filter(warehouse_type=warehouse_type)
+
+        return qs.order_by('-load_date', '-created_at').distinct()
 
 
 class CustomerCargoItemViewSet(viewsets.ReadOnlyModelViewSet):
     """Customer-specific read-only ViewSet for their cargo items"""
     permission_classes = [IsAuthenticated]
     serializer_class = CargoItemSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status']
+    search_fields = ['tracking_id', 'item_description', 'container__container_id']
+    ordering_fields = ['created_at', 'updated_at', 'quantity']
+    ordering = ['-created_at']
 
     def get_queryset(self):
         user = self.request.user
-        if user.user_role == 'CUSTOMER':
-            # Filter cargo items by customer user or shipping mark
-            return CargoItem.objects.filter(
-                Q(customer_user=user) | Q(shipping_mark=user.shipping_mark)
-            ).order_by('-created_at')
-        return CargoItem.objects.none()
+        if getattr(user, 'user_role', None) != 'CUSTOMER':
+            return CargoItem.objects.none()
+
+        qs = CargoItem.objects.filter(
+            Q(client=user) | Q(client__shipping_mark=user.shipping_mark)
+        ).select_related('container')
+
+        cargo_type = self.request.query_params.get('type') or self.request.query_params.get('cargo_type')
+        if cargo_type:
+            cargo_type = cargo_type.lower()
+            type_map = {
+                'sea': 'sea',
+                'air': 'air',
+                'SEA': 'sea',
+                'AIR': 'air'
+            }
+            mapped_type = type_map.get(cargo_type, cargo_type)
+            qs = qs.filter(container__cargo_type=mapped_type)
+
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            status_map = {
+                'PENDING': 'pending',
+                'IN_TRANSIT': 'in_transit',
+                'DELIVERED': 'delivered',
+                'DELAYED': 'delayed',
+                'pending': 'pending',
+                'in_transit': 'in_transit',
+                'delivered': 'delivered',
+                'delayed': 'delayed'
+            }
+            mapped_status = status_map.get(status_param)
+            if mapped_status:
+                qs = qs.filter(status=mapped_status)
+
+        return qs.order_by('-created_at')
 
 
 class CustomerShippingMarkListView(APIView):

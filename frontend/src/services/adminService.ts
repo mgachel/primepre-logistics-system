@@ -65,7 +65,9 @@ export interface AdminFilters {
   region?: string;
   search?: string;
   page?: number;
+  page_size?: number;
   limit?: number;
+  ordering?: string;
 }
 
 export interface UserStats {

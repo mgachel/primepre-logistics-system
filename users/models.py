@@ -74,7 +74,7 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, blank=True, null=True)
     phone = models.CharField(max_length=15, unique=True)
     region = models.CharField(max_length=20, choices=REGION_CHOICES)
-    shipping_mark = models.CharField(max_length=20, unique=True)
+    shipping_mark = models.CharField(max_length=100, unique=True)
     
     # User Classification
     user_role = models.CharField(

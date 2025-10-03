@@ -13,16 +13,24 @@ def create_shipment_from_china(sender, instance, created, **kwargs):
     When goods are received in China, auto-create a Shipment.
     """
     if created:
-        Shipments.objects.create(
-            goods_received_china=instance,
-            shipping_mark=instance.shipping_mark,
-            supply_tracking=instance.supply_tracking,
-            quantity=instance.quantity,
-            cbm=instance.cbm,
-            weight=instance.weight,
-            date_received=instance.date_received,
-            status="pending",
-            method_of_shipping=instance.method_of_shipping.lower(),
+        supply_tracking = instance.supply_tracking
+        if not supply_tracking:
+            return
+
+        defaults = {
+            "goods_received_china": instance,
+            "shipping_mark": instance.shipping_mark or "UNKNOWN",
+            "quantity": instance.quantity,
+            "cbm": instance.cbm,
+            "weight": instance.weight,
+            "date_received": instance.date_received,
+            "status": "pending",
+            "method_of_shipping": (instance.method_of_shipping or "sea").lower(),
+        }
+
+        _shipment, _created = Shipments.objects.update_or_create(
+            supply_tracking=supply_tracking,
+            defaults=defaults,
         )
     else:
         # If goods are marked as shipped, update Shipment

@@ -30,7 +30,8 @@ from .serializers import (
     GoodsReceivedItemSerializer,
     CreateGoodsReceivedContainerSerializer,
     CreateGoodsReceivedItemSerializer,
-    GoodsReceivedContainerStatsSerializer
+    GoodsReceivedContainerStatsSerializer,
+    MAX_SHIPPING_MARK_LENGTH
 )
 
 logger = logging.getLogger(__name__)
@@ -303,12 +304,11 @@ class BaseGoodsReceivedViewSet(viewsets.ModelViewSet):
                     supply_tracking = row.get('supply_tracking')
 
                     try:
-                        # Resolve customer by shipping_mark
+                        # Resolve customer by shipping_mark (optional for China uploads)
                         customer = None
                         if shipping_mark:
-                            try:
-                                customer = CustomerUser.objects.get(shipping_mark=shipping_mark)
-                            except CustomerUser.DoesNotExist:
+                            customer = CustomerUser.objects.filter(shipping_mark=shipping_mark).first()
+                            if not customer and processed['warehouse_type'] != 'china':
                                 errors.append(f"Row {row_index + 1}: Customer with shipping_mark '{shipping_mark}' not found")
                                 failed.append(supply_tracking)
                                 continue
@@ -322,7 +322,7 @@ class BaseGoodsReceivedViewSet(viewsets.ModelViewSet):
                         # Build kwargs to create object with new date fields
                         create_kwargs = {
                             'customer': customer,
-                            'shipping_mark': shipping_mark,
+                            'shipping_mark': (shipping_mark or 'UNKNOWN')[:MAX_SHIPPING_MARK_LENGTH],
                             'supply_tracking': supply_tracking,
                             'cbm': row.get('cbm'),
                             'weight': row.get('weight', None),
@@ -816,8 +816,30 @@ class CustomerGoodsReceivedChinaViewSet(viewsets.ReadOnlyModelViewSet):
     model_class = GoodsReceivedChina
 
     def get_queryset(self):
-        # Return ALL China goods for any customer to see
-        return self.model_class.objects.all()
+        # Return ALL China goods for any customer to see, limited to recent activity
+        qs = self.model_class.objects.all()
+
+        def parse_date(value):
+            if not value:
+                return None
+            try:
+                return datetime.strptime(value, "%Y-%m-%d").date()
+            except (TypeError, ValueError):
+                return None
+
+        today = timezone.now().date()
+        default_start = today - timedelta(days=30)
+
+        requested_start = parse_date(self.request.query_params.get('date_from'))
+        requested_end = parse_date(self.request.query_params.get('date_to'))
+
+        start_date = requested_start or default_start
+        qs = qs.filter(date_received__gte=start_date)
+
+        if requested_end:
+            qs = qs.filter(date_received__lte=requested_end)
+
+        return qs
 
     @action(detail=False, methods=['get'])
     def statistics(self, request):

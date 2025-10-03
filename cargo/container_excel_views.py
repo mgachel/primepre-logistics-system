@@ -4,6 +4,7 @@ Handles Excel file processing, shipping mark matching, and batch item creation.
 """
 import tempfile
 import os
+import re
 from rest_framework import serializers, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -12,9 +13,12 @@ from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.core.files.storage import default_storage
 from django.db import models
-from .models import CargoContainer, CargoItem
+from django.db.models import F, Value, Case, When, IntegerField
+from django.db.models.functions import Upper, Replace
+from .models import CargoContainer, CargoItem, ClientShipmentSummary
 from .excel_utils import ExcelRowParser
 from .shipping_mark_matcher import process_excel_upload
+from users.customer_excel_utils import create_customer_from_data
 import logging
 
 logger = logging.getLogger(__name__)
@@ -253,31 +257,57 @@ class ContainerItemsCreateView(APIView):
                         continue
                     
                     if mapping['action'] == 'map_existing':
-                        customer = CustomerUser.objects.get(id=mapping['customer_id'])
+                        try:
+                            customer = CustomerUser.objects.get(id=mapping['customer_id'])
+                        except CustomerUser.DoesNotExist:
+                            errors.append({
+                                'error': f"Customer with id {mapping.get('customer_id')} not found",
+                                'mapping': mapping
+                            })
+                            continue
                     elif mapping['action'] == 'create_new':
-                        # Create new customer
-                        customer_data = mapping['new_customer_data']
-                        customer = CustomerUser.objects.create_user(
-                            username=customer_data.get('username'),
-                            email=customer_data.get('email', ''),
-                            shipping_mark=customer_data.get('shipping_mark'),
-                            phone=customer_data.get('phone', ''),
-                            first_name=customer_data.get('first_name', ''),
-                            last_name=customer_data.get('last_name', '')
-                        )
+                        try:
+                            customer_payload = dict(mapping.get('new_customer_data', {}))
+                            if candidate.get('shipping_mark_normalized') and not customer_payload.get('shipping_mark'):
+                                customer_payload['shipping_mark'] = candidate['shipping_mark_normalized']
+
+                            customer = create_customer_from_data(
+                                customer_payload,
+                                request.user if hasattr(request, 'user') and request.user.is_authenticated else None
+                            )
+                        except Exception as exc:
+                            errors.append({
+                                'error': str(exc),
+                                'mapping': mapping,
+                                'source_row_number': candidate.get('source_row_number')
+                            })
+                            continue
                     else:
                         continue
                     
                     # Create cargo item
+                    cbm_value = candidate.get('cbm')
+                    if cbm_value is not None:
+                        try:
+                            cbm_value = float(cbm_value)
+                        except (TypeError, ValueError):
+                            cbm_value = None
+
                     cargo_item = CargoItem(
                         container=container,
                         client=customer,
                         tracking_id=candidate['tracking_number'] or '',
                         item_description=candidate['description'],
                         quantity=candidate['quantity'],
-                        cbm=candidate['cbm']
+                        cbm=cbm_value
                     )
                     cargo_item.save()
+
+                    summary, _ = ClientShipmentSummary.objects.get_or_create(
+                        container=container,
+                        client=customer
+                    )
+                    summary.update_totals()
                     
                     created_items.append({
                         'cargo_item_id': str(cargo_item.id),
@@ -320,23 +350,77 @@ class CustomerSearchView(APIView):
         - q: Search query (shipping mark or name)
         - limit: Maximum results (default 10)
         """
-        query = request.query_params.get('q', '').strip()
-        limit = min(int(request.query_params.get('limit', 10)), 50)  # Max 50 results
-        
-        if not query:
-            return Response({
-                'customers': []
-            })
-        
-        # Search by shipping mark, name, email, phone
-        customers = CustomerUser.objects.filter(
-            models.Q(shipping_mark__icontains=query) |
-            models.Q(first_name__icontains=query) |
-            models.Q(last_name__icontains=query) |
-            models.Q(email__icontains=query) |
-            models.Q(phone__icontains=query)
-        )[:limit]
-        
+        query = (request.query_params.get('q') or '').strip()
+
+        try:
+            limit = int(request.query_params.get('limit', 20))
+        except (TypeError, ValueError):
+            limit = 20
+        limit = max(1, min(limit, 500))
+
+        try:
+            page = int(request.query_params.get('page', 1))
+        except (TypeError, ValueError):
+            page = 1
+        page = max(1, page)
+
+        offset = (page - 1) * limit
+
+        base_queryset = CustomerUser.objects.filter(user_role='CUSTOMER')
+
+        shipping_mark_upper_expr = Upper(F('shipping_mark'))
+        compact_expr = shipping_mark_upper_expr
+        for ch in [' ', '-', '_', '/', '.', ',', '#', '&']:
+            compact_expr = Replace(compact_expr, Value(ch), Value(''))
+
+        annotated_queryset = base_queryset.annotate(
+            shipping_mark_upper=shipping_mark_upper_expr,
+            shipping_mark_compact=compact_expr,
+        )
+
+        query_upper = query.upper()
+        sanitized_query = re.sub(r'[^A-Z0-9]', '', query_upper)
+
+        filters = models.Q()
+        if query:
+            filters |= (
+                models.Q(shipping_mark__icontains=query) |
+                models.Q(first_name__icontains=query) |
+                models.Q(last_name__icontains=query) |
+                models.Q(email__icontains=query) |
+                models.Q(phone__icontains=query)
+            )
+            if sanitized_query:
+                filters |= models.Q(shipping_mark_compact__contains=sanitized_query)
+
+        if filters:
+            annotated_queryset = annotated_queryset.filter(filters)
+
+        rank_whens = []
+        if query_upper:
+            rank_whens.append(When(shipping_mark_upper=query_upper, then=Value(0)))
+        if sanitized_query:
+            rank_whens.append(When(shipping_mark_compact=sanitized_query, then=Value(1)))
+            rank_whens.append(When(shipping_mark_compact__startswith=sanitized_query, then=Value(2)))
+        if query_upper:
+            rank_whens.append(When(shipping_mark_upper__startswith=query_upper, then=Value(3)))
+            rank_whens.append(When(shipping_mark_upper__icontains=query_upper, then=Value(4)))
+
+        if rank_whens:
+            match_rank_expr = Case(
+                *rank_whens,
+                default=Value(9),
+                output_field=IntegerField()
+            )
+        else:
+            match_rank_expr = Value(9)
+
+        annotated_queryset = annotated_queryset.annotate(match_rank=match_rank_expr)
+
+        total_matches = annotated_queryset.count()
+
+        customers = annotated_queryset.order_by('match_rank', 'shipping_mark_upper', 'id')[offset:offset + limit]
+
         customer_data = []
         for customer in customers:
             customer_data.append({
@@ -344,9 +428,17 @@ class CustomerSearchView(APIView):
                 'shipping_mark': customer.shipping_mark or '',
                 'name': customer.get_full_name() or customer.phone,
                 'email': customer.email,
-                'phone': customer.phone if hasattr(customer, 'phone') else ''
+                'phone': getattr(customer, 'phone', '') or ''
             })
-        
+
+        has_more = offset + len(customer_data) < total_matches
+
         return Response({
-            'customers': customer_data
+            'customers': customer_data,
+            'pagination': {
+                'page': page,
+                'limit': limit,
+                'total': total_matches,
+                'has_more': has_more
+            }
         })

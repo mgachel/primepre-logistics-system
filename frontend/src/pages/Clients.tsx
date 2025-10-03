@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
@@ -44,15 +44,6 @@ export default function Clients() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Refresh handler for dashboard-related queries
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-    queryClient.invalidateQueries({ queryKey: ["goods-stats"] });
-    queryClient.invalidateQueries({ queryKey: ["containers-summary"] });
-    queryClient.invalidateQueries({ queryKey: ["admin-user-stats"] });
-    queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
-    queryClient.invalidateQueries({ queryKey: ["customer-claims"] });
-  };
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<
     "all" | "active" | "inactive"
@@ -68,65 +59,121 @@ export default function Clients() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
-  // Pagination state
-  const [allClients, setAllClients] = useState<User[]>([]);
+  const [clientResults, setClientResults] = useState<User[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [loadingAllClients, setLoadingAllClients] = useState(false);
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
-  // Function to fetch all clients across all pages
-  const fetchAllClients = async (
-    searchParams: Record<string, string | boolean>
-  ) => {
-    setLoadingAllClients(true);
-    try {
-      let allResults: User[] = [];
-      let currentPage = 1;
-      let hasMore = true;
-      let total = 0;
+  const baseQueryParams = useMemo<Record<string, string | number | boolean>>(
+    () => {
+      const params: Record<string, string | number | boolean> = {
+        user_role: "CUSTOMER",
+        ordering: "-date_joined",
+      };
+      if (searchTerm) params.search = searchTerm;
+      return params;
+    },
+    [searchTerm]
+  );
 
-      while (hasMore) {
-        const search = new URLSearchParams();
-        Object.entries(searchParams).forEach(([k, v]) =>
-          search.append(k, String(v))
-        );
-        search.append("page", currentPage.toString());
+  const queryParams = useMemo<Record<string, string | number | boolean>>(
+    () => {
+      const params = { ...baseQueryParams };
+      if (filterStatus !== "all") {
+        params.is_active = filterStatus === "active";
+      }
+      return params;
+    },
+    [baseQueryParams, filterStatus]
+  );
 
-        const response = await adminService.getAllUsers(
-          Object.fromEntries(search.entries())
-        );
+  const refreshCounts = useCallback(
+    async (currentTotal?: number) => {
+      const total = currentTotal ?? totalCount;
 
-        if (response.data) {
-          allResults = [...allResults, ...(response.data.results || [])];
-          total = response.data.count || 0;
-          hasMore = !!response.data.next;
-          currentPage++;
-        } else {
-          hasMore = false;
+      if (filterStatus === "all") {
+        try {
+          const [activeRes, inactiveRes] = await Promise.all([
+            adminService.getAllUsers({
+              ...baseQueryParams,
+              is_active: true,
+              page: 1,
+              page_size: 1,
+            }),
+            adminService.getAllUsers({
+              ...baseQueryParams,
+              is_active: false,
+              page: 1,
+              page_size: 1,
+            }),
+          ]);
+
+          setActiveCount(activeRes.data?.count ?? 0);
+          setInactiveCount(inactiveRes.data?.count ?? 0);
+        } catch (error) {
+          console.error("Failed to fetch client counts:", error);
+          setActiveCount(0);
+          setInactiveCount(0);
         }
+      } else if (filterStatus === "active") {
+        setActiveCount(total);
+        setInactiveCount(0);
+      } else {
+        setActiveCount(0);
+        setInactiveCount(total);
+      }
+    },
+    [filterStatus, baseQueryParams, totalCount]
+  );
+
+  const loadClients = useCallback(async () => {
+    setLoadingClients(true);
+    try {
+      const response = await adminService.getAllUsers({
+        ...queryParams,
+        page,
+        page_size: pageSize,
+      });
+
+      const results = response.data?.results || [];
+      const total = response.data?.count || 0;
+      const totalPages = total === 0 ? 1 : Math.ceil(total / pageSize);
+
+      if (page > totalPages) {
+        setPage(totalPages);
+        return;
       }
 
-      setAllClients(allResults);
+      setClientResults(results);
       setTotalCount(total);
+      await refreshCounts(total);
     } catch (error) {
-      console.error("Failed to fetch all clients:", error);
-      setAllClients([]);
+      console.error("Failed to fetch clients:", error);
+      setClientResults([]);
       setTotalCount(0);
+      setActiveCount(0);
+      setInactiveCount(0);
     } finally {
-      setLoadingAllClients(false);
+      setLoadingClients(false);
     }
-  };
+  }, [queryParams, page, pageSize, refreshCounts]);
 
-  // Load all clients when filters change
   useEffect(() => {
-    const params: Record<string, string | boolean> = {
-      user_role: "CUSTOMER",
-      ordering: "-date_joined",
-    };
-    if (searchTerm) params.search = searchTerm;
-    if (filterStatus !== "all") params.is_active = filterStatus === "active";
+    loadClients();
+  }, [loadClients]);
 
-    fetchAllClients(params);
-  }, [searchTerm, filterStatus]);
+  const handleRefresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
+    queryClient.invalidateQueries({ queryKey: ["goods-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["containers-summary"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-user-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
+    queryClient.invalidateQueries({ queryKey: ["customer-claims"] });
+    loadClients();
+  }, [queryClient, loadClients]);
 
   // Load ALL shipments for the selected client when details drawer opens
   useEffect(() => {
@@ -139,6 +186,7 @@ export default function Clients() {
         // Get ALL cargo items for this client (not just delivered)
         const res = await cargoService.getCargoItems({
           client: detailsUser.id as unknown as number,
+          page_size: 5000,
         });
         const results = res.data?.results || [];
         results.sort((a, b) =>
@@ -160,19 +208,9 @@ export default function Clients() {
     };
   }, [detailsOpen, detailsUser]);
 
-  const queryParams = useMemo(() => {
-    const params: Record<string, string | boolean> = {
-      user_role: "CUSTOMER",
-      ordering: "-date_joined",
-    };
-    if (searchTerm) params.search = searchTerm;
-    if (filterStatus !== "all") params.is_active = filterStatus === "active";
-    return params;
-  }, [searchTerm, filterStatus]);
-
-  const clients = useMemo(
+  const tableRows = useMemo(
     () =>
-      allClients.map((u) => {
+      clientResults.map((u) => {
         const name = u.full_name || `${u.first_name} ${u.last_name}`.trim();
         const lastActivity = formatDate(u.date_joined);
         // Convert region from backend format (e.g., "GREATER_ACCRA") to readable format
@@ -199,19 +237,19 @@ export default function Clients() {
           _raw: u,
         };
       }),
-    [allClients]
+    [clientResults]
   );
 
   const counts = useMemo(
     () => ({
-      all: allClients.length,
-      active: allClients.filter((u) => u.is_active).length,
-      inactive: allClients.filter((u) => !u.is_active).length,
+      all: totalCount,
+      active: activeCount,
+      inactive: inactiveCount,
     }),
-    [allClients]
+    [totalCount, activeCount, inactiveCount]
   );
 
-  const cols: Column<(typeof clients)[number]>[] = [
+  const cols: Column<(typeof tableRows)[number]>[] = [
     {
       id: "select",
       header: (
@@ -345,14 +383,17 @@ export default function Clients() {
           <Input
             placeholder="Search clients..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
             className="pl-10"
           />
           <Button
             variant="outline"
             size="sm"
             style={{ marginLeft: 8 }}
-            onClick={() => fetchAllClients(queryParams)}
+            onClick={() => loadClients()}
           >
             <Search className="h-4 w-4 mr-1" />
             Search
@@ -364,6 +405,7 @@ export default function Clients() {
             size="sm"
             onClick={() => {
               setFilterStatus("all");
+              setPage(1);
               persistSet("clients:filterStatus", "all");
             }}
           >
@@ -374,6 +416,7 @@ export default function Clients() {
             size="sm"
             onClick={() => {
               setFilterStatus("active");
+              setPage(1);
               persistSet("clients:filterStatus", "active");
             }}
           >
@@ -384,6 +427,7 @@ export default function Clients() {
             size="sm"
             onClick={() => {
               setFilterStatus("inactive");
+              setPage(1);
               persistSet("clients:filterStatus", "inactive");
             }}
           >
@@ -406,6 +450,7 @@ export default function Clients() {
               onClick={() => {
                 setFilterStatus("all");
                 setSearchTerm("");
+                setPage(1);
                 persistSet("clients:filterStatus", "all");
               }}
             >
@@ -415,15 +460,15 @@ export default function Clients() {
         </div>
         <DataTable
           id="clients"
-          rows={clients}
+          rows={tableRows}
           columns={cols}
-          loading={loadingAllClients}
+          loading={loadingClients}
           empty={
             <div className="text-muted-foreground">
               No clients yet. Add Client or Import from Excel.
             </div>
           }
-          renderBulkBar={(rows) => (
+          renderBulkBar={(_rows) => (
             <div className="flex gap-2">
               <Button size="sm" variant="outline">
                 <Briefcase className="h-4 w-4 mr-1" />
@@ -491,20 +536,8 @@ export default function Clients() {
                       }.`,
                     });
 
-                    // Refresh list by re-fetching all clients
-                    const params: {
-                      user_role: string;
-                      ordering: string;
-                      search?: string;
-                      is_active?: boolean;
-                    } = {
-                      user_role: "CUSTOMER",
-                      ordering: "-date_joined",
-                    };
-                    if (searchTerm) params.search = searchTerm;
-                    if (filterStatus !== "all")
-                      params.is_active = filterStatus === "active";
-                    fetchAllClients(params);
+                    // Refresh list by re-fetching current page
+                    loadClients();
                   } catch (e: unknown) {
                     toast({
                       title: `Failed to ${action}`,
@@ -534,6 +567,17 @@ export default function Clients() {
           onRowClick={(row) => {
             setDetailsUser(row._raw);
             setDetailsOpen(true);
+          }}
+          pagination={{
+            page,
+            pageSize,
+            total: totalCount,
+            onPageChange: (nextPage) => setPage(nextPage),
+            onPageSizeChange: (nextSize) => {
+              setPageSize(nextSize);
+              setPage(1);
+            },
+            pageSizeOptions: [10, 25, 50, 100],
           }}
         />
       </div>

@@ -25,7 +25,6 @@ import {
   Download,
   FileSpreadsheet,
   CheckCircle,
-  XCircle,
   AlertCircle,
   Loader2,
   Info,
@@ -84,6 +83,21 @@ export function ExcelUploadDialog({
   }, [open]);
 
   const getColumnSpecs = () => {
+    if (uploadType === 'goods_received' && warehouse === 'China') {
+      return {
+        title: 'China Sea Goods Column Specifications (A-F)',
+        description: 'Only the first six columns are read. Columns beyond F are ignored automatically.',
+        columns: [
+          { index: 0, name: 'Shipping Mark (A)', required: true, description: 'Customer shipping mark. If not found in the system it will still be accepted.' },
+          { index: 1, name: 'Date Received (B)', required: true, description: 'Date goods arrived at China warehouse (DD/MM/YYYY).' },
+          { index: 2, name: 'Description (C)', required: true, description: 'Product description or category.' },
+          { index: 3, name: 'Quantity (D)', required: true, description: 'Number of pieces/cartons.' },
+          { index: 4, name: 'CBM (E)', required: true, description: 'Cubic meters. If blank, defaults to 0.' },
+          { index: 5, name: 'Supplier Tracking Number (F)', required: true, description: 'Supplier tracking / waybill number.' },
+        ],
+      };
+    }
+
     if (uploadType === 'goods_received') {
       return {
         title: 'Goods Received Column Specifications (A,B,C,D,E,G,H)',

@@ -32,8 +32,10 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
+import { useDebounce } from "@/hooks/useDebounce";
 import { cargoService } from "@/services/cargoService";
-import { clientService, Client } from "@/services/clientService";
+import { containerExcelService } from "@/services/containerExcelService";
+import { CustomerOption, mapCustomerToOption, rankCustomerOptions } from "@/lib/customerSearch";
 
 interface AddCargoItemDialogProps {
   open: boolean;
@@ -69,12 +71,12 @@ export function AddCargoItemDialog({
   const [trackingId, setTrackingId] = useState("");
   const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
-  const [debouncedClientQuery, setDebouncedClientQuery] = useState("");
-  const [clients, setClients] = useState<Client[]>([]);
+  const debouncedClientQuery = useDebounce(clientQuery, 250);
+  const [allClients, setAllClients] = useState<CustomerOption[]>([]);
+  const [clients, setClients] = useState<CustomerOption[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
-  const [clientPage, setClientPage] = useState(1);
-  const [clientsHasNext, setClientsHasNext] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [clientsError, setClientsError] = useState<string | null>(null);
+  const [selectedClient, setSelectedClient] = useState<CustomerOption | null>(null);
   const [notes, setNotes] = useState("");
 
   const resetForm = () => {
@@ -89,6 +91,7 @@ export function AddCargoItemDialog({
     setTrackingId("");
     setSelectedClient(null);
     setClientQuery("");
+    setClientsError(null);
     setNotes("");
   };
 
@@ -110,55 +113,50 @@ export function AddCargoItemDialog({
       const q = parseInt(quantity);
       
       if (l > 0 && b > 0 && h > 0 && q > 0) {
-        const calculatedCbm = (l * b * h * q) / 1000000;
-        setCbm(calculatedCbm.toFixed(3));
+  const calculatedCbm = (l * b * h * q) / 1000000;
+  setCbm(calculatedCbm.toFixed(5));
       }
     }
   }, [length, breadth, height, quantity, location, warehouse_type, cargoType]);
 
-  // Debounce the client query to reduce API calls
+  // Load the complete customer directory when the picker opens
   useEffect(() => {
-    const t = setTimeout(
-      () => setDebouncedClientQuery(clientQuery.trim()),
-      300
-    );
-    return () => clearTimeout(t);
-  }, [clientQuery]);
-
-  // Helper to fetch clients (with pagination)
-  const fetchClients = async (page: number, append = false) => {
+    if (!clientPopoverOpen) return;
+    let ignore = false;
     setClientsLoading(true);
-    try {
-      const res = await clientService.getClients({
-        search: debouncedClientQuery || undefined,
-        page,
-      });
-      const results = res.data?.results || [];
-      const hasNext = Boolean(res.data?.next);
-      setClients((prev) => (append ? [...prev, ...results] : results));
-      setClientsHasNext(hasNext);
-    } catch {
-      // silent fail in combobox
-    } finally {
-      setClientsLoading(false);
-    }
-  };
+    setClientsError(null);
 
-  // Load clients when popover opens or debounced query changes
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      if (!clientPopoverOpen) return;
-      if (cancelled) return;
-      setClientPage(1);
-      await fetchClients(1, false);
+    const loadCustomers = async () => {
+      try {
+        const records = await containerExcelService.getAllCustomers();
+        if (ignore) return;
+        const mapped = records.map(mapCustomerToOption);
+        mapped.sort((a, b) => a.shippingMark.localeCompare(b.shippingMark) || a.displayName.localeCompare(b.displayName));
+        setAllClients(mapped);
+      } catch (error) {
+        if (ignore) return;
+        console.error("Failed to load clients:", error);
+        setAllClients([]);
+        setClientsError(error instanceof Error ? error.message : "Failed to load clients");
+      } finally {
+        if (!ignore) {
+          setClientsLoading(false);
+        }
+      }
     };
-    load();
+
+    void loadCustomers();
+
     return () => {
-      cancelled = true;
+      ignore = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientPopoverOpen, debouncedClientQuery]);
+  }, [clientPopoverOpen]);
+
+  // Re-rank clients as the query changes
+  useEffect(() => {
+    const ranked = rankCustomerOptions(allClients, debouncedClientQuery, 150);
+    setClients(ranked);
+  }, [allClients, debouncedClientQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,6 +209,10 @@ export function AddCargoItemDialog({
         // Optionally support values/ status later
       };
 
+      if (selectedClient.shippingMark) {
+        payload.client_shipping_mark = selectedClient.shippingMark;
+      }
+
       // Only include tracking_id if provided; backend will auto-generate if omitted
       if (trackingId.trim()) {
         payload.tracking_id = trackingId.trim();
@@ -260,6 +262,7 @@ export function AddCargoItemDialog({
   const handleClose = () => {
     if (!loading) {
       resetForm();
+      setClientPopoverOpen(false);
       onOpenChange(false);
     }
   };
@@ -343,14 +346,12 @@ export function AddCargoItemDialog({
                   className="w-full justify-between"
                 >
                   {selectedClient
-                    ? selectedClient.full_name ||
-                      selectedClient.shipping_mark ||
-                      `Client #${selectedClient.id}`
+                    ? selectedClient.shippingMark || selectedClient.displayName || `Client #${selectedClient.id}`
                     : "Select client..."}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="p-0">
-                <Command>
+                <Command shouldFilter={false}>
                   <CommandInput
                     placeholder="Search clients by name or shipping mark..."
                     value={clientQuery}
@@ -358,39 +359,32 @@ export function AddCargoItemDialog({
                   />
                   <CommandList>
                     <CommandEmpty>
-                      {clientsLoading ? "Loading..." : "No clients found."}
+                      {clientsLoading
+                        ? "Loading clients..."
+                        : clientsError
+                          ? `No clients found. ${clientsError}`
+                          : "No clients found."}
                     </CommandEmpty>
                     <CommandGroup>
                       {clients.map((c) => (
                         <CommandItem
                           key={c.id}
+                          className="flex flex-col items-start gap-1"
                           onSelect={() => {
                             setSelectedClient(c);
+                            setClientQuery("");
                             setClientPopoverOpen(false);
                           }}
                         >
-                          <div className="flex flex-col">
-                            <span className="font-medium">{c.full_name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {c.shipping_mark}
-                            </span>
-                          </div>
+                          <span className="font-semibold tracking-tight">
+                            {c.shippingMark || "No Shipping Mark"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {c.displayName}
+                            {c.phone ? ` • ${c.phone}` : ""}
+                          </span>
                         </CommandItem>
                       ))}
-                      {clientsHasNext && (
-                        <CommandItem
-                          disabled={clientsLoading}
-                          onSelect={async () => {
-                            const nextPage = clientPage + 1;
-                            setClientPage(nextPage);
-                            await fetchClients(nextPage, true);
-                          }}
-                        >
-                          {clientsLoading
-                            ? "Loading more..."
-                            : "Load more clients"}
-                        </CommandItem>
-                      )}
                     </CommandGroup>
                   </CommandList>
                 </Command>
