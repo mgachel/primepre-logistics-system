@@ -18,6 +18,7 @@ import SignupStep2 from "./pages/SignupStep2";
 import SignupStep3 from "./pages/SignupStep3";
 import SignupStep4 from "./pages/SignupStep4";
 import SignupVerify from "./pages/SignupVerify";
+import VerifyAccount from "./pages/VerifyAccount";
 import ForgotPassword from "./pages/ForgotPassword";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import Clients from "./pages/Clients";
@@ -45,8 +46,11 @@ import Notifications from "./pages/Notifications";
 import Support from "./pages/Support";
 import ContainerDetailsPage from "./pages/ContainerDetailsPage";
 import GoodsReceivedContainerDetailsPage from "./pages/GoodsReceivedContainerDetailsPage";
-import DailyUpdates from "./pages/DailyUpdates";
 import DailyUpdatesAdmin from "./pages/DailyUpdatesAdmin";
+import AirContainersPage from "./pages/AirContainersPage";
+import SeaContainersPage from "./pages/SeaContainersPage";
+import AirGoodsReceivedPage from "./pages/AirGoodsReceivedPage";
+import SeaGoodsReceivedPage from "./pages/SeaGoodsReceivedPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -87,6 +91,8 @@ const App = () => (
             <Route path="/signup/contact" element={<SignupStep3 />} />
             <Route path="/signup/password" element={<SignupStep4 />} />
             <Route path="/signup/verify" element={<SignupVerify />} />
+            {/* New account verification via shipping mark */}
+            <Route path="/verify-account" element={<VerifyAccount />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             {/* Dashboard - Role-based */}
             <Route
@@ -316,15 +322,81 @@ const App = () => (
                 <ProtectedRoute>
                   <RoleBasedRoute
                     adminComponent={<Navigate to="/admin/daily-updates" replace />}
+                    customerComponent={<Navigate to="/daily-updates/air-goods" replace />}
+                  />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Customer Shipments - Air Containers */}
+            <Route
+              path="/shipments/air-containers"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
                     customerComponent={
                       <AppLayout>
-                        <DailyUpdates />
+                        <AirContainersPage />
                       </AppLayout>
                     }
                   />
                 </ProtectedRoute>
               }
             />
+            
+            {/* Customer Shipments - Sea Containers */}
+            <Route
+              path="/shipments/sea-containers"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <SeaContainersPage />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Customer Daily Updates - Air Goods Received */}
+            <Route
+              path="/daily-updates/air-goods"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/admin/daily-updates" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <AirGoodsReceivedPage />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Customer Daily Updates - Sea Goods Received */}
+            <Route
+              path="/daily-updates/sea-goods"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/admin/daily-updates" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <SeaGoodsReceivedPage />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Admin Daily Updates */}
             <Route
               path="/admin/daily-updates"
               element={
@@ -335,7 +407,7 @@ const App = () => (
                         <DailyUpdatesAdmin />
                       </AppLayout>
                     }
-                    customerComponent={<Navigate to="/daily-updates" replace />}
+                    customerComponent={<Navigate to="/daily-updates/air" replace />}
                   />
                 </ProtectedRoute>
               }

@@ -356,6 +356,71 @@ class PhoneSignupCompleteSerializer(serializers.Serializer):
         return data
 
 
+class ShippingMarkVerificationSerializer(serializers.Serializer):
+    """Serializer for verifying customer account using shipping mark"""
+    phone = serializers.CharField(required=True)
+    shipping_mark = serializers.CharField(required=False, allow_blank=True)
+    has_shipping_mark = serializers.BooleanField(required=True)
+    
+    def validate_phone(self, value):
+        """Validate phone exists and is unverified"""
+        from django.db.models import Q
+        
+        # Clean the phone number
+        clean_phone = value.replace('+', '').replace('-', '').replace(' ', '').replace('(', '').replace(')', '')
+        
+        try:
+            # Try to find user with various phone formats
+            user = CustomerUser.objects.filter(
+                Q(phone=value) | 
+                Q(phone=clean_phone) |
+                Q(phone__endswith=clean_phone[-10:]) if len(clean_phone) >= 10 else Q(phone=clean_phone)
+            ).first()
+            
+            if not user:
+                raise serializers.ValidationError("No account found with this phone number.")
+            
+            if user.is_verified:
+                raise serializers.ValidationError("This account is already verified.")
+            
+            return user.phone  # Return the phone as stored in the database
+        except CustomerUser.DoesNotExist:
+            raise serializers.ValidationError("No account found with this phone number.")
+    
+    def validate(self, data):
+        """Validate shipping mark if user claims to have one"""
+        if data['has_shipping_mark']:
+            if not data.get('shipping_mark') or not data['shipping_mark'].strip():
+                raise serializers.ValidationError({
+                    "shipping_mark": "Shipping mark is required when you select 'Yes'."
+                })
+        return data
+
+
+class ShippingMarkConfirmationSerializer(serializers.Serializer):
+    """Serializer for confirming shipping mark match"""
+    phone = serializers.CharField(required=True)
+    shipping_mark = serializers.CharField(required=False, allow_blank=True)
+    password = serializers.CharField(required=True, write_only=True)
+    confirm_password = serializers.CharField(required=True, write_only=True)
+    
+    def validate(self, data):
+        """Validate passwords match"""
+        if data['password'] != data['confirm_password']:
+            raise serializers.ValidationError({
+                "confirm_password": "Passwords do not match."
+            })
+        
+        # Validate password strength
+        password = data['password']
+        if len(password) < 8:
+            raise serializers.ValidationError({
+                "password": "Password must be at least 8 characters long."
+            })
+        
+        return data
+
+
 class PhoneVerificationSerializer(serializers.Serializer):
     """Serializer for phone verification PIN"""
     pin = serializers.CharField(max_length=6, min_length=6)
