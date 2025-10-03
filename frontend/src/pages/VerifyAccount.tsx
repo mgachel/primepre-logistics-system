@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { config } from '@/lib/config';
 import {
   Popover,
   PopoverContent,
@@ -88,7 +89,7 @@ export default function VerifyAccount() {
   const fetchShippingMarks = async () => {
     setLoadingMarks(true);
     try {
-      const response = await fetch('http://localhost:8000/api/auth/shipping-marks/');
+      const response = await fetch(`${config.apiBaseUrl}/api/auth/shipping-marks/`);
       const data = await response.json();
       
       console.log('Shipping marks response:', data);
@@ -122,7 +123,7 @@ export default function VerifyAccount() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/auth/verify/shipping-mark/', {
+      const response = await fetch(`${config.apiBaseUrl}/api/auth/verify/shipping-mark/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -194,7 +195,7 @@ export default function VerifyAccount() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/auth/verify/shipping-mark/confirm/', {
+      const response = await fetch(`${config.apiBaseUrl}/api/auth/verify/shipping-mark/confirm/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
