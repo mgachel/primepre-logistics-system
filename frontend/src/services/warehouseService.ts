@@ -1,4 +1,8 @@
 import { apiClient, ApiResponse, PaginatedResponse } from "./api";
+import { config } from "@/lib/config";
+
+const API_BASE_URL = config.apiBaseUrl.replace(/\/+$/, "");
+const buildApiUrl = (path: string) => `${API_BASE_URL}/${path.replace(/^\/+/, "")}`;
 
 export interface WarehouseItem {
   id: number;
@@ -668,10 +672,8 @@ export const warehouseService = {
 
   // Download templates (admin/staff only)
   async downloadChinaTemplate(): Promise<Blob> {
-    const API_BASE_URL =
-      import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
     const response = await fetch(
-      `${API_BASE_URL}/api/goods/china/download_template/`,
+      buildApiUrl("/api/goods/china/download_template/"),
       {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,
@@ -689,10 +691,8 @@ export const warehouseService = {
   },
 
   async downloadGhanaTemplate(): Promise<Blob> {
-    const API_BASE_URL =
-      import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
     const response = await fetch(
-      `${API_BASE_URL}/api/goods/ghana/download_template/`,
+      buildApiUrl("/api/goods/ghana/download_template/"),
       {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,

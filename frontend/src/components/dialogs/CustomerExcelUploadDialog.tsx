@@ -19,6 +19,10 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { config } from '@/lib/config';
+
+const API_BASE_URL = config.apiBaseUrl.replace(/\/+$/, '');
+const buildApiUrl = (path: string) => `${API_BASE_URL}/${path.replace(/^\/+/, '')}`;
 
 interface CustomerExcelUploadDialogProps {
   open: boolean;
@@ -120,7 +124,7 @@ export function CustomerExcelUploadDialog({
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/auth/customers/excel/upload/', {
+      const response = await fetch(buildApiUrl('/api/auth/customers/excel/upload/'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -136,8 +140,8 @@ export function CustomerExcelUploadDialog({
         data = await response.json();
       } else {
         // Server returned HTML (likely an error page)
-        const text = await response.text();
-        throw new Error(`Server error: ${response.status} ${response.statusText}. The server returned an HTML page instead of JSON. Please check the server logs.`);
+        const responseSnippet = (await response.text()).slice(0, 200);
+        throw new Error(`Server error: ${response.status} ${response.statusText}. Received non-JSON response starting with: ${responseSnippet}`);
       }
 
       if (!response.ok) {
@@ -168,9 +172,9 @@ export function CustomerExcelUploadDialog({
 
     setIsCreating(true);
     try {
-      console.log('Creating customers with data:', uploadResults.duplicate_results.unique_candidates);
-      
-      const response = await fetch('/api/auth/customers/excel/bulk-create/', {
+  console.log('Creating customers with data:', uploadResults.duplicate_results.unique_candidates);
+
+  const response = await fetch(buildApiUrl('/api/auth/customers/excel/bulk-create/'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -226,7 +230,7 @@ export function CustomerExcelUploadDialog({
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetch('/api/auth/customers/excel/template/', {
+      const response = await fetch(buildApiUrl('/api/auth/customers/excel/template/'), {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
@@ -251,7 +255,7 @@ export function CustomerExcelUploadDialog({
         description: "Customer upload template has been downloaded",
       });
 
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: "Download Failed",
         description: "Failed to download template",
