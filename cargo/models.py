@@ -188,7 +188,7 @@ class ClientShipmentSummary(models.Model):
 
     container = models.ForeignKey(CargoContainer, on_delete=models.CASCADE)
     client = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    client_shipping_mark = models.CharField(max_length=20)  # denormalized for grouping
+    client_shipping_mark = models.CharField(max_length=100)  # denormalized for grouping
     assigned_tracking = models.CharField(max_length=100, unique=True, editable=False)
     total_cbm = models.FloatField(default=0)
     total_quantity = models.IntegerField(default=0)

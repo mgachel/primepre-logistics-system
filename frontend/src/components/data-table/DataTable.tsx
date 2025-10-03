@@ -18,6 +18,15 @@ export type Column<T> = {
   clickable?: boolean;
 };
 
+interface PaginationConfig {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+  pageSizeOptions?: number[];
+}
+
 interface DataTableProps<T> {
   id: string; // persistence key
   rows: T[];
@@ -28,9 +37,10 @@ interface DataTableProps<T> {
   rowActions?: (row: T) => ReactNode;
   renderBulkBar?: (selectedRows: T[]) => ReactNode;
   defaultSort?: { column: string; direction: "asc" | "desc" };
+  pagination?: PaginationConfig;
 }
 
-export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, rowActions, renderBulkBar, defaultSort }: DataTableProps<T>) {
+export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, rowActions, renderBulkBar, defaultSort, pagination }: DataTableProps<T>) {
   // Initialize hooks first - always call hooks in the same order
   const [visible, setVisible] = useState<Record<string, boolean>>(() => {
     if (!columns || columns.length === 0) return {};
@@ -50,6 +60,7 @@ export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, ro
   useEffect(() => { persistSet(`dt:${id}:cols`, visible); }, [id, visible]);
   useEffect(() => { persistSet(`dt:${id}:sortBy`, sortBy); }, [id, sortBy]);
   useEffect(() => { persistSet(`dt:${id}:sortDir`, sortDir); }, [id, sortDir]);
+  useEffect(() => { setSelected(new Set()); }, [rows]);
 
   const ordered = useMemo(() => {
     if (!sortBy || !columns) return rows;
@@ -118,6 +129,63 @@ export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, ro
       </TableRow>
     </TableHeader>
   );
+
+  const renderPagination = () => {
+    if (!pagination) return null;
+
+    const { page, pageSize, total, onPageChange, onPageSizeChange, pageSizeOptions } = pagination;
+    const totalPages = total === 0 ? 1 : Math.max(1, Math.ceil(total / pageSize));
+    const currentPage = Math.min(page, totalPages);
+    const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end = total === 0 ? 0 : Math.min(start + ordered.length - 1, total);
+
+    return (
+      <div className="flex flex-col gap-3 mt-4 md:flex-row md:items-center md:justify-between">
+        <div className="text-sm text-muted-foreground">
+          {total === 0 ? "No results to display" : `Showing ${start}–${end} of ${total}`}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {onPageSizeChange && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Rows per page</span>
+              <select
+                className="border rounded px-2 py-1 text-sm bg-background"
+                value={pageSize}
+                onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              >
+                {(pageSizeOptions || [10, 25, 50, 100]).map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage <= 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="relative">
@@ -192,6 +260,7 @@ export function DataTable<T>({ id, rows, columns, loading, empty, onRowClick, ro
           </TableBody>
         </Table>
       </div>
+      {renderPagination()}
     </div>
   );
 }

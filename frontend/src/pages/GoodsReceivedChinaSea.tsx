@@ -39,42 +39,61 @@ export default function GoodsReceivedChinaSea() {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editingData, setEditingData] = useState<Partial<WarehouseItem>>({});
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       console.log('🔍 Loading China Sea data');
-      
-      // Use dedicated China Sea service method
+
+      // Use dedicated China Sea service method with pagination
       const response = await warehouseService.getChinaSeaGoods({
         search: searchTerm || undefined,
         status: statusFilter === 'all' ? undefined : statusFilter,
+        page,
+        page_size: pageSize,
+        ordering: '-date_received',
       });
-      
+
       console.log('📦 Warehouse response:', response);
-      
+
       if (response.success && response.data) {
-        console.log('📊 Total SEA items:', response.data.results.length);
-        
-        // Debug: Log first item structure
-        if (response.data.results.length > 0) {
-          console.log('🔍 First SEA item structure:', response.data.results[0]);
-          console.log('🔍 Available properties:', Object.keys(response.data.results[0]));
+        const results = Array.isArray(response.data.results) ? response.data.results : [];
+        const total = typeof response.data.count === 'number' ? response.data.count : results.length;
+        const totalPages = total === 0 ? 1 : Math.ceil(total / pageSize);
+
+        if (page > totalPages && totalPages >= 1) {
+          setPage(totalPages);
+          return;
         }
-        
-        setItems(response.data.results);
+
+        console.log('📊 Total SEA items:', total);
+
+        if (results.length > 0) {
+          console.log('🔍 First SEA item structure:', results[0]);
+          console.log('🔍 Available properties:', Object.keys(results[0]));
+        }
+
+        setItems(results);
+        setTotalCount(total);
       } else {
         setError('Failed to load warehouse data');
+        setItems([]);
+        setTotalCount(0);
       }
     } catch (err) {
       console.error('Error loading China Sea warehouse items:', err);
+      setItems([]);
+      setTotalCount(0);
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, page, pageSize]);
 
   // Edit functions
   const handleEditStart = (item: WarehouseItem) => {
@@ -120,7 +139,7 @@ export default function GoodsReceivedChinaSea() {
     }
   };
 
-  const handleFieldChange = (field: keyof WarehouseItem, value: any) => {
+  const handleFieldChange = <K extends keyof WarehouseItem>(field: K, value: WarehouseItem[K]) => {
     setEditingData(prev => ({
       ...prev,
       [field]: value,
@@ -332,7 +351,7 @@ export default function GoodsReceivedChinaSea() {
             className="h-8 text-sm w-20"
           />
         ) : (
-          <span className="text-sm">{Number(r.cbm).toFixed(2)}</span>
+          <span className="text-sm">{Number(r.cbm).toFixed(5)}</span>
         );
       },
       sort: (a, b) => Number(a.cbm) - Number(b.cbm),
@@ -485,7 +504,7 @@ export default function GoodsReceivedChinaSea() {
         </div>
         <div className="flex items-center gap-3">
           <ExcelUploadButton
-            uploadType="sea_cargo"
+            uploadType="goods_received"
             warehouse="China"
             onUploadComplete={() => {
               const refreshData = async () => {
@@ -539,12 +558,21 @@ export default function GoodsReceivedChinaSea() {
                 <Input
                   placeholder="Search by shipping mark, tracking ID, or description..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setPage(1);
+                  }}
                   className="pl-10"
                 />
               </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => {
+                setStatusFilter(value);
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="w-48">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Filter by status" />
@@ -612,6 +640,17 @@ export default function GoodsReceivedChinaSea() {
               columns={columns}
               loading={loading}
               defaultSort={{ column: "date_received", direction: "desc" }}
+              pagination={{
+                page,
+                pageSize,
+                total: totalCount,
+                onPageChange: (nextPage) => setPage(nextPage),
+                onPageSizeChange: (nextSize) => {
+                  setPageSize(nextSize);
+                  setPage(1);
+                },
+                pageSizeOptions: [25, 50, 100, 200],
+              }}
               rowActions={(row) => (
                 <>
                   <DropdownMenuItem

@@ -33,9 +33,10 @@ import {
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { warehouseService } from "@/services/warehouseService";
-import { clientService, Client } from "@/services/clientService";
-import { parse } from "path";
+import { useDebounce } from "@/hooks/useDebounce";
+import { warehouseService, CreateWarehouseItemRequest } from "@/services/warehouseService";
+import { containerExcelService } from "@/services/containerExcelService";
+import { CustomerOption, mapCustomerToOption, rankCustomerOptions } from "@/lib/customerSearch";
 
 interface NewGoodsDialogProps {
   open: boolean;
@@ -61,10 +62,13 @@ export function NewGoodsDialog({
   // Use either warehouse or warehouseType prop
   const targetWarehouse = warehouse || warehouseType || "china";
   
-  const [customers, setCustomers] = useState<Client[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
-  const [filteredCustomers, setFilteredCustomers] = useState<Client[]>([]);
+  const debouncedCustomerSearch = useDebounce(customerSearch, 250);
+  const [allCustomers, setAllCustomers] = useState<CustomerOption[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<CustomerOption[]>([]);
   const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [customersError, setCustomersError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     customer_id: "",
@@ -81,38 +85,44 @@ export function NewGoodsDialog({
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch customers when dialog opens
-  const fetchCustomers = async () => {
-    try {
-      const response = await clientService.getActiveClients();
-      if (response.success) {
-        setCustomers(response.data);
+  // Load all customers when dialog opens
+  React.useEffect(() => {
+    if (!customerPopoverOpen) return;
+    let ignore = false;
+    setCustomersLoading(true);
+    setCustomersError(null);
+
+    const loadCustomers = async () => {
+      try {
+        const records = await containerExcelService.getAllCustomers();
+        if (ignore) return;
+        const mapped = records.map(mapCustomerToOption);
+        mapped.sort((a, b) => a.shippingMark.localeCompare(b.shippingMark) || a.displayName.localeCompare(b.displayName));
+        setAllCustomers(mapped);
+      } catch (error) {
+        if (ignore) return;
+        console.error("Failed to load customers:", error);
+        setAllCustomers([]);
+        setCustomersError(error instanceof Error ? error.message : "Failed to load customers");
+      } finally {
+        if (!ignore) {
+          setCustomersLoading(false);
+        }
       }
-    } catch (error) {
-      console.error("Failed to fetch customers:", error);
-    }
-  };
+    };
 
-  // Load customers when dialog opens
-  React.useEffect(() => {
-    if (open) {
-      fetchCustomers();
-    }
-  }, [open]);
+    void loadCustomers();
 
-  // Filter customers based on search
+    return () => {
+      ignore = true;
+    };
+  }, [customerPopoverOpen]);
+
+  // Re-rank customers whenever the query changes
   React.useEffect(() => {
-    if (!customerSearch) {
-      setFilteredCustomers(customers);
-    } else {
-      const filtered = customers.filter(customer => 
-        (customer.full_name && customer.full_name.toLowerCase().includes(customerSearch.toLowerCase())) ||
-        (customer.shipping_mark && customer.shipping_mark.toLowerCase().includes(customerSearch.toLowerCase())) ||
-        (customer.company_name && customer.company_name.toLowerCase().includes(customerSearch.toLowerCase()))
-      );
-      setFilteredCustomers(filtered);
-    }
-  }, [customers, customerSearch]);
+    const ranked = rankCustomerOptions(allCustomers, debouncedCustomerSearch, 150);
+    setFilteredCustomers(ranked);
+  }, [allCustomers, debouncedCustomerSearch]);
 
   // Check if this is Ghana Sea (needs dimensions instead of direct CBM input)
   const isGhanaSea = targetWarehouse === "ghana" && defaultShippingMethod === "SEA";
@@ -129,7 +139,7 @@ export function NewGoodsDialog({
   // Auto-calculate CBM from dimensions for Ghana Sea
   const calculateCBM = (length: string, breadth: string, height: string) => {
     const l = parseFloat(length) || 0;
-    const b = parseFloat(breadth) || 0;
+    const w = parseFloat(breadth) || 0;
     const h = parseFloat(height) || 0;
     const q = parseFloat(formData.quantity) || 1;
     const cbm = (l * w * h * q) / 1000000; // Convert cubic cm to cubic meters
@@ -184,7 +194,13 @@ export function NewGoodsDialog({
     }
     setSubmitting(true);
     try {
-      const payload: any = {
+      // Get selected customer's shipping mark
+      const selectedCustomer = formData.customer_id 
+        ? allCustomers.find(c => c.id.toString() === formData.customer_id)
+        : undefined;
+
+      const payload: CreateWarehouseItemRequest = {
+        shipping_mark: selectedCustomer?.shippingMark || formData.supply_tracking.trim(),
         supply_tracking: formData.supply_tracking.trim(),
         description: formData.description || undefined,
         quantity: Number(formData.quantity),
@@ -198,14 +214,6 @@ export function NewGoodsDialog({
         status: targetWarehouse === "china" ? "READY_FOR_SHIPPING" : undefined,
       };
 
-      // Add customer and shipping_mark if customer is selected
-      if (formData.customer_id) {
-        const selectedCustomer = customers.find(c => c.id.toString() === formData.customer_id);
-        if (selectedCustomer) {
-          payload.customer_id = Number(formData.customer_id);
-          payload.shipping_mark = selectedCustomer.shipping_mark;
-        }
-      }
       const res =
         targetWarehouse === "ghana"
           ? await warehouseService.createGhanaWarehouseItem(payload)
@@ -224,7 +232,7 @@ export function NewGoodsDialog({
           weight: "",
           cbm: "",
           length: "",
-          width: "",
+          breadth: "",
           height: "",
           method_of_shipping: defaultShippingMethod,
           notes: "",
@@ -290,28 +298,36 @@ export function NewGoodsDialog({
                     className="w-full justify-between"
                   >
                     {formData.customer_id ? (() => {
-                      const selectedCustomer = customers.find((customer) => customer.id.toString() === formData.customer_id);
+                      const selectedCustomer = filteredCustomers.find((customer) => customer.id.toString() === formData.customer_id)
+                        || allCustomers.find((customer) => customer.id.toString() === formData.customer_id);
                       return selectedCustomer 
-                        ? `${selectedCustomer.full_name || 'Unknown'} (${selectedCustomer.shipping_mark || 'No Mark'})`
+                        ? `${selectedCustomer.shippingMark || 'No Mark'} - ${selectedCustomer.displayName || 'Unknown'}`
                         : "Select customer...";
                     })() : "Select customer..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-full p-0">
-                  <Command>
+                  <Command shouldFilter={false}>
                     <CommandInput 
                       placeholder="Search customers by name or shipping mark..." 
                       value={customerSearch}
                       onValueChange={setCustomerSearch}
                     />
-                    <CommandEmpty>No customer found.</CommandEmpty>
+                    <CommandEmpty>
+                      {customersLoading
+                        ? "Loading customers..."
+                        : customersError
+                          ? `No customers found. ${customersError}`
+                          : "No customers found."}
+                    </CommandEmpty>
                     <CommandList>
                       <CommandGroup>
                         <CommandItem
                           value=""
                           onSelect={() => {
                             setFormData({ ...formData, customer_id: "" });
+                            setCustomerSearch("");
                             setCustomerPopoverOpen(false);
                           }}
                         >
@@ -326,9 +342,10 @@ export function NewGoodsDialog({
                         {filteredCustomers.map((customer) => (
                           <CommandItem
                             key={customer.id}
-                            value={(customer.full_name || '') + " " + (customer.shipping_mark || '')}
+                            value={customer.shippingMark}
                             onSelect={() => {
                               setFormData({ ...formData, customer_id: customer.id.toString() });
+                              setCustomerSearch("");
                               setCustomerPopoverOpen(false);
                             }}
                           >
@@ -338,10 +355,10 @@ export function NewGoodsDialog({
                                 formData.customer_id === customer.id.toString() ? "opacity-100" : "opacity-0"
                               )}
                             />
-                            {customer.full_name || 'Unknown'} ({customer.shipping_mark || 'No Mark'})
-                            {customer.company_name && (
-                              <span className="text-muted-foreground ml-2">- {customer.company_name}</span>
-                            )}
+                            <div className="flex flex-col gap-1">
+                              <span className="font-semibold">{customer.shippingMark || "No Mark"}</span>
+                              <span className="text-xs text-muted-foreground">{customer.displayName}</span>
+                            </div>
                           </CommandItem>
                         ))}
                       </CommandGroup>

@@ -138,7 +138,7 @@ export function EditGoodsDialog({
 
       if (length > 0 && breadth > 0 && height > 0) {
         const cbm = (length * breadth * height) / 1000000; // Convert cm³ to m³
-        newFormData.cbm = cbm.toFixed(3);
+  newFormData.cbm = cbm.toFixed(3);
         setFormData(newFormData);
       }
     }

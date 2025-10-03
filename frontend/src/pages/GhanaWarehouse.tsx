@@ -67,11 +67,15 @@ export default function GhanaWarehouse() {
   // Load Ghana warehouse items (admin view)
   useEffect(() => {
     let ignore = false;
+  const fmt5 = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n.toFixed(5) : "-";
+  };
     const load = async () => {
       setLoading(true);
       try {
         const res = await warehouseService.getAdminGhanaItems({
-          search: search || undefined,
+      accessor: (r) => fmt5(r.cbm),
           status: status === "all" ? undefined : status,
           ordering: "-updated_at",
           page,

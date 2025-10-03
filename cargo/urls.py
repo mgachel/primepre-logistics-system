@@ -20,6 +20,7 @@ customer_router.register(r'cargo-items', views.CustomerCargoItemViewSet, basenam
 app_name = 'cargo'
 
 urlpatterns = [
+    path('customers/search/', CustomerSearchView.as_view(), name='customer-search'),
     # Admin/Staff API routes (no api/ prefix since it's already in main urls)
     path('', include(router.urls)),
     path('dashboard/', views.CargoDashboardView.as_view(), name='dashboard'),
@@ -47,7 +48,6 @@ urlpatterns = [
     # Container-specific excel upload endpoints (NEW)
     path('containers/<str:container_id>/excel/upload-new/', NewContainerExcelUploadView.as_view(), name='container-excel-upload-new'),
     path('containers/items/create/', ContainerItemsCreateView.as_view(), name='container-items-create'),
-    path('customers/search/', CustomerSearchView.as_view(), name='customer-search'),
     
     # Container-specific excel upload endpoints (EXISTING)
     path('containers/<str:container_id>/excel/upload/', ContainerExcelUploadView.as_view(), name='container-excel-upload'),

@@ -14,7 +14,10 @@ from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from users.models import CustomerUser
-from users.customer_excel_utils import process_customer_excel_upload
+from users.customer_excel_utils import (
+    process_customer_excel_upload,
+    create_customer_from_data,
+)
 
 
 class CustomerExcelUploadSerializer(serializers.Serializer):
@@ -272,61 +275,21 @@ class CustomerBulkCreateView(APIView):
         Returns:
             Created CustomerUser instance
         """
-        # Validate required fields
-        required_fields = ['shipping_mark', 'first_name', 'last_name', 'phone_normalized']
-        for field in required_fields:
-            if not customer_data.get(field):
-                raise ValueError(f"Missing required field: {field}")
-        
-        # Clean and validate data lengths
-        shipping_mark = str(customer_data['shipping_mark']).strip()[:20]
-        first_name = str(customer_data['first_name']).strip()[:50]
-        last_name = str(customer_data['last_name']).strip()[:50]
-        phone = str(customer_data['phone_normalized']).strip()[:15]
-        
-        # Additional validation
-        if len(shipping_mark) < 2:
-            raise ValueError(f"Shipping mark too short: {shipping_mark}")
-        if len(first_name) < 1:
-            raise ValueError(f"First name too short: {first_name}")
-        if len(last_name) < 1:
-            raise ValueError(f"Last name too short: {last_name}")
-        if len(phone) < 10:
-            raise ValueError(f"Phone number too short: {phone}")
-        
-        # Prepare customer creation data with safe defaults
-        customer_fields = {
-            'shipping_mark': shipping_mark,
-            'first_name': first_name,
-            'last_name': last_name,
-            'user_role': 'CUSTOMER',
-            'user_type': 'INDIVIDUAL',
-            'region': 'GREATER_ACCRA',  # Default region
-            'is_active': True,
-            'is_verified': False,
-            'created_by': created_by_user,
-            # Default admin permissions
-            'can_create_users': False,
-            'can_manage_inventory': False,
-            'can_manage_rates': False,
-            'can_view_analytics': False,
-            'can_manage_admins': False,
-            'can_access_admin_panel': False,
-            'accessible_warehouses': []
+        # Prepare payload for shared utility
+        payload = {
+            'shipping_mark': customer_data.get('shipping_mark'),
+            'shipping_mark_normalized': customer_data.get('shipping_mark_normalized'),
+            'first_name': customer_data.get('first_name'),
+            'last_name': customer_data.get('last_name'),
+            'phone_normalized': customer_data.get('phone_normalized'),
+            'email': customer_data.get('email'),
+            'region': customer_data.get('region') or 'GREATER_ACCRA',
+            'accessible_warehouses': customer_data.get('accessible_warehouses', []),
         }
-        
-        # Add email if provided and valid
-        if customer_data.get('email') and len(customer_data['email'].strip()) > 0:
-            customer_fields['email'] = customer_data['email'][:254]  # Email max length
-        
-        # Create the customer using the proper manager method
+
+        # Create the customer using shared utility
         try:
-            # Use create_user with phone as the first parameter and password as second
-            customer = CustomerUser.objects.create_user(
-                phone=phone,
-                password=None,
-                **customer_fields
-            )
+            customer = create_customer_from_data(payload, created_by_user)
             print(f"Successfully created customer: {customer.shipping_mark} - {customer.get_full_name()}")
             return customer
         except Exception as e:

@@ -174,7 +174,7 @@ class ShippingMarkMatcher:
         Returns:
             Dictionary with created items and any errors
         """
-        from .models import CargoItem, CargoContainer
+        from .models import CargoItem, CargoContainer, ClientShipmentSummary
         from django.db import transaction
         
         created_items = []
@@ -194,15 +194,28 @@ class ShippingMarkMatcher:
                     candidate = item_data['candidate']
                     customer = CustomerUser.objects.get(id=item_data['customer']['id'])
                     
+                    cbm_value = candidate.get('cbm')
+                    if cbm_value is not None:
+                        try:
+                            cbm_value = float(cbm_value)
+                        except (TypeError, ValueError):
+                            cbm_value = None
+
                     cargo_item = CargoItem(
                         container=container,
                         client=customer,
                         tracking_id=candidate['tracking_number'] or '',  # Will be auto-generated if empty
                         item_description=candidate['description'],
                         quantity=candidate['quantity'],
-                        cbm=candidate['cbm']
+                        cbm=cbm_value
                     )
                     cargo_item.save()
+
+                    summary, _ = ClientShipmentSummary.objects.get_or_create(
+                        container=container,
+                        client=customer
+                    )
+                    summary.update_totals()
                     
                     created_items.append({
                         'cargo_item_id': str(cargo_item.id),

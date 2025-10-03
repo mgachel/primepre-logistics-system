@@ -52,7 +52,6 @@ export default function ChinaWarehouse() {
   const [stats, setStats] = useState<AdminWarehouseStatistics | null>(null);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrev, setHasPrev] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
   // helpers
   const toNum = (v: unknown) => {
@@ -62,6 +61,10 @@ export default function ChinaWarehouse() {
   const fmt2 = (v: unknown) => {
     const n = Number(v);
     return Number.isFinite(n) ? n.toFixed(2) : "-";
+  };
+  const fmt5 = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n.toFixed(5) : "-";
   };
 
   // Load China items
@@ -176,7 +179,7 @@ export default function ChinaWarehouse() {
     {
       id: "cbm",
       header: "CBM",
-      accessor: (r) => fmt2(r.cbm),
+      accessor: (r) => fmt5(r.cbm),
       align: "right",
       width: "90px",
       sort: (a, b) => toNum(a.cbm) - toNum(b.cbm),
@@ -207,114 +210,6 @@ export default function ChinaWarehouse() {
       sort: (a, b) => a.updated_at.localeCompare(b.updated_at),
     },
   ];
-
-  const onUpload = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".xlsx,.xls";
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const isExcel =
-        file.type.includes("sheet") ||
-        file.name.toLowerCase().endsWith(".xlsx") ||
-        file.name.toLowerCase().endsWith(".xls");
-      if (!isExcel) {
-        toast({
-          title: "Unsupported file",
-          description: "Please upload an .xlsx or .xls Excel file.",
-          variant: "destructive",
-        });
-        return;
-      }
-      setUploading(true);
-      try {
-        const res = await warehouseService.uploadChinaExcel(file);
-
-        if (res.success && res.data) {
-          const { message, results } = res.data;
-          const {
-            total_processed,
-            successful_creates,
-            failed_creates,
-            errors,
-          } = results;
-
-          if (successful_creates === 0) {
-            // No items were created - show detailed error message
-            const errorMessages = errors.slice(0, 3); // Show first 3 errors
-            const displayError =
-              errorMessages.length > 0
-                ? errorMessages.join(". ")
-                : "No items were created from this file. Please check that the columns match the template and required fields are filled.";
-
-            toast({
-              title: "Upload failed",
-              description: displayError,
-              variant: "destructive",
-            });
-          } else {
-            // Some or all items were created successfully
-            const hasErrors = failed_creates > 0;
-            const description = hasErrors
-              ? `Created ${successful_creates} item(s) successfully. ${failed_creates} item(s) failed. ${
-                  errors.length > 0 ? `Example error: ${errors[0]}` : ""
-                }`
-              : `Successfully created ${successful_creates} item(s).`;
-
-            toast({
-              title: hasErrors ? "Partial upload success" : "Upload successful",
-              description,
-              variant: hasErrors ? "default" : "default",
-            });
-
-            // Refresh the data regardless of partial failures
-            setPage(1);
-            setSearch((s) => s); // Trigger reload
-
-            // Refresh statistics
-            const statsRes = await warehouseService.getAdminChinaStatistics();
-            if (statsRes.success) setStats(statsRes.data);
-          }
-        } else {
-          // API call failed
-          const errorMsg = res.message || "Upload failed. Please try again.";
-          toast({
-            title: "Upload failed",
-            description: errorMsg,
-            variant: "destructive",
-          });
-        }
-      } catch (err) {
-        // Network or unexpected error
-        let errorMessage = "Upload failed due to a network error.";
-
-        if (err instanceof Error) {
-          // Check if it's a validation error from the backend
-          if (err.message.includes("Missing required columns")) {
-            errorMessage =
-              "Missing required columns. Please download and use the template file.";
-          } else if (err.message.includes("File must be an Excel file")) {
-            errorMessage = "Please upload a valid Excel file (.xlsx or .xls).";
-          } else if (err.message.includes("File size must be less than")) {
-            errorMessage =
-              "File is too large. Please upload a file smaller than 10MB.";
-          } else {
-            errorMessage = err.message;
-          }
-        }
-
-        toast({
-          title: "Upload failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } finally {
-        setUploading(false);
-      }
-    };
-    input.click();
-  };
 
   const onExportTemplate = async () => {
     try {

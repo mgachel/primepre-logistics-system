@@ -163,7 +163,7 @@ export const warehouseService = {
       }
     });
 
-    const endpoint = `/api/customer/goods/china/?${params.toString()}`;
+  const endpoint = `/api/goods/customer/china/?${params.toString()}`;
     return apiClient.get<PaginatedResponse<WarehouseItem>>(endpoint);
   },
 
@@ -178,7 +178,7 @@ export const warehouseService = {
       }
     });
 
-    const endpoint = `/api/customer/goods/ghana/?${params.toString()}`;
+  const endpoint = `/api/goods/customer/ghana/?${params.toString()}`;
     return apiClient.get<PaginatedResponse<WarehouseItem>>(endpoint);
   },
 
@@ -202,55 +202,55 @@ export const warehouseService = {
   async getChinaWarehouseItemById(
     id: number
   ): Promise<ApiResponse<WarehouseItem>> {
-    return apiClient.get<WarehouseItem>(`/api/customer/goods/china/${id}/`);
+  return apiClient.get<WarehouseItem>(`/api/goods/customer/china/${id}/`);
   },
 
   // Get warehouse item by ID (Ghana)
   async getGhanaWarehouseItemById(
     id: number
   ): Promise<ApiResponse<WarehouseItem>> {
-    return apiClient.get<WarehouseItem>(`/api/customer/goods/ghana/${id}/`);
+  return apiClient.get<WarehouseItem>(`/api/goods/customer/ghana/${id}/`);
   },
 
   // Get China warehouse statistics
   async getChinaWarehouseStats(): Promise<ApiResponse<WarehouseStats>> {
     return apiClient.get<WarehouseStats>(
-      "/api/customer/goods/china/my_statistics/"
+      "/api/goods/customer/china/my_statistics/"
     );
   },
 
   // Get Ghana warehouse statistics
   async getGhanaWarehouseStats(): Promise<ApiResponse<WarehouseStats>> {
     return apiClient.get<WarehouseStats>(
-      "/api/customer/goods/ghana/my_statistics/"
+      "/api/goods/customer/ghana/my_statistics/"
     );
   },
 
   // Get flagged items (China)
   async getChinaFlaggedItems(): Promise<ApiResponse<WarehouseItem[]>> {
     return apiClient.get<WarehouseItem[]>(
-      "/api/customer/goods/china/my_flagged_items/"
+      "/api/goods/customer/china/my_flagged_items/"
     );
   },
 
   // Get flagged items (Ghana)
   async getGhanaFlaggedItems(): Promise<ApiResponse<WarehouseItem[]>> {
     return apiClient.get<WarehouseItem[]>(
-      "/api/customer/goods/ghana/my_flagged_items/"
+      "/api/goods/customer/ghana/my_flagged_items/"
     );
   },
 
   // Get ready for shipping items (China)
   async getChinaReadyForShipping(): Promise<ApiResponse<WarehouseItem[]>> {
     return apiClient.get<WarehouseItem[]>(
-      "/api/customer/goods/china/ready_for_shipping/"
+      "/api/goods/customer/china/ready_for_shipping/"
     );
   },
 
   // Get ready for shipping items (Ghana)
   async getGhanaReadyForShipping(): Promise<ApiResponse<WarehouseItem[]>> {
     return apiClient.get<WarehouseItem[]>(
-      "/api/customer/goods/ghana/ready_for_shipping/"
+      "/api/goods/customer/ghana/ready_for_shipping/"
     );
   },
 
@@ -259,7 +259,7 @@ export const warehouseService = {
     days: number = 30
   ): Promise<ApiResponse<WarehouseItem[]>> {
     return apiClient.get<WarehouseItem[]>(
-      `/api/customer/goods/china/overdue_items/?days=${days}`
+      `/api/goods/customer/china/overdue_items/?days=${days}`
     );
   },
 
@@ -268,7 +268,7 @@ export const warehouseService = {
     days: number = 30
   ): Promise<ApiResponse<WarehouseItem[]>> {
     return apiClient.get<WarehouseItem[]>(
-      `/api/customer/goods/ghana/overdue_items/?days=${days}`
+      `/api/goods/customer/ghana/overdue_items/?days=${days}`
     );
   },
 
@@ -277,7 +277,7 @@ export const warehouseService = {
     trackingId: string
   ): Promise<ApiResponse<WarehouseItem>> {
     return apiClient.get<WarehouseItem>(
-      `/api/customer/goods/china/tracking/?tracking_id=${encodeURIComponent(
+      `/api/goods/customer/china/tracking/?tracking_id=${encodeURIComponent(
         trackingId
       )}`
     );
@@ -288,7 +288,7 @@ export const warehouseService = {
     trackingId: string
   ): Promise<ApiResponse<WarehouseItem>> {
     return apiClient.get<WarehouseItem>(
-      `/api/customer/goods/ghana/tracking/?tracking_id=${encodeURIComponent(
+      `/api/goods/customer/ghana/tracking/?tracking_id=${encodeURIComponent(
         trackingId
       )}`
     );
@@ -579,10 +579,15 @@ export const warehouseService = {
 
   async updateGhanaGoodsStatus(
     id: number,
-    status: string,
+    status:
+      | "PENDING"
+      | "READY_FOR_DELIVERY"
+      | "FLAGGED"
+      | "DELIVERED"
+      | "CANCELLED",
     reason?: string
   ): Promise<ApiResponse<WarehouseItem>> {
-    return this.updateGhanaItemStatus(id, status as any, reason);
+    return this.updateGhanaItemStatus(id, status, reason);
   },
 
   // Helper methods for deletion

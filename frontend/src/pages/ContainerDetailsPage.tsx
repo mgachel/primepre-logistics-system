@@ -54,7 +54,7 @@ export default function ContainerDetailsPage() {
       try {
         const [containerRes, itemsRes] = await Promise.all([
           cargoService.getContainer(containerId),
-          cargoService.getCargoItems({ container_id: containerId }),
+          cargoService.getCargoItems({ container_id: containerId, page_size: 5000 }),
         ]);
 
         if (containerRes.data) {
@@ -277,7 +277,7 @@ export default function ContainerDetailsPage() {
                     </div>
                     <div className="flex gap-8">
                       {container?.cargo_type === "sea" ? (
-                        <span>CBM: {totalCBM.toFixed(3)}</span>
+                        <span>CBM: {totalCBM.toFixed(5)}</span>
                       ) : (
                         <span>
                           Weight: {items.reduce((sum, i) => sum + (i.weight || 0), 0).toFixed(1)} kg

@@ -1,7 +1,14 @@
 from django.db import models
 from django.utils import timezone
 from django.core.validators import MinValueValidator
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
+def quantize_cbm(value: Decimal) -> Decimal:
+    if value is None:
+        return value
+    if not isinstance(value, Decimal):
+        value = Decimal(value)
+    return value.quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP)
+
 import uuid
 
 
@@ -26,7 +33,7 @@ class GoodsReceivedChina(models.Model):
         blank=True,
     )
     shipping_mark = models.CharField(
-        max_length=20,
+        max_length=100,
         help_text="Customer's shipping mark identifier (auto-synced from user)",
         db_index=True,
         blank=True,
@@ -37,8 +44,8 @@ class GoodsReceivedChina(models.Model):
 
     # Physical properties
     cbm = models.DecimalField(
-        max_digits=10, decimal_places=3,
-        validators=[MinValueValidator(Decimal("0.001"))],
+        max_digits=12, decimal_places=5,
+        validators=[MinValueValidator(Decimal("0.00001"))],
         help_text="Cubic meters (CBM)",
         null=True, blank=True,
     )
@@ -85,6 +92,8 @@ class GoodsReceivedChina(models.Model):
     def save(self, *args, **kwargs):
         if self.customer:
             self.shipping_mark = self.customer.shipping_mark
+        if self.cbm is not None:
+            self.cbm = quantize_cbm(self.cbm)
         super().save(*args, **kwargs)
 
     def clean(self):
@@ -184,9 +193,9 @@ class GoodsReceivedGhana(models.Model):
     )
     
     cbm = models.DecimalField(
-        max_digits=10, 
-        decimal_places=3, 
-        validators=[MinValueValidator(Decimal("0.001"))],
+        max_digits=12, 
+        decimal_places=5, 
+        validators=[MinValueValidator(Decimal("0.00001"))],
         null=True, 
         blank=True,
         help_text="Cubic meters - auto-calculated for sea cargo, manual for air cargo"
@@ -234,7 +243,9 @@ class GoodsReceivedGhana(models.Model):
         if (self.method_of_shipping == "SEA" and 
             self.length and self.breadth and self.height and self.quantity):
             # CBM = (length * breadth * height * quantity) / 1,000,000
-            self.cbm = (self.length * self.breadth * self.height * self.quantity) / Decimal('1000000')
+            self.cbm = ((self.length * self.breadth * self.height * self.quantity) / Decimal('1000000'))
+        if self.cbm is not None:
+            self.cbm = quantize_cbm(self.cbm)
         
         super().save(*args, **kwargs)
 

@@ -90,6 +90,7 @@ export interface CargoItemFilters {
   status?: string;
   client?: number;
   page?: number;
+  page_size?: number;
 }
 
 export interface CargoContainer {
@@ -322,6 +323,7 @@ export const cargoService = {
   async createBackendCargoItem(data: {
     container: string; // container_id
     client: number;
+    client_shipping_mark?: string;
     tracking_id?: string;
     item_description?: string;
     quantity: number;
@@ -404,9 +406,51 @@ export const cargoService = {
     filters: CargoFilters = {}
   ): Promise<ApiResponse<PaginatedResponse<CargoContainer>>> {
     const params = new URLSearchParams();
+    const typeMap: Record<string, string> = {
+      SEA: "sea",
+      AIR: "air",
+      sea: "sea",
+      air: "air",
+    };
+    const statusMap: Record<string, string> = {
+      PENDING: "pending",
+      IN_TRANSIT: "in_transit",
+      DELIVERED: "delivered",
+      DELAYED: "demurrage",
+      DEMURRAGE: "demurrage",
+      pending: "pending",
+      in_transit: "in_transit",
+      delivered: "delivered",
+      delayed: "demurrage",
+      demurrage: "demurrage",
+    };
+
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        params.append(key, value.toString());
+      if (value === undefined || value === null || value === "") {
+        return;
+      }
+
+      switch (key) {
+        case "type": {
+          const mapped = typeMap[String(value)] || String(value).toLowerCase();
+          params.append("cargo_type", mapped);
+          break;
+        }
+        case "limit": {
+          params.append("page_size", String(value));
+          break;
+        }
+        case "status": {
+          const mapped = statusMap[String(value)];
+          if (mapped) {
+            params.append("status", mapped);
+          }
+          break;
+        }
+        default: {
+          params.append(key, String(value));
+          break;
+        }
       }
     });
 
@@ -419,9 +463,49 @@ export const cargoService = {
     filters: CargoFilters = {}
   ): Promise<ApiResponse<PaginatedResponse<CargoItem>>> {
     const params = new URLSearchParams();
+    const typeMap: Record<string, string> = {
+      SEA: "sea",
+      AIR: "air",
+      sea: "sea",
+      air: "air",
+    };
+    const statusMap: Record<string, string> = {
+      PENDING: "pending",
+      IN_TRANSIT: "in_transit",
+      DELIVERED: "delivered",
+      DELAYED: "delayed",
+      pending: "pending",
+      in_transit: "in_transit",
+      delivered: "delivered",
+      delayed: "delayed",
+    };
+
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        params.append(key, value.toString());
+      if (value === undefined || value === null || value === "") {
+        return;
+      }
+
+      switch (key) {
+        case "type": {
+          const mapped = typeMap[String(value)] || String(value).toLowerCase();
+          params.append("cargo_type", mapped);
+          break;
+        }
+        case "limit": {
+          params.append("page_size", String(value));
+          break;
+        }
+        case "status": {
+          const mapped = statusMap[String(value)];
+          if (mapped) {
+            params.append("status", mapped);
+          }
+          break;
+        }
+        default: {
+          params.append(key, String(value));
+          break;
+        }
       }
     });
 
