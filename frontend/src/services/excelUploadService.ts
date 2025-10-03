@@ -95,26 +95,30 @@ class ExcelUploadService {
         },
       });
 
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text.substring(0, 500));
+        throw new Error(`Server error ${response.status}: The server returned an HTML page instead of JSON. This usually indicates a server-side error. Please check the server logs for details.`);
+      }
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('Authentication failed. Please log in again.');
         }
-        try {
-          const errorData = await response.json();
-          
-          // Handle our enhanced error format with excel_errors
-          if (errorData.excel_errors) {
-            const errorMessages = Array.isArray(errorData.excel_errors) 
-              ? errorData.excel_errors.join('\n') 
-              : errorData.excel_errors;
-            throw new Error(`Validation errors:\n${errorMessages}`);
-          }
-          
-          const errorMessage = errorData.error || errorData.detail || 'Upload failed';
-          throw new Error(errorMessage);
-        } catch (jsonError) {
-          throw new Error(`Upload failed with status ${response.status}`);
+        const errorData = await response.json();
+        
+        // Handle our enhanced error format with excel_errors
+        if (errorData.excel_errors) {
+          const errorMessages = Array.isArray(errorData.excel_errors) 
+            ? errorData.excel_errors.join('\n') 
+            : errorData.excel_errors;
+          throw new Error(`Validation errors:\n${errorMessages}`);
         }
+        
+        const errorMessage = errorData.error || errorData.detail || 'Upload failed';
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -191,19 +195,23 @@ class ExcelUploadService {
         },
       });
 
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text.substring(0, 500));
+        throw new Error(`Server error ${response.status}: The server returned an HTML page instead of JSON. This usually indicates a server-side error. Please check the server logs for details.`);
+      }
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('Authentication failed. Please log in again.');
         }
-        try {
-          const errorData = await response.json() as ExcelUploadError;
-          const errorMessage = errorData.details 
-            ? `${errorData.error}: ${JSON.stringify(errorData.details)}`
-            : errorData.error;
-          throw new Error(errorMessage || 'Upload failed');
-        } catch (jsonError) {
-          throw new Error(`Upload failed with status ${response.status}`);
-        }
+        const errorData = await response.json() as ExcelUploadError;
+        const errorMessage = errorData.details 
+          ? `${errorData.error}: ${JSON.stringify(errorData.details)}`
+          : errorData.error;
+        throw new Error(errorMessage || 'Upload failed');
       }
 
       return await response.json() as ExcelUploadResponse;
@@ -237,6 +245,14 @@ class ExcelUploadService {
         },
       });
 
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text.substring(0, 500));
+        throw new Error(`Server error ${response.status}: The server returned an HTML page instead of JSON. This usually indicates a server-side error. Please check the server logs for details.`);
+      }
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('Authentication failed. Please log in again.');
@@ -244,15 +260,11 @@ class ExcelUploadService {
         if (response.status === 404) {
           throw new Error(`Container ${containerId} not found.`);
         }
-        try {
-          const errorData = await response.json() as ExcelUploadError;
-          const errorMessage = errorData.details 
-            ? `${errorData.error}: ${JSON.stringify(errorData.details)}`
-            : errorData.error;
-          throw new Error(errorMessage || 'Upload failed');
-        } catch (jsonError) {
-          throw new Error(`Upload failed with status ${response.status}`);
-        }
+        const errorData = await response.json() as ExcelUploadError;
+        const errorMessage = errorData.details 
+          ? `${errorData.error}: ${JSON.stringify(errorData.details)}`
+          : errorData.error;
+        throw new Error(errorMessage || 'Upload failed');
       }
 
       return await response.json() as ExcelUploadResponse;
@@ -366,6 +378,14 @@ class ExcelUploadService {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
       });
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text.substring(0, 500));
+        throw new Error(`Server error ${response.status}: The server returned an HTML page instead of JSON. This usually indicates a server-side error. Please check the server logs for details.`);
+      }
 
       const data = await response.json();
 
