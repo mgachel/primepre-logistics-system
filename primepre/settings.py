@@ -291,6 +291,7 @@ CORS_ALLOWED_ORIGINS = csv_list(config(
             'https://primepre-logistics-backend-fb2561752d16.herokuapp.com,'
             'https://primepre-backend.onrender.com,'
             'https://primepre-frontend.onrender.com,'
+            'https://primepre-logistics-system.onrender.com,'
             'http://localhost:3000,'
             'http://127.0.0.1:3000,'
             'http://localhost:5173,'
@@ -344,6 +345,7 @@ CSRF_TRUSTED_ORIGINS = csv_list(config(
             'https://primepre-logistics-backend-fb2561752d16.herokuapp.com,'
             'https://primepre-backend.onrender.com,'
             'https://primepre-frontend.onrender.com,'
+            'https://primepre-logistics-system.onrender.com,'
             'https://*.herokuapp.com,'
             'https://*.onrender.com'
 ))
