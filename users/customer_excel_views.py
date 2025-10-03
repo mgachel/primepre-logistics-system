@@ -11,6 +11,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, serializers
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import JSONRenderer
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from users.models import CustomerUser
@@ -82,6 +84,8 @@ class CustomerExcelUploadView(APIView):
     API endpoint for uploading and processing customer Excel files.
     """
     permission_classes = [IsAuthenticated]
+    renderer_classes = [JSONRenderer]
+    parser_classes = [MultiPartParser, FormParser]
     
     def post(self, request):
         """
@@ -156,6 +160,7 @@ class CustomerBulkCreateView(APIView):
     API endpoint for bulk creating customers from validated Excel data.
     """
     permission_classes = [IsAuthenticated]
+    renderer_classes = [JSONRenderer]
     
     def post(self, request):
         """
@@ -402,6 +407,7 @@ class CustomerTestCreateView(APIView):
     Simple test endpoint to verify customer creation works.
     """
     permission_classes = [IsAuthenticated]
+    renderer_classes = [JSONRenderer]
     
     def post(self, request):
         """Test creating a single customer with minimal data."""
@@ -448,6 +454,7 @@ class CustomerUploadStatsView(APIView):
     API endpoint for getting customer upload statistics.
     """
     permission_classes = [IsAuthenticated]
+    renderer_classes = [JSONRenderer]
     
     def get(self, request):
         """
