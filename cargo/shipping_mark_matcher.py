@@ -4,6 +4,7 @@ Handles matching imported shipping marks with existing CustomerUser records.
 """
 from typing import List, Dict, Any, Optional, Tuple
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from .excel_utils import normalize_shipping_mark
 import logging
@@ -179,7 +180,7 @@ class ShippingMarkMatcher:
         
         created_items = []
         errors = []
-        
+
         try:
             container = CargoContainer.objects.get(container_id=self.container_id)
         except CargoContainer.DoesNotExist:
@@ -187,26 +188,55 @@ class ShippingMarkMatcher:
                 'created_items': [],
                 'errors': [{'error': f'Container {self.container_id} not found'}]
             }
-        
-        with transaction.atomic():
-            for item_data in matched_items:
-                try:
-                    candidate = item_data['candidate']
-                    customer = CustomerUser.objects.get(id=item_data['customer']['id'])
-                    
-                    cbm_value = candidate.get('cbm')
-                    if cbm_value is not None:
-                        try:
-                            cbm_value = float(cbm_value)
-                        except (TypeError, ValueError):
-                            cbm_value = None
 
+        for item_data in matched_items:
+            candidate = (item_data or {}).get('candidate') or {}
+            customer_payload = (item_data or {}).get('customer') or {}
+            source_row = candidate.get('source_row_number')
+
+            customer_id = customer_payload.get('id')
+            if not customer_id:
+                logger.warning(
+                    "Skipping matched item for container %s due to missing customer data: %s",
+                    self.container_id,
+                    customer_payload,
+                )
+                errors.append({
+                    'source_row_number': source_row,
+                    'error': 'Missing customer information for matched item',
+                    'candidate': candidate,
+                })
+                continue
+
+            try:
+                customer = CustomerUser.objects.get(id=customer_id)
+            except CustomerUser.DoesNotExist:
+                logger.warning(
+                    "Customer %s referenced in matched items could not be found",
+                    customer_id,
+                )
+                errors.append({
+                    'source_row_number': source_row,
+                    'error': f'Customer with id {customer_id} not found',
+                    'candidate': candidate,
+                })
+                continue
+
+            cbm_value = candidate.get('cbm')
+            if cbm_value is not None:
+                try:
+                    cbm_value = float(cbm_value)
+                except (TypeError, ValueError):
+                    cbm_value = None
+
+            try:
+                with transaction.atomic():
                     cargo_item = CargoItem(
                         container=container,
                         client=customer,
-                        tracking_id=candidate['tracking_number'] or '',  # Will be auto-generated if empty
-                        item_description=candidate['description'],
-                        quantity=candidate['quantity'],
+                        tracking_id=candidate.get('tracking_number') or '',
+                        item_description=candidate.get('description') or '',
+                        quantity=candidate.get('quantity') or 0,
                         cbm=cbm_value
                     )
                     cargo_item.save()
@@ -216,22 +246,40 @@ class ShippingMarkMatcher:
                         client=customer
                     )
                     summary.update_totals()
-                    
-                    created_items.append({
-                        'cargo_item_id': str(cargo_item.id),
-                        'tracking_id': cargo_item.tracking_id,
-                        'source_row_number': candidate['source_row_number'],
-                        'customer_name': customer.get_full_name() or customer.phone
-                    })
-                    
-                except Exception as e:
-                    logger.error(f"Error creating cargo item for row {candidate['source_row_number']}: {e}")
-                    errors.append({
-                        'source_row_number': candidate['source_row_number'],
-                        'error': str(e),
-                        'candidate': candidate
-                    })
-        
+
+                created_items.append({
+                    'cargo_item_id': str(cargo_item.id),
+                    'tracking_id': cargo_item.tracking_id,
+                    'source_row_number': source_row,
+                    'customer_name': customer.get_full_name() or customer.phone
+                })
+            except IntegrityError as exc:
+                logger.warning(
+                    "Integrity error while creating cargo item for container %s row %s: %s",
+                    self.container_id,
+                    source_row,
+                    exc,
+                )
+                errors.append({
+                    'source_row_number': source_row,
+                    'error': 'Integrity error while creating cargo item',
+                    'details': str(exc),
+                    'candidate': candidate,
+                })
+            except Exception as exc:
+                logger.error(
+                    "Unexpected error creating cargo item for container %s row %s: %s",
+                    self.container_id,
+                    source_row,
+                    exc,
+                    exc_info=True,
+                )
+                errors.append({
+                    'source_row_number': source_row,
+                    'error': str(exc),
+                    'candidate': candidate,
+                })
+
         return {
             'created_items': created_items,
             'errors': errors

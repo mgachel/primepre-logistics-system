@@ -9,7 +9,7 @@ from rest_framework import serializers, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.contrib.auth import get_user_model
 from django.core.files.storage import default_storage
 from django.db import models
@@ -240,88 +240,124 @@ class ContainerItemsCreateView(APIView):
                 create_results = matcher.create_cargo_items(matched_items)
                 created_items.extend(create_results['created_items'])
                 errors.extend(create_results['errors'])
-            
+
             # Process resolved mappings
             for mapping in resolved_mappings:
+                action = (mapping or {}).get('action')
+                if action == 'skip':
+                    continue
+
+                candidate = (mapping or {}).get('candidate') or {}
+                source_row = candidate.get('source_row_number')
+
+                if not candidate:
+                    errors.append({
+                        'error': 'Missing candidate data in resolved mapping',
+                        'mapping': mapping
+                    })
+                    continue
+
                 try:
-                    if mapping['action'] == 'skip':
-                        continue
-                    
-                    # Get the unmatched item data
-                    candidate = mapping.get('candidate')
-                    if not candidate:
-                        errors.append({
-                            'error': 'Missing candidate data in resolved mapping',
-                            'mapping': mapping
-                        })
-                        continue
-                    
-                    if mapping['action'] == 'map_existing':
-                        try:
-                            customer = CustomerUser.objects.get(id=mapping['customer_id'])
-                        except CustomerUser.DoesNotExist:
-                            errors.append({
-                                'error': f"Customer with id {mapping.get('customer_id')} not found",
-                                'mapping': mapping
-                            })
-                            continue
-                    elif mapping['action'] == 'create_new':
-                        try:
-                            customer_payload = dict(mapping.get('new_customer_data', {}))
-                            if candidate.get('shipping_mark_normalized') and not customer_payload.get('shipping_mark'):
-                                customer_payload['shipping_mark'] = candidate['shipping_mark_normalized']
+                    with transaction.atomic():
+                        if action == 'map_existing':
+                            customer_id = mapping.get('customer_id')
+                            if not customer_id:
+                                errors.append({
+                                    'error': 'Customer ID is required when mapping to an existing customer',
+                                    'mapping': mapping,
+                                    'source_row_number': source_row
+                                })
+                                continue
 
-                            customer = create_customer_from_data(
-                                customer_payload,
-                                request.user if hasattr(request, 'user') and request.user.is_authenticated else None
-                            )
-                        except Exception as exc:
+                            try:
+                                customer = CustomerUser.objects.get(id=customer_id)
+                            except CustomerUser.DoesNotExist:
+                                errors.append({
+                                    'error': f"Customer with id {customer_id} not found",
+                                    'mapping': mapping,
+                                    'source_row_number': source_row
+                                })
+                                continue
+                        elif action == 'create_new':
+                            try:
+                                customer_payload = dict(mapping.get('new_customer_data', {}))
+                                if candidate.get('shipping_mark_normalized') and not customer_payload.get('shipping_mark'):
+                                    customer_payload['shipping_mark'] = candidate['shipping_mark_normalized']
+
+                                customer = create_customer_from_data(
+                                    customer_payload,
+                                    request.user if hasattr(request, 'user') and request.user.is_authenticated else None
+                                )
+                            except Exception as exc:
+                                errors.append({
+                                    'error': str(exc),
+                                    'mapping': mapping,
+                                    'source_row_number': source_row
+                                })
+                                continue
+                        else:
                             errors.append({
-                                'error': str(exc),
+                                'error': f'Unknown action "{action}" in resolved mapping',
                                 'mapping': mapping,
-                                'source_row_number': candidate.get('source_row_number')
+                                'source_row_number': source_row
                             })
                             continue
-                    else:
-                        continue
-                    
-                    # Create cargo item
-                    cbm_value = candidate.get('cbm')
-                    if cbm_value is not None:
-                        try:
-                            cbm_value = float(cbm_value)
-                        except (TypeError, ValueError):
-                            cbm_value = None
 
-                    cargo_item = CargoItem(
-                        container=container,
-                        client=customer,
-                        tracking_id=candidate['tracking_number'] or '',
-                        item_description=candidate['description'],
-                        quantity=candidate['quantity'],
-                        cbm=cbm_value
-                    )
-                    cargo_item.save()
+                        cbm_value = candidate.get('cbm')
+                        if cbm_value is not None:
+                            try:
+                                cbm_value = float(cbm_value)
+                            except (TypeError, ValueError):
+                                cbm_value = None
 
-                    summary, _ = ClientShipmentSummary.objects.get_or_create(
-                        container=container,
-                        client=customer
-                    )
-                    summary.update_totals()
-                    
+                        cargo_item = CargoItem(
+                            container=container,
+                            client=customer,
+                            tracking_id=candidate.get('tracking_number') or '',
+                            item_description=candidate.get('description') or '',
+                            quantity=candidate.get('quantity') or 0,
+                            cbm=cbm_value
+                        )
+                        cargo_item.save()
+
+                        summary, _ = ClientShipmentSummary.objects.get_or_create(
+                            container=container,
+                            client=customer
+                        )
+                        summary.update_totals()
+
                     created_items.append({
                         'cargo_item_id': str(cargo_item.id),
                         'tracking_id': cargo_item.tracking_id,
-                        'source_row_number': candidate['source_row_number'],
+                        'source_row_number': source_row,
                         'customer_name': customer.get_full_name() or customer.phone,
-                        'action_taken': mapping['action']
+                        'action_taken': action
                     })
-                    
-                except Exception as e:
-                    logger.error(f"Error creating cargo item from resolved mapping: {e}")
+                except IntegrityError as exc:
+                    logger.warning(
+                        "Integrity error while creating cargo item for container %s row %s: %s",
+                        container_id,
+                        source_row,
+                        exc,
+                    )
                     errors.append({
-                        'error': str(e),
-                        'mapping': mapping
+                        'error': 'Integrity error while creating cargo item',
+                        'details': str(exc),
+                        'mapping': mapping,
+                        'source_row_number': source_row
+                    })
+                except Exception as exc:
+                    logger.error(
+                        "Error creating cargo item from resolved mapping for container %s row %s: %s",
+                        container_id,
+                        source_row,
+                        exc,
+                        exc_info=True,
+                    )
+                    errors.append({
+                        'error': str(exc),
+                        'mapping': mapping,
+                        'source_row_number': source_row
                     })
         
         return Response({
