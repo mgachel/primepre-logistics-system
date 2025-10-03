@@ -4,36 +4,41 @@ import tempfile
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from users.customer_excel_utils import CustomerExcelParser, create_customer_from_data
+from users.customer_excel_utils import (
+	CustomerExcelParser,
+	create_customer_from_data,
+	MAX_SHIPPING_MARK_LENGTH,
+)
+
+
+def create_excel_file(rows):
+	import openpyxl
+
+	workbook = openpyxl.Workbook()
+	sheet = workbook.active
+
+	headers = ['Shipping Mark', 'First Name', 'Last Name', 'Email', 'Phone Number']
+	sheet.append(headers)
+
+	for row in rows:
+		sheet.append(row)
+
+	temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+	workbook.save(temp_file.name)
+	workbook.close()
+	temp_file.close()
+	return temp_file.name
 
 
 class CustomerExcelParserTests(TestCase):
 	def setUp(self):
 		self.parser = CustomerExcelParser()
 
-	def _create_excel_file(self, rows):
-		import openpyxl
-
-		workbook = openpyxl.Workbook()
-		sheet = workbook.active
-
-		headers = ['Shipping Mark', 'First Name', 'Last Name', 'Email', 'Phone Number']
-		sheet.append(headers)
-
-		for row in rows:
-			sheet.append(row)
-
-		temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
-		workbook.save(temp_file.name)
-		workbook.close()
-		temp_file.close()
-		return temp_file.name
-
 	def test_parse_restores_leading_zero_for_numeric_phone(self):
 		rows = [
 			['PM 1001', 'John', 'Doe', '', 241234567],
 		]
-		file_path = self._create_excel_file(rows)
+		file_path = create_excel_file(rows)
 
 		try:
 			results = self.parser.parse_file(file_path)
@@ -49,7 +54,7 @@ class CustomerExcelParserTests(TestCase):
 		rows = [
 			['PM 1002', 'Jane', 'Doe', '', '0249876543'],
 		]
-		file_path = self._create_excel_file(rows)
+		file_path = create_excel_file(rows)
 
 		try:
 			results = self.parser.parse_file(file_path)
@@ -65,6 +70,7 @@ class CustomerExcelParserTests(TestCase):
 class CustomerCreationUtilsTests(TestCase):
 	def setUp(self):
 		self.user_model = get_user_model()
+		self.parser = CustomerExcelParser()
 
 	def test_create_customer_from_data_success(self):
 		customer = create_customer_from_data({
@@ -95,7 +101,7 @@ class CustomerCreationUtilsTests(TestCase):
 			[long_mark, 'Lydia', 'Mensah', '', '0241234567'],
 		]
 
-		file_path = self._create_excel_file(rows)
+		file_path = create_excel_file(rows)
 
 		try:
 			results = self.parser.parse_file(file_path)
