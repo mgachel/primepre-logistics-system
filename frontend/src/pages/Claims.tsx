@@ -613,14 +613,17 @@ export default function Claims() {
                           <img
                             src={selectedClaim.image_1}
                             alt="Claim supporting image 1"
-                            className="w-20 h-20 object-cover rounded-lg border cursor-pointer hover:opacity-75 transition-opacity"
+                            className="w-32 h-32 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-all shadow-sm"
                             onClick={() => window.open(selectedClaim.image_1, '_blank')}
                             onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
+                              console.error('Failed to load image 1:', selectedClaim.image_1);
+                              const target = e.target as HTMLImageElement;
+                              target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5FcnJvcjwvdGV4dD48L3N2Zz4=';
+                              target.classList.add('opacity-50');
                             }}
                           />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all">
-                            <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all">
+                            <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100" />
                           </div>
                         </div>
                       )}
@@ -629,11 +632,17 @@ export default function Claims() {
                           <img
                             src={selectedClaim.image_2}
                             alt="Claim supporting image 2"
-                            className="w-20 h-20 object-cover rounded-lg border cursor-pointer hover:opacity-75 transition-opacity"
+                            className="w-32 h-32 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-all shadow-sm"
                             onClick={() => window.open(selectedClaim.image_2, '_blank')}
+                            onError={(e) => {
+                              console.error('Failed to load image 2:', selectedClaim.image_2);
+                              const target = e.target as HTMLImageElement;
+                              target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5FcnJvcjwvdGV4dD48L3N2Zz4=';
+                              target.classList.add('opacity-50');
+                            }}
                           />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all">
-                            <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all">
+                            <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100" />
                           </div>
                         </div>
                       )}
@@ -642,11 +651,17 @@ export default function Claims() {
                           <img
                             src={selectedClaim.image_3}
                             alt="Claim supporting image 3"
-                            className="w-20 h-20 object-cover rounded-lg border cursor-pointer hover:opacity-75 transition-opacity"
+                            className="w-32 h-32 object-cover rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-all shadow-sm"
                             onClick={() => window.open(selectedClaim.image_3, '_blank')}
+                            onError={(e) => {
+                              console.error('Failed to load image 3:', selectedClaim.image_3);
+                              const target = e.target as HTMLImageElement;
+                              target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5FcnJvcjwvdGV4dD48L3N2Zz4=';
+                              target.classList.add('opacity-50');
+                            }}
                           />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all">
-                            <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg transition-all">
+                            <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100" />
                           </div>
                         </div>
                       )}

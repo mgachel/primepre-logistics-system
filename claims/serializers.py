@@ -8,6 +8,9 @@ class ClaimSerializer(serializers.ModelSerializer):
     
     customer_name = serializers.CharField(read_only=True)
     days_since_submission = serializers.IntegerField(read_only=True)
+    image_1 = serializers.SerializerMethodField()
+    image_2 = serializers.SerializerMethodField()
+    image_3 = serializers.SerializerMethodField()
     
     class Meta:
         model = Claim
@@ -18,6 +21,27 @@ class ClaimSerializer(serializers.ModelSerializer):
             'image_1', 'image_2', 'image_3'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'shipping_mark']
+    
+    def get_image_1(self, obj):
+        if obj.image_1:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image_1.url)
+        return None
+    
+    def get_image_2(self, obj):
+        if obj.image_2:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image_2.url)
+        return None
+    
+    def get_image_3(self, obj):
+        if obj.image_3:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image_3.url)
+        return None
     
     def create(self, validated_data):
         # Get the customer from the request context
@@ -52,6 +76,9 @@ class AdminClaimSerializer(serializers.ModelSerializer):
     customer_phone = serializers.CharField(source='customer.phone', read_only=True)
     customer_email = serializers.CharField(source='customer.email', read_only=True)
     customer_region = serializers.CharField(source='customer.region', read_only=True)
+    image_1 = serializers.SerializerMethodField()
+    image_2 = serializers.SerializerMethodField()
+    image_3 = serializers.SerializerMethodField()
     
     class Meta:
         model = Claim
@@ -63,6 +90,27 @@ class AdminClaimSerializer(serializers.ModelSerializer):
             'image_1', 'image_2', 'image_3'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'shipping_mark']
+    
+    def get_image_1(self, obj):
+        if obj.image_1:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image_1.url)
+        return None
+    
+    def get_image_2(self, obj):
+        if obj.image_2:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image_2.url)
+        return None
+    
+    def get_image_3(self, obj):
+        if obj.image_3:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image_3.url)
+        return None
 
 
 class ClaimStatusUpdateSerializer(serializers.ModelSerializer):

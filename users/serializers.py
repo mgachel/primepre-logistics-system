@@ -94,6 +94,12 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         # Auto-verify admin users (they don't need phone verification)
         if validated_data.get('user_role') in ['ADMIN', 'STAFF', 'MANAGER', 'SUPER_ADMIN']:
             validated_data['is_verified'] = True
+        
+        # Auto-verify customers created by admin and set default password to "PrimeMade"
+        elif validated_data.get('user_role') == 'CUSTOMER':
+            validated_data['is_verified'] = True
+            # Set password to "PrimeMade" if not provided or if provided, override it
+            validated_data['password'] = 'PrimeMade'
             
         return CustomerUser.objects.create_user(**validated_data)
 

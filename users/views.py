@@ -494,12 +494,13 @@ class ResendVerificationPinView(APIView):
 
 class PhoneForgotPasswordView(APIView):
     """
-    API: Initiate password reset with phone number
+    API: Reset password to default "PrimeMade" for any verified customer
+    No SMS needed - instant password reset for simplicity
     """
     permission_classes = [AllowAny]
     
     def post(self, request):
-        """Send password reset PIN to phone."""
+        """Reset password to 'PrimeMade' immediately."""
         phone = request.data.get('phone')
         
         if not phone:
@@ -512,32 +513,26 @@ class PhoneForgotPasswordView(APIView):
             import re
             phone_clean = re.sub(r'[^\d+]', '', phone)
             
+            # Find user - must be verified
             user = CustomerUser.objects.get(phone=phone_clean, is_verified=True)
             
-            # Create reset PIN
-            reset_pin = ResetPin.create_for_user(user)
+            # Reset password to "PrimeMade" immediately
+            user.set_password('PrimeMade')
+            user.save()
             
-            # Send SMS
-            sms_result = send_password_reset_pin(user.phone, reset_pin.pin)
+            logger.info(f"Password reset to 'PrimeMade' for user: {user.phone}")
             
-            if sms_result['success']:
-                logger.info(f"Password reset PIN sent to: {user.phone}")
-                return Response({
-                    'message': 'Password reset code sent successfully',
-                    'user_id': user.id,  # Frontend will need this for the next step
-                    'phone': user.phone
-                }, status=status.HTTP_200_OK)
-            else:
-                logger.error(f"Failed to send reset PIN to {user.phone}: {sms_result['message']}")
-                return Response({
-                    'error': 'SMS failed',
-                    'message': sms_result['message']
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                'success': True,
+                'message': 'Your password has been reset to "PrimeMade". You can now login and change it.',
+                'phone': user.phone
+            }, status=status.HTTP_200_OK)
             
         except CustomerUser.DoesNotExist:
             # Don't reveal if phone exists - always return success for security
             return Response({
-                'message': 'If this phone number exists, a reset code has been sent'
+                'success': True,
+                'message': 'If this phone number exists and is verified, the password has been reset to "PrimeMade".'
             }, status=status.HTTP_200_OK)
         except Exception as e:
             logger.error(f"Forgot password error: {str(e)}")
@@ -806,6 +801,9 @@ class LoginView(APIView):
         if hasattr(user, 'last_login_ip'):
             user.last_login_ip = self.get_client_ip(request)
             user.save(update_fields=['last_login_ip'])
+        
+        # Log successful authentication (for debugging password changes)
+        logger.info(f"User logged in successfully with password check: {phone_or_username}")
         
         # Generate JWT tokens
         refresh = RefreshToken.for_user(user)

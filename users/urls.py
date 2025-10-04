@@ -92,6 +92,10 @@ urlpatterns = [
     path('forgot-password/', PhoneForgotPasswordView.as_view(), name='phone_forgot_password'),
     path('reset-password/', PhonePasswordResetView.as_view(), name='phone_reset_password'),
     
+    # Phone-based password reset (with phone/ prefix for consistency)
+    path('phone/forgot-password/', PhoneForgotPasswordView.as_view(), name='phone_forgot_password_alt'),
+    path('phone/reset-password/', PhonePasswordResetView.as_view(), name='phone_reset_password_alt'),
+    
     # ============================================================================
     # EXISTING API ENDPOINTS (PRESERVED)
     # ============================================================================

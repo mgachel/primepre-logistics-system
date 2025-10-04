@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '../../components/ui/use-toast';
 import { Separator } from '../../components/ui/separator';
 import { useAuthStore } from '../../stores/authStore';
+import { authService } from '../../services/authService';
 // Note: Full profile editing will be implemented when backend APIs are available
 
 interface ProfileData {
@@ -168,6 +169,25 @@ const CustomerProfile: React.FC = () => {
   };
 
   const handlePasswordUpdate = async () => {
+    // Validation
+    if (!passwordData.current_password) {
+      toast({
+        title: "Current Password Required",
+        description: "Please enter your current password",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!passwordData.new_password) {
+      toast({
+        title: "New Password Required",
+        description: "Please enter a new password",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (passwordData.new_password !== passwordData.confirm_password) {
       toast({
         title: "Password Mismatch",
@@ -186,24 +206,50 @@ const CustomerProfile: React.FC = () => {
       return;
     }
 
+    // Check if trying to use the default password
+    if (passwordData.new_password === 'PrimeMade') {
+      toast({
+        title: "Weak Password",
+        description: "Please choose a different password. 'PrimeMade' is the default password and should be changed.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
-      // TODO: Implement password change when backend API is available
-      setPasswordData({
-        current_password: '',
-        new_password: '',
-        confirm_password: ''
-      });
-      toast({
-        title: "Feature Coming Soon",
-        description: "Password change will be available when backend APIs are implemented",
-        variant: "default",
-      });
+      
+      // Call API to change password
+      const response = await authService.changePassword(
+        passwordData.current_password,
+        passwordData.new_password,
+        passwordData.confirm_password
+      );
+
+      if (response.success) {
+        // Clear form
+        setPasswordData({
+          current_password: '',
+          new_password: '',
+          confirm_password: ''
+        });
+
+        toast({
+          title: "Success!",
+          description: "Your password has been updated successfully",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to update password. Please check your current password.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error('Error updating password:', error);
       toast({
         title: "Error",
-        description: "Failed to update password. Please check your current password.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -470,6 +516,17 @@ const CustomerProfile: React.FC = () => {
 
         <TabsContent value="security">
           <div className="space-y-6">
+            {/* Info Banner */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex gap-3">
+                <Lock className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-semibold mb-1">First time changing your password?</p>
+                  <p>If your account was created by an administrator or you recently used the "Forgot Password" feature, your current password is <strong>"PrimeMade"</strong>. We recommend changing it to a unique, secure password.</p>
+                </div>
+              </div>
+            </div>
+
             {/* Password Change */}
             <Card>
               <CardHeader>
@@ -489,6 +546,7 @@ const CustomerProfile: React.FC = () => {
                       value={passwordData.current_password}
                       onChange={(e) => handlePasswordChange('current_password', e.target.value)}
                       className="pl-10 pr-10"
+                      placeholder="Enter your current password"
                     />
                     <Button
                       type="button"
@@ -500,6 +558,9 @@ const CustomerProfile: React.FC = () => {
                       {showPassword.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    If you haven't changed it yet, use "PrimeMade"
+                  </p>
                 </div>
 
                 <div>

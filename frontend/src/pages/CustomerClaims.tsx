@@ -649,7 +649,7 @@ export default function CustomerClaims() {
                       </h4>
                       <div className="flex gap-2 flex-wrap">
                         {claim.image_1 && (
-                          <div className="relative group">
+                          <div key={`${claim.id}-image-1`} className="relative group">
                             <img
                               src={claim.image_1}
                               alt="Claim supporting image 1"
@@ -662,7 +662,7 @@ export default function CustomerClaims() {
                           </div>
                         )}
                         {claim.image_2 && (
-                          <div className="relative group">
+                          <div key={`${claim.id}-image-2`} className="relative group">
                             <img
                               src={claim.image_2}
                               alt="Claim supporting image 2"
@@ -675,7 +675,7 @@ export default function CustomerClaims() {
                           </div>
                         )}
                         {claim.image_3 && (
-                          <div className="relative group">
+                          <div key={`${claim.id}-image-3`} className="relative group">
                             <img
                               src={claim.image_3}
                               alt="Claim supporting image 3"
