@@ -190,10 +190,33 @@ SESSION_COOKIE_AGE = 3600  # 1 hour
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
-# Twilio SMS Configuration
+# ═══════════════════════════════════════════════════════════════
+# TWILIO SMS CONFIGURATION WITH FAILSAFE
+# ═══════════════════════════════════════════════════════════════
+# 
+# FAILSAFE PROTECTION:
+# - Prevents app crash when Twilio env vars are missing
+# - Disables SMS features gracefully in development
+# - Logs warning instead of throwing exceptions
+# 
 TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='')
 TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN', default='')
 TWILIO_PHONE_NUMBER = config('TWILIO_PHONE_NUMBER', default='')
+
+# Check if Twilio is properly configured
+if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]):
+    TWILIO_ENABLED = False
+    import logging
+    logging.getLogger(__name__).warning(
+        "⚠️ Twilio not configured — SMS functionality disabled. "
+        "Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER to enable SMS."
+    )
+else:
+    TWILIO_ENABLED = True
+    import logging
+    logging.getLogger(__name__).info(
+        "✅ Twilio configured — SMS functionality enabled"
+    )
 
 # SMS Rate Limiting
 SMS_RATE_LIMIT_PER_HOUR = 3
