@@ -19,6 +19,7 @@ from .models import CargoContainer, CargoItem, ClientShipmentSummary
 from .excel_utils import ExcelRowParser
 from .shipping_mark_matcher import process_excel_upload
 from users.customer_excel_utils import create_customer_from_data
+from excel_config import validate_file_size, validate_row_count, get_batch_size
 import logging
 
 logger = logging.getLogger(__name__)
@@ -35,9 +36,10 @@ class ContainerExcelUploadSerializer(serializers.Serializer):
         if not value.name.lower().endswith(('.xlsx', '.xls')):
             raise serializers.ValidationError("File must be an Excel file (.xlsx or .xls)")
         
-        # Check file size (limit to 10MB)
-        if value.size > 10 * 1024 * 1024:
-            raise serializers.ValidationError("File size must be less than 10MB")
+        # Check file size using centralized config (now 50MB)
+        is_valid, error_msg = validate_file_size(value.size)
+        if not is_valid:
+            raise serializers.ValidationError(error_msg)
         
         return value
 
@@ -133,6 +135,14 @@ class ContainerExcelUploadView(APIView):
                     'invalid_rows': parse_results['invalid_rows']
                 }, status=status.HTTP_400_BAD_REQUEST)
             
+            # Validate row count
+            is_valid, error_msg = validate_row_count(len(parse_results['candidates']), 'container_items')
+            if not is_valid:
+                return Response({
+                    'success': False,
+                    'error': error_msg
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
             # Process shipping mark matching
             processing_results = process_excel_upload(
                 container_id=container_id,
@@ -221,10 +231,11 @@ class ContainerItemsCreateView(APIView):
             
             # Validate request size to prevent memory issues
             total_items = len(matched_items) + len(resolved_mappings)
-            if total_items > 1000:
+            is_valid, error_msg = validate_row_count(total_items, 'container_items')
+            if not is_valid:
                 return Response({
                     'success': False,
-                    'error': f'Too many items ({total_items}). Maximum 1000 items per request.'
+                    'error': error_msg
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             if not container_id:

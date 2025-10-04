@@ -42,11 +42,11 @@ class CustomerExcelUploadSerializer(serializers.Serializer):
                 "File must be an Excel file (.xlsx or .xls)"
             )
         
-        # Check file size (max 10MB)
-        if value.size > 10 * 1024 * 1024:
-            raise serializers.ValidationError(
-                "File size cannot exceed 10MB"
-            )
+        # Check file size using centralized config (max 50MB)
+        from excel_config import validate_file_size
+        is_valid, error_msg = validate_file_size(value.size)
+        if not is_valid:
+            raise serializers.ValidationError(error_msg)
         
         return value
 
@@ -65,9 +65,9 @@ class CustomerBulkCreateSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("Customer list cannot be empty")
         
-        # Increase limit to handle larger uploads, but still prevent abuse
-        if len(value) > 5000:
-            raise serializers.ValidationError("Cannot create more than 5000 customers at once")
+        # Increased limit to handle 4,000-7,000 customer uploads
+        if len(value) > 10000:
+            raise serializers.ValidationError("Cannot create more than 10,000 customers at once. Please split large files.")
         
         # Validate each customer data structure
         required_fields = ['shipping_mark', 'first_name', 'last_name', 'phone_normalized', 'source_row_number']
@@ -200,59 +200,80 @@ class CustomerBulkCreateView(APIView):
         
         Expects a list of validated customer data objects.
         """
-        print(f"Bulk create request received. Method: {request.method}")
-        print(f"Request data keys: {list(request.data.keys()) if hasattr(request, 'data') else 'No data'}")
-        print(f"Request content type: {request.content_type}")
-        
-        # Validate input
-        serializer = CustomerBulkCreateSerializer(data=request.data)
-        if not serializer.is_valid():
-            print(f"Serializer validation failed: {serializer.errors}")
+        try:
+            print(f"Bulk create request received. Method: {request.method}")
+            print(f"Request data keys: {list(request.data.keys()) if hasattr(request, 'data') else 'No data'}")
+            print(f"Request content type: {request.content_type}")
+            
+            # Validate input
+            serializer = CustomerBulkCreateSerializer(data=request.data)
+            if not serializer.is_valid():
+                print(f"Serializer validation failed: {serializer.errors}")
+                return Response({
+                    'success': False,
+                    'errors': serializer.errors,
+                    'message': 'Invalid request data'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            customers_data = serializer.validated_data['customers']
+            print(f"Number of customers to create: {len(customers_data)}")
+            
+            # Prevent memory issues on Render free tier
+            # Increased limit to handle 4,000-7,000 customer uploads
+            if len(customers_data) > 10000:
+                return Response({
+                    'success': False,
+                    'error': f'Too many customers ({len(customers_data)}). Maximum 10,000 customers per request.',
+                    'message': 'Request too large - please split into smaller files'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if len(customers_data) == 0:
+                return Response({
+                    'success': False,
+                    'message': 'No customers provided',
+                    'created_customers': [],
+                    'failed_customers': []
+                }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception("Error validating bulk create request")
             return Response({
                 'success': False,
-                'errors': serializer.errors,
-                'message': 'Invalid request data'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        customers_data = serializer.validated_data['customers']
-        print(f"Number of customers to create: {len(customers_data)}")
-        
-        if len(customers_data) == 0:
-            return Response({
-                'success': False,
-                'message': 'No customers provided',
+                'message': f'Request validation failed: {str(e)}',
                 'created_customers': [],
                 'failed_customers': []
-            }, status=status.HTTP_400_BAD_REQUEST)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         created_customers = []
         failed_customers = []
         
         print(f"Starting bulk creation of {len(customers_data)} customers")
         
-        try:
-            # Process customers in batches for better performance and memory usage
-            batch_size = 100
-            total_customers = len(customers_data)
+        # Process customers in batches for better performance and memory usage
+        # Each customer is created in its own transaction to prevent deadlocks
+        # Small batch size (25) to handle 4,000-7,000 customer uploads safely
+        batch_size = 25  # Optimized for large uploads on Render free tier (512MB RAM)
+        total_customers = len(customers_data)
+        
+        for batch_start in range(0, total_customers, batch_size):
+            batch_end = min(batch_start + batch_size, total_customers)
+            batch = customers_data[batch_start:batch_end]
             
-            for batch_start in range(0, total_customers, batch_size):
-                batch_end = min(batch_start + batch_size, total_customers)
-                batch = customers_data[batch_start:batch_end]
-                
-                print(f"Processing batch {batch_start//batch_size + 1}: customers {batch_start + 1} to {batch_end}")
-                
-                for customer_data in batch:
-                    try:
-                        # Validate customer data structure
-                        if not isinstance(customer_data, dict):
-                            failed_customers.append({
-                                'customer_data': customer_data,
-                                'error': 'Invalid customer data format',
-                                'source_row_number': customer_data.get('source_row_number', 0)
-                            })
-                            continue
-                        
-                        # Create customer
+            print(f"Processing batch {batch_start//batch_size + 1}: customers {batch_start + 1} to {batch_end}")
+            
+            for customer_data in batch:
+                try:
+                    # Validate customer data structure
+                    if not isinstance(customer_data, dict):
+                        failed_customers.append({
+                            'customer_data': customer_data,
+                            'error': 'Invalid customer data format',
+                            'source_row_number': customer_data.get('source_row_number', 0)
+                        })
+                        continue
+                    
+                    # Create customer with individual transaction
+                    # This prevents nested transaction deadlocks on Render
+                    with transaction.atomic():
                         customer = self._create_customer(customer_data, request.user)
                         created_customers.append({
                             'id': customer.id,
@@ -262,25 +283,21 @@ class CustomerBulkCreateView(APIView):
                             'phone': customer.phone,
                             'source_row_number': customer_data.get('source_row_number', 0)
                         })
-                        
-                    except Exception as e:
-                        failed_customers.append({
-                            'customer_data': customer_data,
-                            'error': str(e),
-                            'source_row_number': customer_data.get('source_row_number', 0)
-                        })
-                
-                # Log progress
-                print(f"Batch completed. Total created so far: {len(created_customers)}, Total failed so far: {len(failed_customers)}")
-        
-        except Exception as e:
-            print(f"Batch processing error: {str(e)}")
-            return Response({
-                'success': False,
-                'message': f'Bulk creation failed: {str(e)}',
-                'created_customers': created_customers,
-                'failed_customers': failed_customers
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    
+                except Exception as e:
+                    # Log the error but continue processing
+                    logger.error(f"Failed to create customer: {str(e)}", extra={
+                        'customer_data': customer_data,
+                        'error': str(e)
+                    })
+                    failed_customers.append({
+                        'customer_data': customer_data,
+                        'error': str(e),
+                        'source_row_number': customer_data.get('source_row_number', 0)
+                    })
+            
+            # Log progress
+            print(f"Batch completed. Total created so far: {len(created_customers)}, Total failed so far: {len(failed_customers)}")
         
         # Return results
         response_data = {
@@ -311,36 +328,44 @@ class CustomerBulkCreateView(APIView):
             
         Returns:
             Created CustomerUser instance
+            
+        Raises:
+            ValueError: If customer creation fails
         """
-        # Prepare payload for shared utility
-        payload = {
-            'shipping_mark': customer_data.get('shipping_mark'),
-            'shipping_mark_normalized': customer_data.get('shipping_mark_normalized'),
-            'first_name': customer_data.get('first_name'),
-            'last_name': customer_data.get('last_name'),
-            'phone_normalized': customer_data.get('phone_normalized'),
-            'email': customer_data.get('email'),
-            'region': customer_data.get('region') or 'GREATER_ACCRA',
-            'accessible_warehouses': customer_data.get('accessible_warehouses', []),
-        }
-
-        # Create the customer using shared utility
         try:
+            # Prepare payload for shared utility
+            payload = {
+                'shipping_mark': customer_data.get('shipping_mark'),
+                'shipping_mark_normalized': customer_data.get('shipping_mark_normalized'),
+                'first_name': customer_data.get('first_name'),
+                'last_name': customer_data.get('last_name'),
+                'phone_normalized': customer_data.get('phone_normalized'),
+                'email': customer_data.get('email'),
+                'region': customer_data.get('region') or 'GREATER_ACCRA',
+                'accessible_warehouses': customer_data.get('accessible_warehouses', []),
+            }
+
+            # Create the customer using shared utility
             customer = create_customer_from_data(payload, created_by_user)
             print(f"Successfully created customer: {customer.shipping_mark} - {customer.get_full_name()}")
             return customer
+            
+        except ValidationError as e:
+            # Django validation errors
+            error_msg = f"Validation error: {str(e)}"
+            logger.error(error_msg, extra={
+                "customer_data": customer_data,
+                "created_by": getattr(created_by_user, "id", None),
+            })
+            raise ValueError(error_msg)
+            
         except Exception as e:
-            # Log the specific error for debugging
-            import traceback
+            # Any other errors - log and re-raise
             error_msg = f"Customer creation failed: {str(e)}"
-            logger.exception(
-                error_msg,
-                extra={
-                    "customer_data": customer_data,
-                    "payload": payload,
-                    "created_by": getattr(created_by_user, "id", None),
-                }
-            )
+            logger.exception(error_msg, extra={
+                "customer_data": customer_data,
+                "created_by": getattr(created_by_user, "id", None),
+            })
             raise ValueError(error_msg)
 
 
