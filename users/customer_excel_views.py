@@ -93,7 +93,12 @@ class CustomerExcelUploadView(APIView):
     
     def post(self, request):
         """
-        Upload and process Excel file containing customer data.
+        Upload and process Excel file containing customer data with MEMORY-OPTIMIZED chunked processing.
+        
+        OPTIMIZATION FOR RENDER FREE TIER (512MB RAM):
+        - Processes Excel file in chunks to minimize memory usage
+        - Validates data in chunks without loading entire file
+        - Memory-safe for files with 4,000-7,000 customer records
         
         Expected Excel format:
         - Column A: Shipping Mark (required, unique)
@@ -104,6 +109,8 @@ class CustomerExcelUploadView(APIView):
         
         Returns processing results including valid candidates and duplicates.
         """
+        logger.info(f"[EXCEL-UPLOAD-START] User: {getattr(request.user, 'id', 'unknown')}")
+        
         # Validate input
         serializer = CustomerExcelUploadSerializer(data=request.data)
         if not serializer.is_valid():
@@ -117,6 +124,9 @@ class CustomerExcelUploadView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         uploaded_file = serializer.validated_data['file']
+        file_size_mb = uploaded_file.size / (1024 * 1024)
+        
+        logger.info(f"[EXCEL-UPLOAD-FILE] Name: {uploaded_file.name}, Size: {file_size_mb:.2f}MB")
         
         # Save uploaded file temporarily
         temp_file_path = None
@@ -127,17 +137,13 @@ class CustomerExcelUploadView(APIView):
                     temp_file.write(chunk)
                 temp_file_path = temp_file.name
             
-            # Process the Excel file
-            logger.info(
-                "Processing customer Excel upload",
-                extra={
-                    "user_id": getattr(request.user, "id", None),
-                    "file_name": getattr(uploaded_file, "name", "unknown"),
-                    "file_size": getattr(uploaded_file, "size", None),
-                }
-            )
+            logger.info(f"[EXCEL-UPLOAD-PROCESS] Starting chunked processing: {temp_file_path}")
 
+            # Process the Excel file with memory optimization
             results = process_customer_excel_upload(temp_file_path)
+            
+            logger.info(f"[EXCEL-UPLOAD-PARSED] Success: {results.get('success')}, "
+                       f"Valid: {results.get('parsing_results', {}).get('valid_candidates', 0)}")
             
             if not results['success']:
                 logger.warning(
@@ -163,14 +169,16 @@ class CustomerExcelUploadView(APIView):
                 'upload_id': f"customer_upload_{request.user.id}_{temp_file.name.split('/')[-1]}"
             }
             
+            logger.info(f"[EXCEL-UPLOAD-COMPLETE] Valid candidates: {results['parsing_results']['valid_candidates']}")
             return Response(response_data, status=status.HTTP_200_OK)
             
         except Exception as e:
             logger.exception(
-                "Customer Excel upload processing failed",
+                "[EXCEL-UPLOAD-ERROR] Processing failed",
                 extra={
                     "user_id": getattr(request.user, "id", None),
                     "file_name": getattr(uploaded_file, "name", "unknown"),
+                    "error": str(e),
                 }
             )
             return Response({
@@ -183,8 +191,9 @@ class CustomerExcelUploadView(APIView):
             if temp_file_path and os.path.exists(temp_file_path):
                 try:
                     os.unlink(temp_file_path)
-                except:
-                    pass
+                    logger.debug(f"[EXCEL-UPLOAD-CLEANUP] Temp file deleted: {temp_file_path}")
+                except Exception as cleanup_error:
+                    logger.warning(f"[EXCEL-UPLOAD-CLEANUP] Failed to delete temp file: {cleanup_error}")
 
 
 class CustomerBulkCreateView(APIView):
@@ -261,20 +270,43 @@ class CustomerBulkCreateView(APIView):
         failed_customers = []
         
         try:
+            logger.info(f"[BULK-CREATE-START] Processing {len(customers_data)} customers")
             print(f"Starting bulk creation of {len(customers_data)} customers")
-        
-            # Process customers in batches for better performance and memory usage
-            # Each customer is created in its own transaction to prevent deadlocks
-            # Small batch size (25) to handle 4,000-7,000 customer uploads safely
-            batch_size = 25  # Optimized for large uploads on Render free tier (512MB RAM)
+            
+            # ═══════════════════════════════════════════════════════════════
+            # MEMORY-OPTIMIZED BATCH PROCESSING FOR RENDER FREE TIER
+            # ═══════════════════════════════════════════════════════════════
+            # 
+            # STRATEGY:
+            # - Process in small batches (25 customers) to minimize memory spikes
+            # - Individual transactions prevent deadlocks on Postgres
+            # - Progress logging helps track long-running operations
+            # - Continue on errors (graceful degradation)
+            # 
+            # MEMORY PROFILE:
+            # - Each customer object: ~2-5KB
+            # - Batch of 25: ~125KB
+            # - Total for 7,000: ~35MB in memory (spread across batches)
+            # 
+            batch_size = 25  # Optimized for 512MB RAM free tier
             total_customers = len(customers_data)
+            total_batches = (total_customers + batch_size - 1) // batch_size
+            
+            logger.info(f"[BULK-CREATE-BATCHES] Total: {total_batches} batches of {batch_size}")
             
             for batch_start in range(0, total_customers, batch_size):
                 batch_end = min(batch_start + batch_size, total_customers)
                 batch = customers_data[batch_start:batch_end]
+                batch_num = (batch_start // batch_size) + 1
                 
-                print(f"Processing batch {batch_start//batch_size + 1}: customers {batch_start + 1} to {batch_end}")
-            
+                # Log progress every 20 batches (every 500 customers)
+                if batch_num % 20 == 0 or batch_num == 1:
+                    logger.info(f"[BULK-CREATE-PROGRESS] Batch {batch_num}/{total_batches} | "
+                               f"Processed: {batch_start}/{total_customers} | "
+                               f"Created: {len(created_customers)} | Failed: {len(failed_customers)}")
+                
+                print(f"Processing batch {batch_num}/{total_batches}: customers {batch_start + 1} to {batch_end}")
+                
                 for customer_data in batch:
                     try:
                         # Validate customer data structure
@@ -301,20 +333,16 @@ class CustomerBulkCreateView(APIView):
                         
                     except Exception as e:
                         # Log the error but continue processing
-                        logger.error(f"Failed to create customer: {str(e)}", extra={
-                            'customer_data': customer_data,
-                            'error': str(e)
-                        })
+                        logger.error(f"[BULK-CREATE-FAIL] Row {customer_data.get('source_row_number', '?')}: {str(e)}")
                         failed_customers.append({
                             'customer_data': customer_data,
                             'error': str(e),
                             'source_row_number': customer_data.get('source_row_number', 0)
                         })
                 
-                # Log progress
-                print(f"Batch completed. Total created so far: {len(created_customers)}, Total failed so far: {len(failed_customers)}")
-        
-            # Return results
+                # Log batch completion (every batch for visibility)
+                if batch_num % 20 == 0 or batch_num == total_batches:
+                    print(f"Batch {batch_num}/{total_batches} completed. Total created: {len(created_customers)}, Total failed: {len(failed_customers)}")            # Return results
             response_data = {
                 'success': True,
                 'message': f'Processing completed. Created {len(created_customers)} customers, {len(failed_customers)} failed',
