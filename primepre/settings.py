@@ -416,4 +416,12 @@ CACHES = {
 }
 
 # Default primary key field type
+# Default primary key field type
+# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Request size limits for large Excel uploads
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB in bytes
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB in bytes
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 50000    # Allow many form fields for large uploads
