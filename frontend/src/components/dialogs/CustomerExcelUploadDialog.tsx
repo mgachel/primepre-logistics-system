@@ -169,9 +169,9 @@ export function CustomerExcelUploadDialog({
 
     setIsCreating(true);
     try {
-  console.log('Creating customers with data:', uploadResults.duplicate_results.unique_candidates);
+      console.log('Creating customers with data:', uploadResults.duplicate_results.unique_candidates);
 
-  const response = await fetch(buildApiUrl('/api/auth/customers/excel/bulk-create/'), {
+      const response = await fetch(buildApiUrl('/api/auth/customers/excel/bulk-create/'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -201,17 +201,97 @@ export function CustomerExcelUploadDialog({
         throw new Error(data.message || data.error || `Creation failed with status ${response.status}`);
       }
 
-      setCreateResults(data);
-      setCurrentStep('complete');
+      // ═══════════════════════════════════════════════════════════════
+      // ASYNC TASK HANDLING (NEW)
+      // ═══════════════════════════════════════════════════════════════
+      // Check if response is async (has task_id) or sync (has total_created)
+      if (data.task_id) {
+        console.log('🔄 Async task queued:', data.task_id);
+        
+        toast({
+          title: "Processing Started",
+          description: `Processing ${data.total_customers} customers in background. This may take a few minutes...`,
+        });
 
-      toast({
-        title: "Customers Created",
-        description: `Successfully created ${data.total_created} customers`,
-      });
+        // Poll for task status every 2 seconds
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusResponse = await fetch(
+              buildApiUrl(`/api/auth/customers/excel/bulk-create/status/${data.task_id}/`),
+              {
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                },
+              }
+            );
 
-      // Call completion callback
-      if (onUploadComplete) {
-        onUploadComplete();
+            const statusData = await statusResponse.json();
+            console.log('Task status:', statusData);
+
+            if (statusData.status === 'COMPLETE') {
+              clearInterval(pollInterval);
+              setIsCreating(false);
+              
+              // Set results in expected format
+              setCreateResults({
+                success: true,
+                total_created: statusData.created || 0,
+                total_failed: statusData.failed || 0,
+                errors: statusData.errors || [],
+                message: `Successfully created ${statusData.created} customers`,
+              });
+              
+              setCurrentStep('complete');
+
+              toast({
+                title: "✅ Customers Created",
+                description: `Successfully created ${statusData.created} customers`,
+              });
+
+              // Call completion callback
+              if (onUploadComplete) {
+                onUploadComplete();
+              }
+            } else if (statusData.status === 'FAILED') {
+              clearInterval(pollInterval);
+              setIsCreating(false);
+              
+              throw new Error(statusData.error || 'Task failed');
+            } else if (statusData.status === 'RUNNING') {
+              // Still processing - update toast with progress
+              console.log('⏳ Task still running...');
+            }
+          } catch (pollError) {
+            clearInterval(pollInterval);
+            setIsCreating(false);
+            console.error('Status polling error:', pollError);
+            
+            toast({
+              title: "Error Checking Status",
+              description: pollError instanceof Error ? pollError.message : 'Failed to check task status',
+              variant: "destructive",
+            });
+          }
+        }, 2000); // Poll every 2 seconds
+
+      } else {
+        // ═══════════════════════════════════════════════════════════════
+        // SYNC RESPONSE HANDLING (OLD - BACKWARD COMPATIBLE)
+        // ═══════════════════════════════════════════════════════════════
+        setCreateResults(data);
+        setCurrentStep('complete');
+
+        toast({
+          title: "Customers Created",
+          description: `Successfully created ${data.total_created} customers`,
+        });
+
+        // Call completion callback
+        if (onUploadComplete) {
+          onUploadComplete();
+        }
+        
+        setIsCreating(false);
       }
 
     } catch (error) {
@@ -220,7 +300,6 @@ export function CustomerExcelUploadDialog({
         description: error instanceof Error ? error.message : 'An error occurred',
         variant: "destructive",
       });
-    } finally {
       setIsCreating(false);
     }
   };
