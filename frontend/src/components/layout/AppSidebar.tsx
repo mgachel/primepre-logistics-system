@@ -14,7 +14,8 @@ import {
   ChevronDown,
   FileText,
   StickyNote,
-  Bell
+  Bell,
+  Warehouse
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
@@ -32,18 +33,17 @@ interface SidebarProps {
 // Admin/Super Admin Navigation
 const adminNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Daily Updates", href: "/admin/daily-updates", icon: Bell },
+  { name: "Client Announcements", href: "/admin/daily-updates", icon: Bell },
   { name: "Clients", href: "/clients", icon: Users },
   {
     name: "Cargo",
     children: [
       { name: "Sea Cargo", href: "/cargos/sea", icon: Ship },
       { name: "Air Cargo", href: "/cargos/air", icon: Plane },
-      { name: "Claims", href: "/cargos/claims", icon: AlertTriangle },
     ],
   },
   {
-    name: "Goods Received",
+    name: "Daily Updates",
     children: [
       { name: "China (All)", href: "/goods/china", icon: Package },
       { name: "China Sea", href: "/goods/china/sea", icon: Ship },
@@ -57,6 +57,7 @@ const adminNavigation = [
       { name: "Ghana Air", href: "/goods/ghana/air", icon: Plane },
     ],
   },
+  { name: "Claims", href: "/cargos/claims", icon: AlertTriangle },
   { name: "Rates", href: "/rates", icon: Calculator },
   { name: "Admins", href: "/my-admins", icon: UserCog },
   { name: "Notes", href: "/notes", icon: StickyNote },
@@ -66,6 +67,13 @@ const adminNavigation = [
 // Customer Navigation
 const customerNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  {
+    name: "Local Warehouse",
+    children: [
+      { name: "Ghana Sea", href: "/goods/ghana/sea", icon: Ship },
+      { name: "Ghana Air", href: "/goods/ghana/air", icon: Plane },
+    ],
+  },
   {
     name: "Daily Updates",
     children: [
@@ -186,7 +194,11 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
                     title={`Toggle ${item.name} section`}
                   >
                     <span className="flex items-center">
-                      <Package className="h-4 w-4 shrink-0" />
+                      {item.name === "Local Warehouse" || item.name === "Daily Updates" ? (
+                        <Warehouse className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <Package className="h-4 w-4 shrink-0" />
+                      )}
                       {(!isCollapsed || isMobile) && <span className="ml-3">{item.name}</span>}
                     </span>
                     {(!isCollapsed || isMobile) && (

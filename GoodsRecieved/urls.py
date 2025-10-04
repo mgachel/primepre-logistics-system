@@ -11,7 +11,10 @@ from .views import (
     GhanaAirContainerViewSet,
     GhanaSeaContainerViewSet,
     ChinaAirContainerViewSet,
-    ChinaSeaContainerViewSet
+    ChinaSeaContainerViewSet,
+    CustomerGoodsReceivedContainerViewSet,
+    CustomerGhanaSeaContainerViewSet,
+    CustomerGhanaAirContainerViewSet
 )
 
 # Create router and register viewsets - UPDATED TO USE CONTAINER ARCHITECTURE
@@ -38,6 +41,11 @@ customer_router = DefaultRouter()
 customer_router.register(r'china', CustomerGoodsReceivedChinaViewSet, basename='customer-china')
 customer_router.register(r'ghana', CustomerGoodsReceivedGhanaViewSet, basename='customer-ghana')
 
+# Customer container views - separate router to avoid nested path issues
+customer_ghana_containers_router = DefaultRouter()
+customer_ghana_containers_router.register(r'sea_containers', CustomerGhanaSeaContainerViewSet, basename='customer-ghana-sea')
+customer_ghana_containers_router.register(r'air_containers', CustomerGhanaAirContainerViewSet, basename='customer-ghana-air')
+
 # URL patterns
 urlpatterns = [
     # Admin/Staff endpoints (existing individual items)
@@ -48,6 +56,7 @@ urlpatterns = [
     
     # Customer-specific endpoints (new)
     path('customer/', include(customer_router.urls)),
+    path('customer/ghana/', include(customer_ghana_containers_router.urls)),
     
     # Customer dashboard
     path('customer/dashboard/', CustomerDashboardView.as_view(), name='customer-dashboard'),

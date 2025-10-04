@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "@/stores/authStore";
 import {
   Search,
   Plus,
@@ -68,6 +69,9 @@ function mapStatus(
 export default function GoodsReceivedGhanaAir() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  // Check if user is customer (user_role is CUSTOMER and not an admin)
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
 
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewContainerDialog, setShowNewContainerDialog] = useState(false);
@@ -195,8 +199,56 @@ export default function GoodsReceivedGhanaAir() {
     });
   }, [containers, searchTerm, statusFilter]);
 
-  // Table columns matching cargo structure
-    const columns: Column<GoodsReceivedContainer>[] = [
+  // Table columns - different for customers vs admins
+  const columns: Column<GoodsReceivedContainer>[] = isCustomer ? [
+    // Customer columns: Only Container ID, Offloading Date, Rates, Dollar Rate
+    {
+      id: "container",
+      header: "AWB ID",
+      accessor: (row) => (
+        <div className="font-mono font-medium">{row.container_id}</div>
+      ),
+      sort: (a, b) => a.container_id.localeCompare(b.container_id),
+    },
+    {
+      id: "offloading_date",
+      header: "Offloading Date",
+      accessor: (row) => (
+        <div className="text-sm">
+          <div className="font-medium">
+            {row.arrival_date ? formatDate(row.arrival_date) : "Not set"}
+          </div>
+        </div>
+      ),
+      sort: (a, b) => {
+        const aDate = a.arrival_date ? new Date(a.arrival_date).getTime() : 0;
+        const bDate = b.arrival_date ? new Date(b.arrival_date).getTime() : 0;
+        return bDate - aDate;
+      },
+      width: "140px",
+    },
+    {
+      id: "rates",
+      header: "Rates",
+      accessor: (row) => (
+        <div className="text-sm font-medium">
+          {row.rates ? `¥${row.rates}` : "Not set"}
+        </div>
+      ),
+      width: "100px",
+    },
+    {
+      id: "dollar_rate",
+      header: "Dollar Rate",
+      accessor: (row) => (
+        <div className="text-sm font-medium">
+          {row.dollar_rate ? `$${row.dollar_rate}` : "Not set"}
+        </div>
+      ),
+      width: "110px",
+    },
+  ] : [
+    // Admin columns: All columns
     {
       id: "container",
       header: "AWB ID",
@@ -247,7 +299,7 @@ export default function GoodsReceivedGhanaAir() {
       header: "Rates",
       accessor: (row) => (
         <div className="text-sm font-medium">
-          {row.rates ? `$${row.rates}` : "Not set"}
+          {row.rates ? `¥${row.rates}` : "Not set"}
         </div>
       ),
       width: "100px",
@@ -324,14 +376,18 @@ export default function GoodsReceivedGhanaAir() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ExcelUploadButton 
-            onUploadSuccess={reloadData}
-            uploadType="goods-received-air"
-          />
-          <Button onClick={() => setShowNewContainerDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Container
-          </Button>
+          {!isCustomer && (
+            <>
+              <ExcelUploadButton 
+                onUploadSuccess={reloadData}
+                uploadType="goods-received-air"
+              />
+              <Button onClick={() => setShowNewContainerDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Container
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -433,51 +489,55 @@ export default function GoodsReceivedGhanaAir() {
               >
                 <Eye className="h-4 w-4 mr-2" /> View Details
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setSelectedStatusContainer(row);
-                  setNewStatus(row.status || "pending");
-                  setShowStatusDialog(true);
-                }}
-              >
-                <Settings className="h-4 w-4 mr-2" /> Update Status
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setEditContainer(row);
-                  setEditOpen(true);
-                }}
-              >
-                <Edit className="h-4 w-4 mr-2" /> Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={async () => {
-                  if (
-                    !confirm(
-                      `Delete container ${row.container_id}? This cannot be undone.`
-                    )
-                  )
-                    return;
-                  
-                  try {
-                    await goodsReceivedContainerService.deleteContainer(row.container_id);
-                    await reloadData();
-                    toast({
-                      title: "Deleted",
-                      description: `${row.container_id} removed.`,
-                    });
-                  } catch (e: unknown) {
-                    toast({
-                      title: "Delete failed",
-                      description: e instanceof Error ? e.message : "Unable to delete",
-                      variant: "destructive",
-                    });
-                  }
-                }}
-              >
-                <Trash2 className="h-4 w-4 mr-2" /> Delete
-              </DropdownMenuItem>
+              {!isCustomer && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setSelectedStatusContainer(row);
+                      setNewStatus(row.status || "pending");
+                      setShowStatusDialog(true);
+                    }}
+                  >
+                    <Settings className="h-4 w-4 mr-2" /> Update Status
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setEditContainer(row);
+                      setEditOpen(true);
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={async () => {
+                      if (
+                        !confirm(
+                          `Delete container ${row.container_id}? This cannot be undone.`
+                        )
+                      )
+                        return;
+                      
+                      try {
+                        await goodsReceivedContainerService.deleteContainer(row.container_id);
+                        await reloadData();
+                        toast({
+                          title: "Deleted",
+                          description: `${row.container_id} removed.`,
+                        });
+                      } catch (e: unknown) {
+                        toast({
+                          title: "Delete failed",
+                          description: e instanceof Error ? e.message : "Unable to delete",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                  </DropdownMenuItem>
+                </>
+              )}
             </>
           )}
         />

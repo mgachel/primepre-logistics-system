@@ -410,8 +410,8 @@ class GoodsReceivedItem(models.Model):
         null=True, blank=True,
     )
     cbm = models.DecimalField(
-        max_digits=10, decimal_places=3,
-        validators=[MinValueValidator(Decimal("0.001"))],
+        max_digits=15, decimal_places=6,
+        validators=[MinValueValidator(Decimal("0.000001"))],
         help_text="Cubic meters (CBM)",
         null=True, blank=True,
     )

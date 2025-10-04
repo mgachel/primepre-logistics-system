@@ -1,232 +1,213 @@
-import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
-  Ship, 
-  FileText, 
-  Clock,
-  CheckCircle,
+  Bell,
   AlertCircle,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Clock,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  Info
 } from 'lucide-react';
-import { useAuthStore } from '@/stores/authStore';
-import { CustomerClaim, customerDashboardService } from '@/services/customerDashboardService';
-import { CargoItem } from '@/services/cargoService';
-import { formatDate } from '@/lib/date';
-import { useNavigate } from 'react-router-dom';
+import dailyUpdatesService, { DailyUpdate } from '@/services/dailyUpdatesService';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 
-// Recent shipments component - Enhanced table format
-const RecentShipmentsTable = ({ shipments }: { shipments: CargoItem[] }) => {
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'in_transit':
-        return <Ship className="h-4 w-4 text-blue-500" />;
-      case 'pending':
-      case 'processing':
-        return <Clock className="h-4 w-4 text-yellow-500" />;
-      case 'demurrage':
-      case 'delayed':
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
+// Daily Update Card Component
+const DailyUpdateCard = ({ update, isExpanded, onToggle }: { update: DailyUpdate; isExpanded: boolean; onToggle: () => void }) => {
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return <AlertTriangle className="h-5 w-5 text-red-500" />;
+      case 'medium':
+        return <AlertCircle className="h-5 w-5 text-yellow-500" />;
+      case 'low':
+        return <Info className="h-5 w-5 text-blue-500" />;
       default:
-        return <AlertCircle className="h-4 w-4 text-gray-500" />;
+        return <Bell className="h-5 w-5 text-gray-500" />;
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return <Badge variant="default" className="bg-green-100 text-green-800">Delivered</Badge>;
-      case 'in_transit':
-        return <Badge variant="default" className="bg-blue-100 text-blue-800">In Transit</Badge>;
-      case 'pending':
-        return <Badge variant="default" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-      case 'demurrage':
-        return <Badge variant="destructive">Demurrage</Badge>;
-      case 'processing':
-        return <Badge variant="default" className="bg-yellow-100 text-yellow-800">Processing</Badge>;
-      case 'delayed':
-        return <Badge variant="destructive">Delayed</Badge>;
+  const getPriorityBadge = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return <Badge variant="destructive">High Priority</Badge>;
+      case 'medium':
+        return <Badge variant="default" className="bg-yellow-100 text-yellow-800">Medium Priority</Badge>;
+      case 'low':
+        return <Badge variant="secondary">Low Priority</Badge>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <Badge variant="secondary">{priority}</Badge>;
     }
   };
 
-  if (shipments.length === 0) {
-    return (
-      <div className="text-center py-6 text-muted-foreground">
-        <Ship className="h-12 w-12 mx-auto mb-2 opacity-50" />
-        <p>No goods in Ghana warehouse</p>
-      </div>
-    );
-  }
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const isExpiring = update.days_until_expiry !== null && update.days_until_expiry <= 7 && update.days_until_expiry > 0;
+  const isExpired = update.is_expired;
 
   return (
-    <div className="space-y-3">
-      {/* Table Header */}
-      <div className="grid grid-cols-12 gap-3 px-3 py-2 bg-muted/50 rounded-lg text-xs font-medium text-muted-foreground">
-        <div className="col-span-3">Shipping Mark</div>
-        <div className="col-span-4">Tracking ID</div>
-        <div className="col-span-2">Quantity</div>
-        <div className="col-span-3">Received On</div>
-      </div>
-      
-      {/* Table Rows */}
-      <div className="space-y-2">
-        {shipments.slice(0, 5).map((shipment) => (
-          <div key={shipment.id} className="grid grid-cols-12 gap-3 px-3 py-3 border rounded-lg hover:bg-muted/50 transition-colors">
-            <div className="col-span-3 flex items-center space-x-2">
-              {getStatusIcon(shipment.status)}
-              <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm truncate" title={shipment.shipping_mark || 'N/A'}>
-                  {shipment.shipping_mark || 'N/A'}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {shipment.type === 'AIR' ? 'Air' : 'Sea'}
-                </div>
+    <Card className={`${isExpired ? 'opacity-60 border-gray-300' : ''} ${update.priority === 'high' ? 'border-red-200 shadow-md' : ''}`}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start space-x-3 flex-1">
+            {getPriorityIcon(update.priority)}
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-semibold">{update.title}</CardTitle>
+                {getPriorityBadge(update.priority)}
               </div>
-            </div>
-            <div className="col-span-4 flex items-center">
-              <div className="text-sm">
-                <div className="font-medium truncate" title={shipment.tracking_number || 'N/A'}>
-                  {shipment.tracking_number || 'N/A'}
+              <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                <div className="flex items-center space-x-1">
+                  <Calendar className="h-3 w-3" />
+                  <span>{formatDate(update.created_at)}</span>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {getStatusBadge(shipment.status)}
-                </div>
-              </div>
-            </div>
-            <div className="col-span-2 flex items-center">
-              <div className="text-sm font-medium">
-                {shipment.quantity}
-              </div>
-            </div>
-            <div className="col-span-3 flex items-center">
-              <div className="text-sm">
-                <div className="font-medium">
-                  {formatDate(shipment.created_at)}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Created
-                </div>
+                {update.expires_at && (
+                  <div className="flex items-center space-x-1">
+                    <Clock className="h-3 w-3" />
+                    <span>
+                      {isExpired ? 'Expired' : isExpiring ? `Expires in ${update.days_until_expiry} days` : 'Active'}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// Recent claims component - Enhanced to show latest 5 claims
-const RecentClaimsTable = ({ claims }: { claims: CustomerClaim[] }) => {
-  const formatStatusText = (status: string) => {
-    return status.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'under_review':
-        return 'bg-blue-100 text-blue-800';
-      case 'approved':
-        return 'bg-green-100 text-green-800';
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  if (claims.length === 0) {
-    return (
-      <div className="text-center py-6 text-muted-foreground">
-        <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-        <p>No recent claims</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {/* Table Header */}
-      <div className="grid grid-cols-12 gap-3 px-3 py-2 bg-muted/50 rounded-lg text-xs font-medium text-muted-foreground">
-        <div className="col-span-3">Claim ID</div>
-        <div className="col-span-5">Item Name</div>
-        <div className="col-span-4">Tracking ID</div>
-      </div>
-      
-      {/* Table Rows */}
-      <div className="space-y-2">
-        {claims.slice(0, 5).map((claim) => (
-          <div key={claim.id} className="grid grid-cols-12 gap-3 px-3 py-3 border rounded-lg hover:bg-muted/50 transition-colors">
-            <div className="col-span-3 flex items-center space-x-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm">#{claim.id}</div>
-                <div className="text-xs">
-                  <Badge className={getStatusColor(claim.status)} variant="outline">
-                    {formatStatusText(claim.status)}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-            <div className="col-span-5 flex items-center">
-              <div className="text-sm truncate" title={(claim as CustomerClaim & {item_name?: string}).item_name || 'N/A'}>
-                {(claim as CustomerClaim & {item_name?: string}).item_name || 'N/A'}
-              </div>
-            </div>
-            <div className="col-span-4 flex items-center">
-              <div className="text-sm font-medium truncate" title={(claim as CustomerClaim & {tracking_id?: string}).tracking_id || 'N/A'}>
-                {(claim as CustomerClaim & {tracking_id?: string}).tracking_id || 'N/A'}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {claims.length > 5 && (
-        <div className="text-center py-2">
-          <span className="text-xs text-muted-foreground">
-            Showing 5 of {claims.length} claims
-          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggle}
+            className="ml-2"
+          >
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
         </div>
+      </CardHeader>
+      
+      {isExpanded && (
+        <>
+          <Separator />
+          <CardContent className="pt-4">
+            <div className="prose prose-sm max-w-none">
+              <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                {update.content}
+              </div>
+            </div>
+            
+            {isExpiring && (
+              <Alert className="mt-4 border-yellow-200 bg-yellow-50">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <AlertDescription className="text-yellow-800">
+                  This update will expire in {update.days_until_expiry} days
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {isExpired && (
+              <Alert className="mt-4 border-gray-200 bg-gray-50">
+                <AlertCircle className="h-4 w-4 text-gray-600" />
+                <AlertDescription className="text-gray-800">
+                  This update has expired
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </>
       )}
-    </div>
+    </Card>
   );
 };
 
 // Main CustomerDashboard component
 export default function CustomerDashboard() {
-  const { user } = useAuthStore();
-  const navigate = useNavigate();
-  
-  // Use React Query for dashboard data
-  const {
-    data: dashboardData,
-    isLoading: loading,
-    error,
-    refetch: loadDashboardData
-  } = useQuery({
-    queryKey: ['customerDashboard', user?.id], // Include user ID to prevent cross-user caching
-    queryFn: async () => {
-      const response = await customerDashboardService.getCargoDashboard();
-      return response.data;
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (was cacheTime in v4)
-  });
+  const [updates, setUpdates] = useState<DailyUpdate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [showExpired, setShowExpired] = useState(false);
+
+  // Load daily updates
+  const loadDailyUpdates = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await dailyUpdatesService.getDailyUpdates({
+        page: 1,
+        page_size: 50,
+        ordering: '-created_at',
+        expired: showExpired ? undefined : false,
+      });
+
+      if (response && response.results && Array.isArray(response.results)) {
+        setUpdates(response.results);
+        // Auto-expand high priority updates
+        const highPriorityIds = response.results
+          .filter(u => u.priority === 'high' && !u.is_expired)
+          .map(u => u.id);
+        setExpandedIds(new Set(highPriorityIds));
+      } else {
+        setUpdates([]);
+      }
+    } catch (err) {
+      console.error('Error loading daily updates:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load updates');
+      setUpdates([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    loadDailyUpdates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showExpired]);
 
   // Manual refresh handler
   const handleRefresh = () => {
-    loadDashboardData();
+    loadDailyUpdates();
   };
+
+  // Toggle expand/collapse
+  const toggleExpand = (id: number) => {
+    const newExpanded = new Set(expandedIds);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedIds(newExpanded);
+  };
+
+  // Expand all
+  const expandAll = () => {
+    setExpandedIds(new Set(updates.map(u => u.id)));
+  };
+
+  // Collapse all
+  const collapseAll = () => {
+    setExpandedIds(new Set());
+  };
+
+  // Filter updates
+  const activeUpdates = updates.filter(u => !u.is_expired);
+  const expiredUpdates = updates.filter(u => u.is_expired);
+  const displayedUpdates = showExpired ? updates : activeUpdates;
 
   // Show loading state
   if (loading) {
@@ -235,56 +216,43 @@ export default function CustomerDashboard() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center space-y-4">
             <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-            <span className="block">Loading dashboard...</span>
+            <span className="block">Loading updates...</span>
           </div>
         </div>
       </div>
     );
   }
 
-  // Show error state with retry options
+  // Show error state
   if (error) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Dashboard</h3>
-            <p className="text-red-600 mb-4">{error?.message || 'An error occurred'}</p>
-            <div className="space-x-2">
-              <Button onClick={handleRefresh} disabled={loading}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Try Again
-              </Button>
-              <Button variant="outline" onClick={() => window.location.reload()}>
-                Hard Refresh
-              </Button>
-            </div>
+            <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Updates</h3>
+            <p className="text-red-600 mb-4">{error}</p>
+            <Button onClick={handleRefresh}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!dashboardData) {
-    return null;
-  }
-
-  const stats = dashboardData || {};
-  const recent_shipments = dashboardData?.recent_items || [];
-  const recent_claims: CustomerClaim[] = dashboardData?.recent_claims || []; // Use actual claims data from API
-
-  // Use API data for pending claims count
-  const pendingClaimsCount = dashboardData?.pending_claims_count || 0;
-
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.full_name || user?.first_name || 'Customer'}!</h1>
-          <p className="text-muted-foreground">
-            Here's what's happening with your shipments today.
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Bell className="h-8 w-8 text-primary" />
+            Announcements
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Stay informed with the latest updates from our team
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -300,69 +268,67 @@ export default function CustomerDashboard() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Stats and Controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Badge variant="default" className="bg-green-100 text-green-800">
+              {activeUpdates.length} Active
+            </Badge>
+            {expiredUpdates.length > 0 && (
+              <Badge variant="secondary">
+                {expiredUpdates.length} Expired
+              </Badge>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          {displayedUpdates.length > 0 && (
+            <>
+              <Button variant="ghost" size="sm" onClick={expandAll}>
+                Expand All
+              </Button>
+              <Button variant="ghost" size="sm" onClick={collapseAll}>
+                Collapse All
+              </Button>
+            </>
+          )}
+          {expiredUpdates.length > 0 && (
+            <Button 
+              variant={showExpired ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setShowExpired(!showExpired)}
+            >
+              {showExpired ? 'Hide' : 'Show'} Expired
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Updates List */}
+      {displayedUpdates.length === 0 ? (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Shipments</CardTitle>
-            <Ship className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total_shipments || stats.ghana_total_items || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              All time shipments
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Bell className="h-16 w-16 text-muted-foreground opacity-50 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Updates Yet</h3>
+            <p className="text-sm text-muted-foreground text-center max-w-md">
+              There are no annpuncements available at the moment. Check back later for new announcements and information.
             </p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Claims</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingClaimsCount}</div>
-            <p className="text-xs text-muted-foreground">
-              Currently pending
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Recent Shipments */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Shipments</CardTitle>
-            <CardDescription>
-              Your latest goods received in Ghana warehouse
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RecentShipmentsTable shipments={recent_shipments} />
-            <Button variant="outline" className="w-full mt-4" onClick={() => navigate('/my-shipments')}>
-              View All Shipments
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Recent Claims */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Claims</CardTitle>
-            <CardDescription>
-              Latest 5 claims from your account
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RecentClaimsTable claims={recent_claims} />
-            <Button variant="outline" className="w-full mt-4" onClick={() => navigate('/my-claims')}>
-              View All Claims
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      ) : (
+        <div className="space-y-4">
+          {displayedUpdates.map((update) => (
+            <DailyUpdateCard
+              key={update.id}
+              update={update}
+              isExpanded={expandedIds.has(update.id)}
+              onToggle={() => toggleExpand(update.id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

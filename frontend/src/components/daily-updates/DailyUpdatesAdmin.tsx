@@ -175,7 +175,7 @@ export function DailyUpdatesAdmin() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <h1 className="text-2xl font-bold text-foreground">Daily Updates Management</h1>
+          <h1 className="text-2xl font-bold text-foreground">Client Announcements</h1>
           {totalCount > 0 && (
             <Badge variant="secondary" className="ml-2">
               {totalCount} total

@@ -1153,29 +1153,59 @@ class GoodsReceivedItemViewSet(viewsets.ModelViewSet):
 # ==========================================
 
 class GhanaAirContainerViewSet(GoodsReceivedContainerViewSet):
-    """Ghana Air containers specifically - filters containers by location=ghana and container_type=air"""
+    """Ghana Air containers specifically - filters containers by location=ghana and container_type=air
+    For customers: only shows containers that have items with their shipping mark"""
     
     def get_queryset(self):
+        from django.db.models import Exists, OuterRef
+        from .models import GoodsReceivedItem
+        
         # Get the base queryset with search functionality from parent
         queryset = super().get_queryset()
         # Apply Ghana Air specific filters
-        return queryset.filter(
+        queryset = queryset.filter(
             location='ghana', 
             container_type='air'
         )
+        
+        # If user is a customer (not staff/admin), only show containers with their items
+        if not self.request.user.is_staff and hasattr(self.request.user, 'shipping_mark') and self.request.user.shipping_mark:
+            user_shipping_mark = self.request.user.shipping_mark
+            has_customer_items = GoodsReceivedItem.objects.filter(
+                container=OuterRef('pk'),
+                shipping_mark=user_shipping_mark
+            )
+            queryset = queryset.filter(Exists(has_customer_items))
+        
+        return queryset
 
 
 class GhanaSeaContainerViewSet(GoodsReceivedContainerViewSet):
-    """Ghana Sea containers specifically - filters containers by location=ghana and container_type=sea"""
+    """Ghana Sea containers specifically - filters containers by location=ghana and container_type=sea
+    For customers: only shows containers that have items with their shipping mark"""
     
     def get_queryset(self):
+        from django.db.models import Exists, OuterRef
+        from .models import GoodsReceivedItem
+        
         # Get the base queryset with search functionality from parent
         queryset = super().get_queryset()
         # Apply Ghana Sea specific filters
-        return queryset.filter(
+        queryset = queryset.filter(
             location='ghana', 
             container_type='sea'
         )
+        
+        # If user is a customer (not staff/admin), only show containers with their items
+        if not self.request.user.is_staff and hasattr(self.request.user, 'shipping_mark') and self.request.user.shipping_mark:
+            user_shipping_mark = self.request.user.shipping_mark
+            has_customer_items = GoodsReceivedItem.objects.filter(
+                container=OuterRef('pk'),
+                shipping_mark=user_shipping_mark
+            )
+            queryset = queryset.filter(Exists(has_customer_items))
+        
+        return queryset
 
 
 class ChinaAirContainerViewSet(GoodsReceivedContainerViewSet):
@@ -1198,3 +1228,160 @@ class ChinaSeaContainerViewSet(GoodsReceivedContainerViewSet):
             location='china', 
             container_type='sea'
         ).prefetch_related('goods_items')
+
+
+# ==========================================
+# CUSTOMER-FACING CONTAINER VIEWSETS
+# ==========================================
+
+class CustomerGoodsReceivedContainerViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only ViewSet for customers to view containers.
+    When retrieving container details, only shows items matching customer's shipping mark.
+    """
+    queryset = GoodsReceivedContainer.objects.all()
+    serializer_class = GoodsReceivedContainerSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['container_type', 'location', 'status']
+    search_fields = ['container_id', 'notes']
+    ordering_fields = ['created_at', 'arrival_date', 'status']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        from django.db.models import Q, Exists, OuterRef
+        
+        # Get all containers but we'll filter items later
+        queryset = super().get_queryset().prefetch_related('goods_items')
+        
+        # Custom search functionality
+        search = self.request.query_params.get('search')
+        if search:
+            user_shipping_mark = self.request.user.shipping_mark
+            queryset = queryset.filter(
+                Q(container_id__icontains=search) |
+                Q(notes__icontains=search) |
+                Q(goods_items__shipping_mark__icontains=search, goods_items__shipping_mark=user_shipping_mark) |
+                Q(goods_items__supply_tracking__icontains=search, goods_items__shipping_mark=user_shipping_mark) |
+                Q(goods_items__description__icontains=search, goods_items__shipping_mark=user_shipping_mark)
+            ).distinct()
+        
+        # Only show containers that have items for this customer
+        from .models import GoodsReceivedItem
+        user_shipping_mark = self.request.user.shipping_mark
+        has_customer_items = GoodsReceivedItem.objects.filter(
+            container=OuterRef('pk'),
+            shipping_mark=user_shipping_mark
+        )
+        queryset = queryset.filter(Exists(has_customer_items))
+        
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        """List containers that have items for the current customer."""
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def items(self, request, pk=None):
+        """Get items in container, filtered by customer's shipping mark and grouped."""
+        container = self.get_object()
+        from .serializers import GoodsReceivedItemSerializer
+        
+        user_shipping_mark = request.user.shipping_mark
+        
+        # Only get items for this customer's shipping mark
+        items = container.goods_items.filter(
+            shipping_mark=user_shipping_mark
+        ).order_by('created_at')
+        
+        # Group by shipping mark (will only be the customer's mark)
+        grouped_items = {}
+        for item in items:
+            mark = item.shipping_mark or "Unknown"
+            if mark not in grouped_items:
+                grouped_items[mark] = []
+            grouped_items[mark].append(GoodsReceivedItemSerializer(item).data)
+        
+        return Response({
+            'container': self.get_serializer(container).data,
+            'items_by_shipping_mark': grouped_items,
+            'total_items': items.count()
+        })
+    
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Get statistics for containers with customer's items."""
+        from .models import GoodsReceivedContainer, GoodsReceivedItem
+        from django.db.models import Q, Count, Sum, Exists, OuterRef
+        
+        user_shipping_mark = request.user.shipping_mark
+        
+        # Get containers that have items for this customer
+        has_customer_items = GoodsReceivedItem.objects.filter(
+            container=OuterRef('pk'),
+            shipping_mark=user_shipping_mark
+        )
+        containers = GoodsReceivedContainer.objects.filter(Exists(has_customer_items))
+        
+        # Filter by location if specified
+        location = request.query_params.get('location')
+        if location:
+            containers = containers.filter(location=location)
+        
+        # Filter by container type if specified
+        container_type = request.query_params.get('container_type')
+        if container_type:
+            containers = containers.filter(container_type=container_type)
+        
+        # Get customer's items across all containers
+        customer_items = GoodsReceivedItem.objects.filter(
+            shipping_mark=user_shipping_mark
+        )
+        
+        if location:
+            customer_items = customer_items.filter(container__location=location)
+        if container_type:
+            customer_items = customer_items.filter(container__container_type=container_type)
+        
+        stats = {
+            'total_containers': containers.count(),
+            'pending_containers': containers.filter(status='pending').count(),
+            'processing_containers': containers.filter(status='processing').count(),
+            'ready_for_delivery': containers.filter(status='ready_for_delivery').count(),
+            'delivered_containers': containers.filter(status='delivered').count(),
+            'flagged_containers': containers.filter(status='flagged').count(),
+            
+            'total_items': customer_items.count(),
+            'total_weight': customer_items.aggregate(total=Sum('weight'))['total'] or 0,
+            'total_cbm': customer_items.aggregate(total=Sum('cbm'))['total'] or 0,
+            
+            'air_containers': containers.filter(container_type='air').count(),
+            'sea_containers': containers.filter(container_type='sea').count(),
+        }
+        
+        from .serializers import GoodsReceivedContainerStatsSerializer
+        return Response(GoodsReceivedContainerStatsSerializer(stats).data)
+
+
+class CustomerGhanaSeaContainerViewSet(CustomerGoodsReceivedContainerViewSet):
+    """Customer view for Ghana Sea containers - filtered by location and type, items by shipping mark."""
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.filter(location='ghana', container_type='sea')
+
+
+class CustomerGhanaAirContainerViewSet(CustomerGoodsReceivedContainerViewSet):
+    """Customer view for Ghana Air containers - filtered by location and type, items by shipping mark."""
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.filter(location='ghana', container_type='air')
