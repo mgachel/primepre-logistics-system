@@ -7,7 +7,7 @@ import logging
 from django.db import transaction
 from django_q.tasks import async_task, result
 from .customer_excel_utils import create_customer_from_data
-from .models import CustomUser
+from .models import CustomerUser  # FIXED: Was CustomUser, should be CustomerUser
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ def bulk_create_customers_task(customers_data, created_by_user_id, task_id):
     
     try:
         # Get the user who created this batch
-        created_by_user = CustomUser.objects.get(id=created_by_user_id)
+        created_by_user = CustomerUser.objects.get(id=created_by_user_id)
         
         # Process in batches of 25 (same as sync version)
         batch_size = 25
