@@ -632,3 +632,139 @@ class CustomerUploadStatsView(APIView):
                 'success': False,
                 'message': f'Stats retrieval failed: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ASYNC BACKGROUND TASK ENDPOINTS (RENDER TIMEOUT FIX)
+# ═══════════════════════════════════════════════════════════════
+
+class CustomerBulkCreateAsyncView(APIView):
+    """
+    Async bulk customer creation endpoint.
+    
+    SOLVES: Render's 60-100 second timeout limit for large uploads.
+    
+    Flow:
+    1. Receives customer data from frontend
+    2. Queues background task immediately
+    3. Returns task ID in < 5 seconds
+    4. Frontend polls /api/auth/customers/bulk-create/status/<task_id>/
+    5. Background worker processes customers asynchronously
+    
+    Supports: 4,000-7,000 customer uploads without timeout
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Queue bulk customer creation as background task."""
+        try:
+            from django_q.tasks import async_task
+            import uuid
+            
+            logger.info(f"[ASYNC-BULK-CREATE-REQUEST] User: {request.user.id}")
+            
+            # Validate request
+            customers_data = request.data.get('customers', [])
+            if not customers_data or not isinstance(customers_data, list):
+                return Response({
+                    'success': False,
+                    'message': 'Invalid request: "customers" array required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Generate unique task ID
+            task_id = str(uuid.uuid4())
+            
+            logger.info(
+                f"[ASYNC-BULK-CREATE-QUEUE] Task: {task_id} | "
+                f"Customers: {len(customers_data)} | User: {request.user.id}"
+            )
+            
+            # Queue the background task
+            from .async_customer_tasks import bulk_create_customers_task
+            async_task(
+                bulk_create_customers_task,
+                customers_data,
+                request.user.id,
+                task_id,
+                task_name=f'bulk_create_{task_id}',
+                group='customer_bulk_create'
+            )
+            
+            return Response({
+                'success': True,
+                'message': f'Bulk creation queued: {len(customers_data)} customers',
+                'task_id': task_id,
+                'total_customers': len(customers_data),
+                'estimated_time_seconds': len(customers_data) // 10  # ~10 customers/sec
+            }, status=status.HTTP_202_ACCEPTED)
+            
+        except Exception as e:
+            logger.error(f"[ASYNC-BULK-CREATE-ERROR] {str(e)}", exc_info=True)
+            return Response({
+                'success': False,
+                'message': f'Failed to queue task: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CustomerBulkCreateStatusView(APIView):
+    """
+    Check status of async bulk customer creation task.
+    
+    Frontend polls this endpoint every 2-3 seconds to track progress.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, task_id):
+        """Get task status and results."""
+        try:
+            from django_q.models import Task
+            
+            # Find task in database
+            try:
+                task = Task.objects.get(name=f'bulk_create_{task_id}')
+            except Task.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'message': 'Task not found',
+                    'status': 'NOT_FOUND'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check task status
+            if task.success is None:
+                # Task still running
+                return Response({
+                    'success': True,
+                    'status': 'RUNNING',
+                    'message': 'Task is processing...',
+                    'task_id': task_id
+                }, status=status.HTTP_200_OK)
+            
+            elif task.success:
+                # Task completed successfully
+                result = task.result
+                return Response({
+                    'success': True,
+                    'status': 'COMPLETE',
+                    'message': 'Bulk creation complete',
+                    'task_id': task_id,
+                    'created': result.get('created', 0),
+                    'failed': result.get('failed', 0),
+                    'errors': result.get('errors', [])
+                }, status=status.HTTP_200_OK)
+            
+            else:
+                # Task failed
+                return Response({
+                    'success': False,
+                    'status': 'FAILED',
+                    'message': 'Task failed',
+                    'task_id': task_id,
+                    'error': str(task.result)
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"[ASYNC-STATUS-ERROR] Task: {task_id} | {str(e)}", exc_info=True)
+            return Response({
+                'success': False,
+                'message': f'Status check failed: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
