@@ -200,9 +200,22 @@ class CustomerBulkCreateView(APIView):
         
         Expects a list of validated customer data objects.
         """
+        # CRITICAL: Early crash protection - catch ANY exception before it crashes the worker
         try:
+            logger.info(f"Customer bulk create request started from user: {getattr(request.user, 'id', 'unknown')}")
             print(f"Bulk create request received. Method: {request.method}")
-            print(f"Request data keys: {list(request.data.keys()) if hasattr(request, 'data') else 'No data'}")
+            
+            # Check if request.data exists and is accessible
+            if not hasattr(request, 'data'):
+                logger.error("Request has no data attribute")
+                return Response({
+                    'success': False,
+                    'message': 'Invalid request format',
+                    'created_customers': [],
+                    'failed_customers': []
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            print(f"Request data keys: {list(request.data.keys()) if request.data else 'Empty data'}")
             print(f"Request content type: {request.content_type}")
             
             # Validate input
@@ -243,80 +256,94 @@ class CustomerBulkCreateView(APIView):
                 'failed_customers': []
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
+        # Main processing block with comprehensive error handling
         created_customers = []
         failed_customers = []
         
-        print(f"Starting bulk creation of {len(customers_data)} customers")
+        try:
+            print(f"Starting bulk creation of {len(customers_data)} customers")
         
-        # Process customers in batches for better performance and memory usage
-        # Each customer is created in its own transaction to prevent deadlocks
-        # Small batch size (25) to handle 4,000-7,000 customer uploads safely
-        batch_size = 25  # Optimized for large uploads on Render free tier (512MB RAM)
-        total_customers = len(customers_data)
-        
-        for batch_start in range(0, total_customers, batch_size):
-            batch_end = min(batch_start + batch_size, total_customers)
-            batch = customers_data[batch_start:batch_end]
+            # Process customers in batches for better performance and memory usage
+            # Each customer is created in its own transaction to prevent deadlocks
+            # Small batch size (25) to handle 4,000-7,000 customer uploads safely
+            batch_size = 25  # Optimized for large uploads on Render free tier (512MB RAM)
+            total_customers = len(customers_data)
             
-            print(f"Processing batch {batch_start//batch_size + 1}: customers {batch_start + 1} to {batch_end}")
+            for batch_start in range(0, total_customers, batch_size):
+                batch_end = min(batch_start + batch_size, total_customers)
+                batch = customers_data[batch_start:batch_end]
+                
+                print(f"Processing batch {batch_start//batch_size + 1}: customers {batch_start + 1} to {batch_end}")
             
-            for customer_data in batch:
-                try:
-                    # Validate customer data structure
-                    if not isinstance(customer_data, dict):
+                for customer_data in batch:
+                    try:
+                        # Validate customer data structure
+                        if not isinstance(customer_data, dict):
+                            failed_customers.append({
+                                'customer_data': customer_data,
+                                'error': 'Invalid customer data format',
+                                'source_row_number': customer_data.get('source_row_number', 0)
+                            })
+                            continue
+                        
+                        # Create customer with individual transaction
+                        # This prevents nested transaction deadlocks on Render
+                        with transaction.atomic():
+                            customer = self._create_customer(customer_data, request.user)
+                            created_customers.append({
+                                'id': customer.id,
+                                'shipping_mark': customer.shipping_mark,
+                                'name': customer.get_full_name(),
+                                'email': customer.email or '',
+                                'phone': customer.phone,
+                                'source_row_number': customer_data.get('source_row_number', 0)
+                            })
+                        
+                    except Exception as e:
+                        # Log the error but continue processing
+                        logger.error(f"Failed to create customer: {str(e)}", extra={
+                            'customer_data': customer_data,
+                            'error': str(e)
+                        })
                         failed_customers.append({
                             'customer_data': customer_data,
-                            'error': 'Invalid customer data format',
+                            'error': str(e),
                             'source_row_number': customer_data.get('source_row_number', 0)
                         })
-                        continue
-                    
-                    # Create customer with individual transaction
-                    # This prevents nested transaction deadlocks on Render
-                    with transaction.atomic():
-                        customer = self._create_customer(customer_data, request.user)
-                        created_customers.append({
-                            'id': customer.id,
-                            'shipping_mark': customer.shipping_mark,
-                            'name': customer.get_full_name(),
-                            'email': customer.email or '',
-                            'phone': customer.phone,
-                            'source_row_number': customer_data.get('source_row_number', 0)
-                        })
-                    
-                except Exception as e:
-                    # Log the error but continue processing
-                    logger.error(f"Failed to create customer: {str(e)}", extra={
-                        'customer_data': customer_data,
-                        'error': str(e)
-                    })
-                    failed_customers.append({
-                        'customer_data': customer_data,
-                        'error': str(e),
-                        'source_row_number': customer_data.get('source_row_number', 0)
-                    })
+                
+                # Log progress
+                print(f"Batch completed. Total created so far: {len(created_customers)}, Total failed so far: {len(failed_customers)}")
+        
+            # Return results
+            response_data = {
+                'success': True,
+                'message': f'Processing completed. Created {len(created_customers)} customers, {len(failed_customers)} failed',
+                'created_customers': created_customers,
+                'failed_customers': failed_customers,
+                'total_attempted': len(customers_data),
+                'total_created': len(created_customers),
+                'total_failed': len(failed_customers)
+            }
+        
+            # If no customers were created but we had data, this suggests a systematic issue
+            if len(customers_data) > 0 and len(created_customers) == 0:
+                response_data['success'] = False
+                response_data['message'] = 'Failed to create any customers - check error details'
+                return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
             
-            # Log progress
-            print(f"Batch completed. Total created so far: {len(created_customers)}, Total failed so far: {len(failed_customers)}")
-        
-        # Return results
-        response_data = {
-            'success': True,
-            'message': f'Processing completed. Created {len(created_customers)} customers, {len(failed_customers)} failed',
-            'created_customers': created_customers,
-            'failed_customers': failed_customers,
-            'total_attempted': len(customers_data),
-            'total_created': len(created_customers),
-            'total_failed': len(failed_customers)
-        }
-        
-        # If no customers were created but we had data, this suggests a systematic issue
-        if len(customers_data) > 0 and len(created_customers) == 0:
-            response_data['success'] = False
-            response_data['message'] = 'Failed to create any customers - check error details'
-            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
-        
-        return Response(response_data, status=status.HTTP_201_CREATED)
+            logger.info(f"Customer bulk create completed: {len(created_customers)} created, {len(failed_customers)} failed")
+            return Response(response_data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            # FINAL SAFETY NET: Catch any uncaught exception in processing
+            logger.exception(f"CRITICAL: Uncaught exception in customer bulk create: {str(e)}")
+            return Response({
+                'success': False,
+                'message': f'Server error during processing: {str(e)}',
+                'created_customers': created_customers,
+                'failed_customers': failed_customers,
+                'error_type': type(e).__name__
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def _create_customer(self, customer_data, created_by_user):
         """
