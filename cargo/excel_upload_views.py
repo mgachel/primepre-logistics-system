@@ -33,9 +33,11 @@ class ExcelUploadSerializer(serializers.Serializer):
         if not value.name.endswith(('.xlsx', '.xls')):
             raise serializers.ValidationError("Only Excel files (.xlsx, .xls) are allowed.")
         
-        # Check file size (10MB limit)
-        if value.size > 10 * 1024 * 1024:
-            raise serializers.ValidationError("File size cannot exceed 10MB.")
+        # Check file size using centralized config (50MB limit)
+        from excel_config import validate_file_size
+        is_valid, error_msg = validate_file_size(value.size)
+        if not is_valid:
+            raise serializers.ValidationError(error_msg)
         
         return value
 
@@ -645,8 +647,14 @@ class ContainerExcelUploadView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Check file size (10MB limit)
-            if file.size > 10 * 1024 * 1024:
+            # Check file size using centralized config (50MB limit)
+            from excel_config import validate_file_size
+            is_valid, error_msg = validate_file_size(file.size)
+            if not is_valid:
+                return Response({'error': error_msg}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # OLD CODE - remove this if block
+            if False and file.size > 10 * 1024 * 1024:
                 return Response(
                     {'error': 'File size cannot exceed 10MB.'},
                     status=status.HTTP_400_BAD_REQUEST
