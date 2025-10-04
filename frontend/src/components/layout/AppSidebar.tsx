@@ -68,10 +68,10 @@ const adminNavigation = [
 const customerNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   {
-    name: "Local Warehouse",
+    name: "Invoices",
     children: [
-      { name: "Ghana Sea", href: "/goods/ghana/sea", icon: Ship },
-      { name: "Ghana Air", href: "/goods/ghana/air", icon: Plane },
+      { name: "Sea Goods", href: "/goods/ghana/sea", icon: Ship },
+      { name: "Air Goods", href: "/goods/ghana/air", icon: Plane },
     ],
   },
   {

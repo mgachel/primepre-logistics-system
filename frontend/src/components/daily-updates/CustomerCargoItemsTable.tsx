@@ -9,7 +9,7 @@ interface CustomerCargoItemsTableProps {
   cargoType: 'air' | 'sea';
 }
 
-export function CustomerCargoItemsTable({ items }: CustomerCargoItemsTableProps) {
+export function CustomerCargoItemsTable({ items, cargoType }: CustomerCargoItemsTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredItems = items.filter(item => {
@@ -60,17 +60,24 @@ export function CustomerCargoItemsTable({ items }: CustomerCargoItemsTableProps)
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tracking ID</TableHead>
+                <TableHead>Shipping Mark</TableHead>
+                <TableHead>Tracking Number</TableHead>
                 <TableHead className="text-right">Quantity</TableHead>
-                <TableHead className="text-right">CBM</TableHead>
+                <TableHead className="text-right">{cargoType === 'air' ? 'Weight (kg)' : 'CBM'}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredItems.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.tracking_id}</TableCell>
+                  <TableCell className="font-medium">{item.client_shipping_mark || '-'}</TableCell>
+                  <TableCell>{item.tracking_id}</TableCell>
                   <TableCell className="text-right">{item.quantity}</TableCell>
-                  <TableCell className="text-right">{item.cbm?.toFixed(3) || '-'}</TableCell>
+                  <TableCell className="text-right">
+                    {cargoType === 'air' 
+                      ? (item.weight?.toFixed(2) || '-')
+                      : (item.cbm?.toFixed(3) || '-')
+                    }
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

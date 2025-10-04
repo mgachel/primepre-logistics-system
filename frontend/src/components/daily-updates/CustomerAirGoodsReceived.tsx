@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Search, Calendar, Package, AlertCircle, Loader2 } from 'lucide-react';
+import { Search, Package, AlertCircle, Loader2 } from 'lucide-react';
 import { customerDailyUpdatesService, GoodsReceivedChina } from '@/services/customerDailyUpdatesService';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -61,27 +60,6 @@ export function CustomerAirGoodsReceived() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      PENDING: { label: 'Pending', variant: 'secondary' as const },
-      READY_FOR_SHIPPING: { label: 'Ready for Shipping', variant: 'default' as const },
-      FLAGGED: { label: 'Flagged', variant: 'destructive' as const },
-      SHIPPED: { label: 'Shipped', variant: 'success' as const },
-      CANCELLED: { label: 'Cancelled', variant: 'outline' as const },
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.PENDING;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
   };
 
   return (
@@ -163,13 +141,9 @@ export function CustomerAirGoodsReceived() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Shipping Mark</TableHead>
-                          <TableHead>Tracking</TableHead>
-                          <TableHead>Status</TableHead>
+                          <TableHead>Tracking Number</TableHead>
                           <TableHead>Quantity</TableHead>
                           <TableHead>Weight (kg)</TableHead>
-                          <TableHead>Date Received</TableHead>
-                          <TableHead>Days in Warehouse</TableHead>
-                          <TableHead>Description</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -181,24 +155,9 @@ export function CustomerAirGoodsReceived() {
                             <TableCell className="font-mono text-sm">
                               {item.supply_tracking}
                             </TableCell>
-                            <TableCell>{getStatusBadge(item.status)}</TableCell>
                             <TableCell>{item.quantity}</TableCell>
                             <TableCell>
                               {item.weight ? `${item.weight} kg` : 'N/A'}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1 text-sm">
-                                <Calendar className="h-3 w-3" />
-                                {formatDate(item.date_received)}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {item.days_in_warehouse !== undefined 
-                                ? `${item.days_in_warehouse} days` 
-                                : 'N/A'}
-                            </TableCell>
-                            <TableCell className="max-w-xs truncate">
-                              {item.description || '-'}
                             </TableCell>
                           </TableRow>
                         ))}

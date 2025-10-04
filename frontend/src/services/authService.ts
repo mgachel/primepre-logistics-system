@@ -241,11 +241,12 @@ export const authService = {
   },
 
   // Change password
-  async changePassword(oldPassword: string, newPassword: string): Promise<ApiResponse<void>> {
+  async changePassword(oldPassword: string, newPassword: string, confirmPassword: string): Promise<ApiResponse<void>> {
     try {
       return await apiClient.post<void>('/api/auth/password-change/', {
         old_password: oldPassword,
         new_password: newPassword,
+        confirm_password: confirmPassword,
       });
     } catch (error) {
       console.error('Change password error:', error);
@@ -297,6 +298,24 @@ export const authService = {
       return {
         success: false,
         data: {} as { detail?: string },
+        message: 'Failed to reset password',
+      };
+    }
+  },
+
+  // Phone-based instant password reset to "Prime"
+  async phoneForgotPassword(phone: string): Promise<ApiResponse<{ phone?: string }>> {
+    try {
+      const response = await apiClient.post<{ phone?: string; message?: string }>(
+        '/api/auth/phone/forgot-password/',
+        { phone }
+      );
+      return response;
+    } catch (error) {
+      console.error('Phone forgot password error:', error);
+      return {
+        success: false,
+        data: {} as { phone?: string },
         message: 'Failed to reset password',
       };
     }

@@ -526,7 +526,7 @@ def create_customer_from_data(customer_data: Dict[str, Any], created_by_user=Non
         'user_type': 'INDIVIDUAL',
         'region': customer_data.get('region') or 'GREATER_ACCRA',
         'is_active': True,
-        'is_verified': False,
+        'is_verified': True,  # Auto-verify customers created by admin
         'created_by': created_by_user,
         'can_create_users': False,
         'can_manage_inventory': False,
@@ -543,8 +543,9 @@ def create_customer_from_data(customer_data: Dict[str, Any], created_by_user=Non
     if email:
         customer_fields['email'] = email
 
+    # Create user with default password "PrimeMade" for admin-created customers
     return CustomerUser.objects.create_user(
         phone=phone,
-        password=None,
+        password='PrimeMade',  # Default password for all admin-created customers
         **customer_fields
     )

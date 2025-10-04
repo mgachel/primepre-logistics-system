@@ -22,7 +22,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CustomerCargoItemsTable } from './CustomerCargoItemsTable';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 /**
  * Customer Air Containers Component
@@ -66,18 +65,6 @@ export function CustomerAirContainers() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { label: 'Pending', variant: 'secondary' as const },
-      in_transit: { label: 'In Transit', variant: 'default' as const },
-      delivered: { label: 'Delivered', variant: 'success' as const },
-      demurrage: { label: 'Demurrage', variant: 'destructive' as const },
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   const formatDate = (dateString: string) => {
@@ -196,7 +183,6 @@ export function CustomerAirContainers() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-10"></TableHead>
-                          <TableHead>Status</TableHead>
                           <TableHead>Load Date</TableHead>
                           <TableHead>ETA</TableHead>
                           <TableHead>Items</TableHead>
@@ -222,7 +208,6 @@ export function CustomerAirContainers() {
                                     <ChevronRight className="h-4 w-4" />
                                   )}
                                 </TableCell>
-                                <TableCell>{getStatusBadge(container.status)}</TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-1 text-sm">
                                     <Calendar className="h-3 w-3" />
@@ -243,7 +228,7 @@ export function CustomerAirContainers() {
                               </TableRow>
                               {isExpanded && (
                                 <TableRow>
-                                  <TableCell colSpan={5} className="bg-muted/30 p-4">
+                                  <TableCell colSpan={4} className="bg-muted/30 p-4">
                                     {isLoading ? (
                                       <div className="flex items-center justify-center py-8">
                                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
