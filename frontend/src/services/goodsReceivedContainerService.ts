@@ -372,6 +372,77 @@ class GoodsReceivedContainerService {
   async getChinaSeaStatistics(): Promise<ApiResponse<GoodsReceivedContainerStats>> {
     return this.getContainerStatistics({ location: "china", container_type: "sea" });
   }
+
+  // =====================================
+  // CUSTOMER-FACING CONTAINER OPERATIONS
+  // =====================================
+
+  // Customer Ghana Sea Containers
+  async getCustomerGhanaSeaContainers(
+    filters?: Partial<{
+      status: string;
+      search: string;
+      ordering: string;
+      page: number;
+      page_size: number;
+    }>
+  ): Promise<ApiResponse<PaginatedResponse<GoodsReceivedContainer>>> {
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "")
+        params.append(k, String(v));
+    });
+    return apiClient.get<PaginatedResponse<GoodsReceivedContainer>>(
+      `/api/goods/customer/ghana/sea_containers/?${params.toString()}`
+    );
+  }
+
+  // Customer Ghana Air Containers
+  async getCustomerGhanaAirContainers(
+    filters?: Partial<{
+      status: string;
+      search: string;
+      ordering: string;
+      page: number;
+      page_size: number;
+    }>
+  ): Promise<ApiResponse<PaginatedResponse<GoodsReceivedContainer>>> {
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "")
+        params.append(k, String(v));
+    });
+    return apiClient.get<PaginatedResponse<GoodsReceivedContainer>>(
+      `/api/goods/customer/ghana/air_containers/?${params.toString()}`
+    );
+  }
+
+  // Customer Container Details (with filtered items)
+  async getCustomerContainerById(containerId: string, type: "sea" | "air" = "sea"): Promise<ApiResponse<GoodsReceivedContainer>> {
+    return apiClient.get<GoodsReceivedContainer>(
+      `/api/goods/customer/ghana/${type}_containers/${containerId}/`
+    );
+  }
+
+  // Customer Container Items (filtered by shipping mark)
+  async getCustomerContainerItems(containerId: string, type: "sea" | "air" = "sea"): Promise<ApiResponse<ContainerItemsResponse>> {
+    return apiClient.get<ContainerItemsResponse>(
+      `/api/goods/customer/ghana/${type}_containers/${containerId}/items/`
+    );
+  }
+
+  // Customer Statistics (for containers with their items)
+  async getCustomerGhanaSeaStatistics(): Promise<ApiResponse<GoodsReceivedContainerStats>> {
+    return apiClient.get<GoodsReceivedContainerStats>(
+      `/api/goods/customer/ghana/sea_containers/statistics/`
+    );
+  }
+
+  async getCustomerGhanaAirStatistics(): Promise<ApiResponse<GoodsReceivedContainerStats>> {
+    return apiClient.get<GoodsReceivedContainerStats>(
+      `/api/goods/customer/ghana/air_containers/statistics/`
+    );
+  }
 }
 
 export const goodsReceivedContainerService = new GoodsReceivedContainerService();

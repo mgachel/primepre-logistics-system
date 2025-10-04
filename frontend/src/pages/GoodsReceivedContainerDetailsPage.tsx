@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuthStore } from "@/stores/authStore";
 import {
   ArrowLeft,
   Plus,
@@ -36,6 +37,11 @@ export default function GoodsReceivedContainerDetailsPage() {
   const { containerId } = useParams<{ containerId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuthStore();
+  
+  // Check if user is customer
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
+  const customerShippingMark = user?.shipping_mark;
 
   const [loading, setLoading] = useState(true);
   const [container, setContainer] = useState<GoodsReceivedContainer | null>(null);
@@ -103,8 +109,16 @@ export default function GoodsReceivedContainerDetailsPage() {
   const groupedByShippingMark = useMemo(() => {
     const groups: Record<string, GoodsReceivedItem[]> = {};
 
-    // Filter items based on search query
+    // Filter items based on search query and customer shipping mark
     const filteredItems = goodsItems.filter((item) => {
+      // If customer, only show items with their shipping mark
+      if (isCustomer && customerShippingMark) {
+        if (item.shipping_mark !== customerShippingMark) {
+          return false;
+        }
+      }
+      
+      // Then apply search filter
       if (!searchQuery.trim()) return true;
       
       const query = searchQuery.toLowerCase();
@@ -126,7 +140,7 @@ export default function GoodsReceivedContainerDetailsPage() {
     });
 
     return groups;
-  }, [goodsItems, searchQuery]);
+  }, [goodsItems, searchQuery, isCustomer, customerShippingMark]);
 
   const handleDeleteItem = async (itemId: string) => {
     if (
@@ -505,18 +519,25 @@ export default function GoodsReceivedContainerDetailsPage() {
           <Button variant="outline" size="sm" onClick={refreshData}>
             <RefreshCcw className="h-4 w-4" /> Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowEditContainerDialog(true)}>
-            <Edit className="h-4 w-4" /> Edit Container
-          </Button>
-          <ExcelUploadButton
-            onUpload={(file) => {
-              // TODO: Implement Excel upload for goods received items
-              console.log('Excel upload for goods received container:', containerId, file);
-            }}
-          />
-          <Button size="sm" onClick={() => setShowAddItemDialog(true)}>
-            <Plus className="h-4 w-4" /> Add Item
-          </Button>
+          {!isCustomer && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setShowEditContainerDialog(true)}>
+                <Edit className="h-4 w-4" /> Edit Container
+              </Button>
+              <ExcelUploadButton
+                uploadType="goods_received"
+                warehouse="Ghana"
+                onUploadComplete={(response) => {
+                  console.log('Excel upload complete for container:', containerId, response);
+                  refreshData();
+                }}
+                size="sm"
+              />
+              <Button size="sm" onClick={() => setShowAddItemDialog(true)}>
+                <Plus className="h-4 w-4" /> Add Item
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -644,14 +665,14 @@ export default function GoodsReceivedContainerDetailsPage() {
                     id="goods-received-items"
                     columns={columns}
                     rows={items}
-                    rowActions={(item) => (
+                    rowActions={!isCustomer ? (item) => (
                       <>
                         <DropdownMenuItem onClick={() => handleDeleteItem(item.id)}>
                           <Trash2 className="h-4 w-4 mr-2 text-red-500" />
                           Delete Item
                         </DropdownMenuItem>
                       </>
-                    )}
+                    ) : undefined}
                   />
                 </div>
               )}

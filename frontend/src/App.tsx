@@ -51,6 +51,9 @@ import AirContainersPage from "./pages/AirContainersPage";
 import SeaContainersPage from "./pages/SeaContainersPage";
 import AirGoodsReceivedPage from "./pages/AirGoodsReceivedPage";
 import SeaGoodsReceivedPage from "./pages/SeaGoodsReceivedPage";
+import CustomerWarehouseSea from "./pages/CustomerWarehouse";
+import CustomerWarehouseAir from "./pages/CustomerWarehouseAir";
+import CustomerContainerDetailsPage from "./pages/CustomerContainerDetailsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -234,7 +237,11 @@ const App = () => (
                         <GoodsReceivedGhanaSea />
                       </AppLayout>
                     }
-                    customerComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <GoodsReceivedGhanaSea />
+                      </AppLayout>
+                    }
                   />
                 </ProtectedRoute>
               }
@@ -249,7 +256,11 @@ const App = () => (
                         <GoodsReceivedGhanaAir />
                       </AppLayout>
                     }
-                    customerComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <GoodsReceivedGhanaAir />
+                      </AppLayout>
+                    }
                   />
                 </ProtectedRoute>
               }
@@ -414,6 +425,66 @@ const App = () => (
             />
 
             {/* Customer-only routes */}
+            <Route
+              path="/customer/warehouse/sea"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <CustomerWarehouseSea />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customer/warehouse/air"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <CustomerWarehouseAir />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customer/warehouse/sea/container/:containerId"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <CustomerContainerDetailsPage />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customer/warehouse/air/container/:containerId"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <CustomerContainerDetailsPage />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/my-shipments"
               element={
@@ -586,7 +657,11 @@ const App = () => (
                         <GoodsReceivedContainerDetailsPage />
                       </AppLayout>
                     }
-                    customerComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <GoodsReceivedContainerDetailsPage />
+                      </AppLayout>
+                    }
                   />
                 </ProtectedRoute>
               }
