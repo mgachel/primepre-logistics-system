@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'django_filters',
     'corsheaders',  # Add CORS support
+    'django_q',  # Background task processing
 ]
 
 MIDDLEWARE = [
@@ -448,3 +449,25 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB in bytes
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB in bytes
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 50000    # Allow many form fields for large uploads
+
+# ═══════════════════════════════════════════════════════════════
+# DJANGO Q2 CONFIGURATION (BACKGROUND TASKS)
+# ═══════════════════════════════════════════════════════════════
+# 
+# SOLUTION FOR RENDER'S 60-100 SECOND TIMEOUT LIMIT:
+# - Handles long-running tasks (Excel uploads) asynchronously
+# - Uses PostgreSQL as queue (no Redis needed on free tier)
+# - Prevents request timeout errors on large customer uploads
+# 
+Q_CLUSTER = {
+    'name': 'primepre_tasks',
+    'workers': 1,  # Single worker for Render free tier (512MB RAM)
+    'timeout': 3600,  # 1 hour timeout for background tasks
+    'retry': 3600,  # Retry failed tasks after 1 hour
+    'queue_limit': 50,  # Max 50 tasks in queue (memory-safe)
+    'bulk': 10,  # Process 10 tasks per batch
+    'orm': 'default',  # Use PostgreSQL as queue (default database)
+    'save_limit': 100,  # Keep last 100 task results
+    'sync': False,  # Async mode (required for background processing)
+    'catch_up': True,  # Process missed tasks on restart
+}

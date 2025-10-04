@@ -16,6 +16,9 @@ sqlparse==0.5.3
 # Cache and throttling
 redis>=4.0.0
 
+# Background task processing
+django-q2>=1.6.0
+
 # Excel and data processing
 pandas==2.2.0
 openpyxl==3.1.2
