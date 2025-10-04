@@ -138,7 +138,7 @@ urlpatterns = [
     
     # Customer Excel upload and processing
     path('customers/excel/upload/', CustomerExcelUploadView.as_view(), name='customer_excel_upload'),
-    path('customers/excel/bulk-create/', CustomerBulkCreateView.as_view(), name='customer_bulk_create'),  # OLD: Sync (will timeout)
+    path('customers/excel/bulk-create/', CustomerBulkCreateAsyncView.as_view(), name='customer_bulk_create'),  # TEMP: Point old endpoint to async view
     path('customers/excel/bulk-create-async/', CustomerBulkCreateAsyncView.as_view(), name='customer_bulk_create_async'),  # NEW: Async (no timeout)
     path('customers/excel/bulk-create/status/<str:task_id>/', CustomerBulkCreateStatusView.as_view(), name='customer_bulk_create_status'),  # Task status
     path('customers/excel/template/', CustomerExcelTemplateView.as_view(), name='customer_excel_template'),
