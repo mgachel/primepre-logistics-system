@@ -25,6 +25,9 @@ from .views import (
     # Shipping mark verification views
     ShippingMarkVerificationView, ShippingMarkConfirmationView, ShippingMarksListView,
     
+    # Admin utilities
+    DeleteUnverifiedUsersView,
+    
     # Development helpers
     DevelopmentPinsView
 )
@@ -136,6 +139,13 @@ urlpatterns = [
     path('customers/excel/template/', CustomerExcelTemplateView.as_view(), name='customer_excel_template'),
     path('customers/upload/stats/', CustomerUploadStatsView.as_view(), name='customer_upload_stats'),
     path('customers/test-create/', CustomerTestCreateView.as_view(), name='customer_test_create'),
+    
+    # ============================================================================
+    # ADMIN UTILITY ENDPOINTS
+    # ============================================================================
+    
+    # Delete unverified users (admin only)
+    path('admin/delete-unverified/', DeleteUnverifiedUsersView.as_view(), name='delete_unverified_users'),
 ]
 
 # ============================================================================

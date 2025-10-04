@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Cleanup - Delete Unverified Users</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .warning h3 {
+            color: #856404;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .warning p {
+            color: #856404;
+            line-height: 1.6;
+        }
+        
+        .info-box {
+            background: #d1ecf1;
+            border: 2px solid #17a2b8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .info-box h3 {
+            color: #0c5460;
+            margin-bottom: 10px;
+        }
+        
+        .info-box p {
+            color: #0c5460;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .auth-section {
+            margin-bottom: 30px;
+        }
+        
+        .auth-section label {
+            display: block;
+            color: #555;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .auth-section input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .auth-section input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .btn-check {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .btn-check:hover {
+            background: #138496;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(23, 162, 184, 0.3);
+        }
+        
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-delete:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.3);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+        
+        .result h3 {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗑️ Delete Unverified Users</h1>
+        <p class="subtitle">Admin utility for production database cleanup</p>
+        
+        <div class="warning">
+            <h3>
+                <span>⚠️</span>
+                <span>Warning: Irreversible Action</span>
+            </h3>
+            <p>This will permanently delete all unverified customer accounts from the database. This action cannot be undone. Please make sure you want to proceed before clicking delete.</p>
+        </div>
+        
+        <div class="info-box" id="infoBox" style="display: none;">
+            <h3>Unverified Users Count:</h3>
+            <p id="userCount">-</p>
+        </div>
+        
+        <div class="auth-section">
+            <label for="email">Admin Email/Phone:</label>
+            <input type="text" id="email" placeholder="Enter your admin email or phone">
+        </div>
+        
+        <div class="auth-section">
+            <label for="password">Admin Password:</label>
+            <input type="password" id="password" placeholder="Enter your admin password">
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-check" onclick="checkCount()">
+                <span id="checkIcon">🔍</span>
+                <span id="checkText">Check Count</span>
+            </button>
+            <button class="btn-delete" onclick="deleteUsers()" id="deleteBtn" disabled>
+                <span id="deleteIcon">🗑️</span>
+                <span id="deleteText">Delete All</span>
+            </button>
+        </div>
+        
+        <div class="result" id="result"></div>
+        
+        <div class="footer">
+            Admin Access Only • Use with Caution
+        </div>
+    </div>
+    
+    <script>
+        // Update this URL to match your deployed backend URL
+        const API_BASE_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:8000' 
+            : 'https://your-backend-url.onrender.com';
+        
+        let authToken = null;
+        
+        async function login() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+            
+            if (!email || !password) {
+                showResult('error', 'Please enter both email/phone and password');
+                return null;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/login/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email_or_phone: email,
+                        password: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || 'Login failed');
+                }
+                
+                if (data.user?.user_role !== 'ADMIN' && data.user?.user_role !== 'SUPER_ADMIN') {
+                    throw new Error('Access denied. Admin privileges required.');
+                }
+                
+                authToken = data.access;
+                return authToken;
+            } catch (error) {
+                showResult('error', `Authentication failed: ${error.message}`);
+                return null;
+            }
+        }
+        
+        async function checkCount() {
+            const checkBtn = document.querySelector('.btn-check');
+            const checkIcon = document.getElementById('checkIcon');
+            const checkText = document.getElementById('checkText');
+            
+            checkBtn.disabled = true;
+            checkIcon.innerHTML = '<span class="spinner"></span>';
+            checkText.textContent = 'Checking...';
+            hideResult();
+            
+            try {
+                if (!authToken) {
+                    authToken = await login();
+                    if (!authToken) {
+                        return;
+                    }
+                }
+                
+                const response = await fetch(`${API_BASE_URL}/api/auth/admin/delete-unverified/`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to check count');
+                }
+                
+                document.getElementById('userCount').textContent = data.unverified_count;
+                document.getElementById('infoBox').style.display = 'block';
+                document.getElementById('deleteBtn').disabled = data.unverified_count === 0;
+                
+                showResult('success', data.message);
+            } catch (error) {
+                showResult('error', `Error: ${error.message}`);
+            } finally {
+                checkBtn.disabled = false;
+                checkIcon.textContent = '🔍';
+                checkText.textContent = 'Check Count';
+            }
+        }
+        
+        async function deleteUsers() {
+            if (!confirm('Are you absolutely sure you want to delete all unverified users? This cannot be undone!')) {
+                return;
+            }
+            
+            const deleteBtn = document.getElementById('deleteBtn');
+            const deleteIcon = document.getElementById('deleteIcon');
+            const deleteText = document.getElementById('deleteText');
+            
+            deleteBtn.disabled = true;
+            deleteIcon.innerHTML = '<span class="spinner"></span>';
+            deleteText.textContent = 'Deleting...';
+            hideResult();
+            
+            try {
+                if (!authToken) {
+                    authToken = await login();
+                    if (!authToken) {
+                        return;
+                    }
+                }
+                
+                const response = await fetch(`${API_BASE_URL}/api/auth/admin/delete-unverified/`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to delete users');
+                }
+                
+                showResult('success', `✅ ${data.message}`);
+                document.getElementById('userCount').textContent = '0';
+                deleteBtn.disabled = true;
+            } catch (error) {
+                showResult('error', `Error: ${error.message}`);
+            } finally {
+                deleteBtn.disabled = false;
+                deleteIcon.textContent = '🗑️';
+                deleteText.textContent = 'Delete All';
+            }
+        }
+        
+        function showResult(type, message) {
+            const result = document.getElementById('result');
+            result.className = `result ${type}`;
+            result.innerHTML = `
+                <h3>
+                    <span>${type === 'success' ? '✅' : '❌'}</span>
+                    <span>${type === 'success' ? 'Success' : 'Error'}</span>
+                </h3>
+                <p>${message}</p>
+            `;
+            result.style.display = 'block';
+        }
+        
+        function hideResult() {
+            document.getElementById('result').style.display = 'none';
+        }
+        
+        // Allow Enter key to trigger check
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkCount();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1790,3 +1790,63 @@ class ShippingMarksListView(APIView):
                 'error': 'Failed to fetch shipping marks',
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DeleteUnverifiedUsersView(APIView):
+    """
+    Admin-only endpoint to delete all unverified users
+    Can be called from browser or admin panel
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def post(self, request):
+        """Delete all unverified users"""
+        try:
+            # Get count before deletion
+            unverified_users = CustomerUser.objects.filter(is_verified=False)
+            count = unverified_users.count()
+            
+            if count == 0:
+                return Response({
+                    'success': True,
+                    'message': 'No unverified users found',
+                    'deleted_count': 0
+                }, status=status.HTTP_200_OK)
+            
+            # Delete unverified users
+            deleted_count, _ = unverified_users.delete()
+            
+            logger.info(f"Admin {request.user.email or request.user.phone} deleted {deleted_count} unverified users")
+            
+            return Response({
+                'success': True,
+                'message': f'Successfully deleted {deleted_count} unverified users',
+                'deleted_count': deleted_count
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error deleting unverified users: {str(e)}")
+            return Response({
+                'success': False,
+                'error': 'Failed to delete unverified users',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def get(self, request):
+        """Get count of unverified users (for preview)"""
+        try:
+            count = CustomerUser.objects.filter(is_verified=False).count()
+            
+            return Response({
+                'success': True,
+                'unverified_count': count,
+                'message': f'Found {count} unverified users'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error counting unverified users: {str(e)}")
+            return Response({
+                'success': False,
+                'error': 'Failed to count unverified users',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
