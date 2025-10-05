@@ -3,12 +3,16 @@ import tempfile
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
+
+from rest_framework.test import APITestCase
 
 from users.customer_excel_utils import (
 	CustomerExcelParser,
 	create_customer_from_data,
 	MAX_SHIPPING_MARK_LENGTH,
 )
+from users.models import CustomerBulkUploadTask, BulkUploadStatus
 
 
 def create_excel_file(rows):
@@ -111,3 +115,83 @@ class CustomerCreationUtilsTests(TestCase):
 			self.assertEqual(candidate['shipping_mark'], long_mark.strip())
 		finally:
 			os.unlink(file_path)
+
+
+class CustomerBulkCreateStatusViewTests(APITestCase):
+
+	def setUp(self):
+		self.user_model = get_user_model()
+		self.creator = self.user_model.objects.create_user(
+			phone='0550000001',
+			password='testpass123',
+			first_name='Task',
+			last_name='Owner',
+			shipping_mark='PM OWNER',
+			region='GREATER_ACCRA',
+			user_role='ADMIN',
+		)
+
+	def test_returns_queued_status_for_new_task(self):
+		tracker = CustomerBulkUploadTask.objects.create(
+			task_id='queued-task-123',
+			created_by=self.creator,
+			status=BulkUploadStatus.QUEUED,
+			total_customers=50,
+			message='Task queued and awaiting a worker',
+		)
+
+		url = reverse('customer_bulk_create_status', args=[tracker.task_id])
+		self.client.force_authenticate(user=self.creator)
+		response = self.client.get(url)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.data['status'], BulkUploadStatus.QUEUED)
+		self.assertEqual(response.data['total_customers'], 50)
+		self.assertFalse(response.data['is_complete'])
+		self.assertFalse(response.data['is_failed'])
+
+	def test_blocks_other_non_admin_users(self):
+		tracker = CustomerBulkUploadTask.objects.create(
+			task_id='secure-task-456',
+			created_by=self.creator,
+			status=BulkUploadStatus.RUNNING,
+			total_customers=10,
+		)
+
+		other_user = self.user_model.objects.create_user(
+			phone='0550000002',
+			password='otherpass123',
+			first_name='Other',
+			last_name='User',
+			shipping_mark='PM OTHER',
+			region='GREATER_ACCRA',
+			user_role='CUSTOMER',
+		)
+
+		url = reverse('customer_bulk_create_status', args=[tracker.task_id])
+		self.client.force_authenticate(user=other_user)
+		response = self.client.get(url)
+
+		self.assertEqual(response.status_code, 403)
+		self.assertEqual(response.data['status'], 'FORBIDDEN')
+
+	def test_returns_completion_payload(self):
+		tracker = CustomerBulkUploadTask.objects.create(
+			task_id='complete-task-789',
+			created_by=self.creator,
+			status=BulkUploadStatus.COMPLETE,
+			total_customers=5,
+			created_count=5,
+			failed_count=0,
+			errors=[],
+			message='Bulk creation complete',
+		)
+
+		url = reverse('customer_bulk_create_status', args=[tracker.task_id])
+		self.client.force_authenticate(user=self.creator)
+		response = self.client.get(url)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(response.data['is_complete'])
+		self.assertEqual(response.data['created'], 5)
+		self.assertEqual(response.data['progress_percent'], 100)

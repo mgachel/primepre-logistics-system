@@ -11,6 +11,12 @@ KEY OPTIMIZATIONS FOR RENDER FREE TIER:
 
 import multiprocessing
 import os
+import sys
+
+# DIAGNOSTIC: Confirm config file is being loaded
+print("=" * 80, file=sys.stderr)
+print("🔧 LOADING gunicorn_config.py - RENDER FREE TIER OPTIMIZED", file=sys.stderr)
+print("=" * 80, file=sys.stderr)
 
 # Server socket
 # Render provides PORT via environment variable
@@ -61,7 +67,8 @@ worker_connections = 100
 # - Render has its own 15-minute proxy timeout
 # - Our 10-minute timeout ensures graceful worker shutdown
 # 
-timeout = 600  # 10 minutes for large Excel processing
+# CRITICAL: Allow environment override but default to 600
+timeout = int(os.environ.get('GUNICORN_TIMEOUT', '600'))  # 10 minutes for large Excel processing
 
 # Graceful shutdown timeout (worker cleanup after SIGTERM)
 graceful_timeout = 60  # Allow 1 minute for cleanup
@@ -111,6 +118,16 @@ pidfile = None
 umask = 0
 user = None
 group = None
+
+# ═══════════════════════════════════════════════════════════════
+# DIAGNOSTIC OUTPUT - Confirm Configuration is Applied
+# ═══════════════════════════════════════════════════════════════
+print(f"⚙️  Workers: {workers}", file=sys.stderr)
+print(f"⏱️  Timeout: {timeout}s (10 minutes)", file=sys.stderr)
+print(f"🔄 Max Requests: {max_requests} (memory cleanup)", file=sys.stderr)
+print(f"🔌 Backlog: {backlog}", file=sys.stderr)
+print(f"👷 Worker Class: {worker_class}", file=sys.stderr)
+print("=" * 80, file=sys.stderr)
 tmp_upload_dir = None
 
 # SSL (handled by Render)

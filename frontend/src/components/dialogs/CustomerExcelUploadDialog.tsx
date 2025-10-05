@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ import {
   Download,
   Users,
   UserPlus,
+  Loader2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { buildApiUrl } from '@/lib/apiUrl';
@@ -68,6 +70,16 @@ interface CreateResults {
   total_attempted: number;
   total_created: number;
   total_failed: number;
+  errors?: string[];
+  message?: string;
+}
+
+interface TaskStatusSnapshot {
+  status: string;
+  message: string;
+  progressPercent: number;
+  created: number;
+  failed: number;
 }
 
 export function CustomerExcelUploadDialog({
@@ -84,13 +96,29 @@ export function CustomerExcelUploadDialog({
   const [uploadResults, setUploadResults] = useState<UploadResults | null>(null);
   const [createResults, setCreateResults] = useState<CreateResults | null>(null);
   const [currentStep, setCurrentStep] = useState<'upload' | 'review' | 'create' | 'complete'>('upload');
+  const [taskStatus, setTaskStatus] = useState<TaskStatusSnapshot | null>(null);
+  const pollingIntervalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        window.clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const resetDialog = useCallback(() => {
+    if (pollingIntervalRef.current) {
+      window.clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
     setFile(null);
     setIsUploading(false);
     setIsCreating(false);
     setUploadResults(null);
     setCreateResults(null);
+    setTaskStatus(null);
     setCurrentStep('upload');
   }, []);
 
@@ -169,16 +197,19 @@ export function CustomerExcelUploadDialog({
 
     setIsCreating(true);
     try {
-      console.log('Creating customers with data:', uploadResults.duplicate_results.unique_candidates);
+      const uniqueCandidates = uploadResults.duplicate_results.unique_candidates;
+      const totalToCreate = uniqueCandidates.length;
 
-      const response = await fetch(buildApiUrl('/api/auth/customers/excel/bulk-create/'), {
+      console.log('Creating customers with data:', uniqueCandidates);
+
+      const response = await fetch(buildApiUrl('/api/auth/customers/excel/bulk-create-async/'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
         body: JSON.stringify({
-          customers: uploadResults.duplicate_results.unique_candidates,
+          customers: uniqueCandidates,
         }),
       });
 
@@ -207,72 +238,177 @@ export function CustomerExcelUploadDialog({
       // Check if response is async (has task_id) or sync (has total_created)
       if (data.task_id) {
         console.log('🔄 Async task queued:', data.task_id);
+        const totalCustomers = data.total_customers ?? totalToCreate;
         
         toast({
           title: "Processing Started",
-          description: `Processing ${data.total_customers} customers in background. This may take a few minutes...`,
+          description: `Processing ${totalCustomers} customers in background. This may take a few minutes...`,
         });
 
-        // Poll for task status every 2 seconds
-        const pollInterval = setInterval(async () => {
-          try {
-            const statusResponse = await fetch(
-              buildApiUrl(`/api/auth/customers/excel/bulk-create/status/${data.task_id}/`),
-              {
-                headers: {
-                  'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-                },
-              }
+        setCurrentStep('create');
+        setTaskStatus({
+          status: data.status ?? 'QUEUED',
+          message: data.message ?? `Task queued. Processing ${totalCustomers} customers...`,
+          progressPercent: 0,
+          created: 0,
+          failed: 0,
+        });
+
+        const stopPolling = () => {
+          if (pollingIntervalRef.current) {
+            window.clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+        };
+
+        const handleStatusUpdate = (statusData: any) => {
+          setTaskStatus({
+            status: statusData.status,
+            message: statusData.message ?? 'Processing customers...',
+            progressPercent: statusData.progress_percent ?? (statusData.status === 'COMPLETE' ? 100 : 0),
+            created: statusData.created ?? 0,
+            failed: statusData.failed ?? 0,
+          });
+        };
+
+        const extractErrors = (errors: unknown): string[] => {
+          if (!errors) {
+            return [];
+          }
+
+          if (Array.isArray(errors)) {
+            return errors.map((errorItem) =>
+              typeof errorItem === 'string' ? errorItem : JSON.stringify(errorItem)
             );
+          }
 
-            const statusData = await statusResponse.json();
-            console.log('Task status:', statusData);
+          if (typeof errors === 'string') {
+            return [errors];
+          }
 
-            if (statusData.status === 'COMPLETE') {
-              clearInterval(pollInterval);
-              setIsCreating(false);
-              
-              // Set results in expected format
-              setCreateResults({
-                success: true,
-                total_created: statusData.created || 0,
-                total_failed: statusData.failed || 0,
-                errors: statusData.errors || [],
-                message: `Successfully created ${statusData.created} customers`,
-              });
-              
-              setCurrentStep('complete');
+          return [JSON.stringify(errors)];
+        };
 
-              toast({
-                title: "✅ Customers Created",
-                description: `Successfully created ${statusData.created} customers`,
-              });
+        const buildFailedCustomers = (errorMessages: string[]) =>
+          errorMessages.map((errorMsg, index) => ({
+            customer_data: null,
+            error: errorMsg,
+            source_row_number: index + 1,
+          }));
 
-              // Call completion callback
-              if (onUploadComplete) {
-                onUploadComplete();
-              }
-            } else if (statusData.status === 'FAILED') {
-              clearInterval(pollInterval);
-              setIsCreating(false);
-              
-              throw new Error(statusData.error || 'Task failed');
-            } else if (statusData.status === 'RUNNING') {
-              // Still processing - update toast with progress
-              console.log('⏳ Task still running...');
+        const pollStatus = async () => {
+          const statusResponse = await fetch(
+            buildApiUrl(`/api/auth/customers/excel/bulk-create/status/${data.task_id}/`),
+            {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+              },
             }
-          } catch (pollError) {
-            clearInterval(pollInterval);
+          );
+
+          if (!statusResponse.ok) {
+            const errorText = await statusResponse.text();
+            throw new Error(
+              `Status check failed: ${statusResponse.status} ${statusResponse.statusText}. ${errorText}`
+            );
+          }
+
+          const statusData = await statusResponse.json();
+          console.log('Task status:', statusData);
+
+          if (statusData.status === 'FORBIDDEN' || statusData.status === 'NOT_FOUND') {
+            stopPolling();
             setIsCreating(false);
-            console.error('Status polling error:', pollError);
-            
+            setTaskStatus(null);
+            throw new Error(statusData.message || 'Unable to find task status');
+          }
+
+          if (statusData.status === 'FAILED' || statusData.is_failed) {
+            stopPolling();
+            setIsCreating(false);
+            handleStatusUpdate(statusData);
+            const normalizedErrors = extractErrors(statusData.errors);
+            setCreateResults({
+              created_customers: [],
+              failed_customers: buildFailedCustomers(normalizedErrors),
+              total_attempted: totalCustomers,
+              total_created: statusData.created ?? 0,
+              total_failed: statusData.failed ?? totalCustomers,
+              errors: normalizedErrors,
+              message: statusData.message,
+            });
+            setCurrentStep('complete');
+            setTaskStatus(null);
             toast({
-              title: "Error Checking Status",
+              title: 'Bulk Upload Failed',
+              description: statusData.message || 'Background task failed. Please review the errors and try again.',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          handleStatusUpdate(statusData);
+
+          if (statusData.status === 'COMPLETE' || statusData.is_complete) {
+            stopPolling();
+            setIsCreating(false);
+            const normalizedErrors = extractErrors(statusData.errors);
+            setCreateResults({
+              created_customers: [],
+              failed_customers: buildFailedCustomers(normalizedErrors),
+              total_attempted: totalCustomers,
+              total_created: statusData.created ?? totalCustomers,
+              total_failed: statusData.failed ?? 0,
+               errors: normalizedErrors,
+              message: statusData.message,
+            });
+            setCurrentStep('complete');
+
+            toast({
+              title: '✅ Customers Created',
+              description: statusData.message || `Successfully created ${statusData.created ?? totalCustomers} customers`,
+            });
+
+            if (onUploadComplete) {
+              onUploadComplete();
+            }
+
+            setTaskStatus(null);
+          }
+        };
+
+        try {
+          // Kick off first status fetch immediately for quicker feedback
+          await pollStatus();
+        } catch (pollError) {
+          console.error('Status polling error:', pollError);
+          setIsCreating(false);
+          setTaskStatus(null);
+          toast({
+            title: 'Error Checking Status',
+            description: pollError instanceof Error ? pollError.message : 'Failed to check task status',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        pollingIntervalRef.current = window.setInterval(async () => {
+          try {
+            await pollStatus();
+          } catch (pollError) {
+            console.error('Status polling error:', pollError);
+            stopPolling();
+            setIsCreating(false);
+            setTaskStatus(null);
+            toast({
+              title: 'Error Checking Status',
               description: pollError instanceof Error ? pollError.message : 'Failed to check task status',
-              variant: "destructive",
+              variant: 'destructive',
             });
           }
-        }, 2000); // Poll every 2 seconds
+        }, 2000);
+
+        return;
 
       } else {
         // ═══════════════════════════════════════════════════════════════
@@ -295,12 +431,18 @@ export function CustomerExcelUploadDialog({
       }
 
     } catch (error) {
+      if (pollingIntervalRef.current) {
+        window.clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      setTaskStatus(null);
       toast({
         title: "Creation Failed",
         description: error instanceof Error ? error.message : 'An error occurred',
         variant: "destructive",
       });
       setIsCreating(false);
+      setCurrentStep('review');
     }
   };
 
@@ -331,10 +473,11 @@ export function CustomerExcelUploadDialog({
         description: "Customer upload template has been downloaded",
       });
 
-    } catch (_error) {
+    } catch (error) {
+      console.error('Template download failed', error);
       toast({
         title: "Download Failed",
-        description: "Failed to download template",
+        description: error instanceof Error ? error.message : "Failed to download template",
         variant: "destructive",
       });
     }
@@ -587,6 +730,55 @@ export function CustomerExcelUploadDialog({
     );
   };
 
+  const renderProcessingStep = () => {
+    return (
+      <div className="space-y-4 py-8">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <Loader2 className="h-10 w-10 text-blue-600 animate-spin" />
+          <div>
+            <p className="text-sm font-medium text-gray-900">
+              {taskStatus?.message ?? 'Preparing background task...'}
+            </p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mt-1">
+              {taskStatus?.status ?? 'QUEUED'}
+            </p>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Background Processing</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-blue-600 h-2 transition-all duration-500"
+                style={{ width: `${Math.min(taskStatus?.progressPercent ?? 5, 100)}%` }}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-semibold text-green-600">
+                  {taskStatus?.created ?? 0}
+                </div>
+                <div className="text-xs text-muted-foreground">Created</div>
+              </div>
+              <div>
+                <div className="text-2xl font-semibold text-red-600">
+                  {taskStatus?.failed ?? 0}
+                </div>
+                <div className="text-xs text-muted-foreground">Failed</div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Please keep this dialog open while customers are being created. You can safely continue browsing other pages.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   const renderCompleteStep = () => {
     if (!createResults) return null;
 
@@ -615,6 +807,11 @@ export function CustomerExcelUploadDialog({
                 <div className="text-xs text-muted-foreground">Failed</div>
               </div>
             </div>
+            {createResults.message && (
+              <p className="text-xs text-muted-foreground mt-4 text-center">
+                {createResults.message}
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -672,6 +869,26 @@ export function CustomerExcelUploadDialog({
           </Card>
         )}
 
+        {createResults.errors && createResults.errors.length > 0 && createResults.failed_customers.length === 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                Errors
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-xs">
+                {createResults.errors.map((errorMessage, index) => (
+                  <li key={index} className="p-2 bg-yellow-50 rounded">
+                    {errorMessage}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Close Button */}
         <Button onClick={handleClose} className="w-full">
           Close
@@ -715,7 +932,8 @@ export function CustomerExcelUploadDialog({
         <div className="min-h-[400px]">
           {currentStep === 'upload' && renderUploadStep()}
           {currentStep === 'review' && renderReviewStep()}
-          {(currentStep === 'create' || currentStep === 'complete') && renderCompleteStep()}
+          {currentStep === 'create' && renderProcessingStep()}
+          {currentStep === 'complete' && renderCompleteStep()}
         </div>
       </DialogContent>
     </Dialog>
