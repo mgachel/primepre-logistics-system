@@ -137,7 +137,7 @@ class ClaimsService {
       formData.append('item_name', claimData.item_name);
       formData.append('item_description', claimData.item_description);
       
-      // Append image files if they exist
+      // Append image files if they exist (only if new images are being uploaded)
       if (claimData.image_1) {
         formData.append('image_1', claimData.image_1);
       }
@@ -148,7 +148,8 @@ class ClaimsService {
         formData.append('image_3', claimData.image_3);
       }
 
-      const response = await apiClient.put<Claim>(`/api/claims/my-claims/${id}/`, formData);
+      // Use PATCH for partial updates instead of PUT (which requires all fields)
+      const response = await apiClient.patch<Claim>(`/api/claims/my-claims/${id}/`, formData);
       return {
         success: response.success,
         data: response.data

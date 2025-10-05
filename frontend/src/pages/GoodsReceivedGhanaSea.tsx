@@ -209,15 +209,7 @@ export default function GoodsReceivedGhanaSea() {
 
   // Table columns - different for customers vs admins
   const columns: Column<GoodsReceivedContainer>[] = isCustomer ? [
-    // Customer columns: Only Container ID, Offloading Date, Rates, Dollar Rate
-    {
-      id: "container",
-      header: "Container ID",
-      accessor: (row) => (
-        <div className="font-mono font-medium">{row.container_id}</div>
-      ),
-      sort: (a, b) => a.container_id.localeCompare(b.container_id),
-    },
+    // Customer columns: Only Offloading Date
     {
       id: "offloading_date",
       header: "Offloading Date",
@@ -234,26 +226,6 @@ export default function GoodsReceivedGhanaSea() {
         return bDate - aDate;
       },
       width: "140px",
-    },
-    {
-      id: "rates",
-      header: "Rates",
-      accessor: (row) => (
-        <div className="text-sm font-medium">
-          {row.rates ? `¥${row.rates}` : "Not set"}
-        </div>
-      ),
-      width: "100px",
-    },
-    {
-      id: "dollar_rate",
-      header: "Dollar Rate",
-      accessor: (row) => (
-        <div className="text-sm font-medium">
-          {row.dollar_rate ? `$${row.dollar_rate}` : "Not set"}
-        </div>
-      ),
-      width: "110px",
     },
   ] : [
     // Admin columns: All columns
@@ -399,48 +371,50 @@ export default function GoodsReceivedGhanaSea() {
         </div>
       </div>
 
-      {/* Stats cards matching cargo structure */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="logistics-card p-6">
-          <div className="flex items-center">
-            <Package className="h-8 w-8 text-blue-600" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-muted-foreground">Total Containers</p>
-              <p className="text-2xl font-bold">{dashboard?.total_containers || 0}</p>
+      {/* Stats cards matching cargo structure - Admin Only */}
+      {!isCustomer && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="logistics-card p-6">
+            <div className="flex items-center">
+              <Package className="h-8 w-8 text-blue-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Total Containers</p>
+                <p className="text-2xl font-bold">{dashboard?.total_containers || 0}</p>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="logistics-card p-6">
-          <div className="flex items-center">
-            <Package className="h-8 w-8 text-green-600" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-muted-foreground">Total Items</p>
-              <p className="text-2xl font-bold">{dashboard?.total_items || 0}</p>
+          
+          <div className="logistics-card p-6">
+            <div className="flex items-center">
+              <Package className="h-8 w-8 text-green-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Total Items</p>
+                <p className="text-2xl font-bold">{dashboard?.total_items || 0}</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="logistics-card p-6">
-          <div className="flex items-center">
-            <Calendar className="h-8 w-8 text-orange-600" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-muted-foreground">Ready for Delivery</p>
-              <p className="text-2xl font-bold">{dashboard?.ready_for_delivery || 0}</p>
+          <div className="logistics-card p-6">
+            <div className="flex items-center">
+              <Calendar className="h-8 w-8 text-orange-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Ready for Delivery</p>
+                <p className="text-2xl font-bold">{dashboard?.ready_for_delivery || 0}</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="logistics-card p-6">
-          <div className="flex items-center">
-            <Package className="h-8 w-8 text-purple-600" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-muted-foreground">Pending</p>
-              <p className="text-2xl font-bold">{dashboard?.pending || 0}</p>
+          <div className="logistics-card p-6">
+            <div className="flex items-center">
+              <Package className="h-8 w-8 text-purple-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Pending</p>
+                <p className="text-2xl font-bold">{dashboard?.pending || 0}</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Filters matching cargo structure */}
       <div className="flex flex-col sm:flex-row gap-4">

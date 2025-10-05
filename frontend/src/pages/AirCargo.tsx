@@ -301,9 +301,8 @@ export default function AirCargo() {
     ];
     
     if (isCustomer) {
-      // Customers only see: Airway Bill No., Flight Date, and ETA
+      // Customers only see: Flight Date and ETA
       return allCols.filter(col => 
-        col.id === "container" || 
         col.id === "loading_date" || 
         col.id === "eta"
       );
@@ -347,59 +346,61 @@ export default function AirCargo() {
         )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="logistics-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-muted-foreground">
-                Total Shipments
+      {/* Summary Cards - Admin Only */}
+      {!isCustomer && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="logistics-card p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-muted-foreground">
+                  Total Shipments
+                </div>
+                <div className="text-2xl font-semibold mt-1">
+                  {dashboard?.total_containers ?? 0}
+                </div>
               </div>
-              <div className="text-2xl font-semibold mt-1">
-                {dashboard?.total_containers ?? 0}
-              </div>
+              <Package className="h-8 w-8 text-primary/60" />
             </div>
-            <Package className="h-8 w-8 text-primary/60" />
+          </div>
+          <div className="logistics-card p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-muted-foreground">In Transit</div>
+                <div className="text-2xl font-semibold mt-1">
+                  {dashboard?.containers_in_transit ?? 0}
+                </div>
+              </div>
+              <Plane className="h-8 w-8 text-secondary/60" />
+            </div>
+          </div>
+          <div className="logistics-card p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-muted-foreground">Total Weight</div>
+                <div className="text-2xl font-semibold mt-1">
+                  {filteredCargo
+                    .reduce(
+                      (sum, c) => sum + (c.total_weight || c.weight || 0),
+                      0
+                    )
+                    .toFixed(1)}{" "}
+                  kg
+                </div>
+              </div>
+              <Package className="h-8 w-8 text-accent/60" />
+            </div>
+          </div>
+          <div className="logistics-card p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-muted-foreground">This Month</div>
+                <div className="text-2xl font-semibold mt-1">8</div>
+              </div>
+              <Calendar className="h-8 w-8 text-warning/60" />
+            </div>
           </div>
         </div>
-        <div className="logistics-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-muted-foreground">In Transit</div>
-              <div className="text-2xl font-semibold mt-1">
-                {dashboard?.containers_in_transit ?? 0}
-              </div>
-            </div>
-            <Plane className="h-8 w-8 text-secondary/60" />
-          </div>
-        </div>
-        <div className="logistics-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-muted-foreground">Total Weight</div>
-              <div className="text-2xl font-semibold mt-1">
-                {filteredCargo
-                  .reduce(
-                    (sum, c) => sum + (c.total_weight || c.weight || 0),
-                    0
-                  )
-                  .toFixed(1)}{" "}
-                kg
-              </div>
-            </div>
-            <Package className="h-8 w-8 text-accent/60" />
-          </div>
-        </div>
-        <div className="logistics-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-muted-foreground">This Month</div>
-              <div className="text-2xl font-semibold mt-1">8</div>
-            </div>
-            <Calendar className="h-8 w-8 text-warning/60" />
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
