@@ -493,7 +493,10 @@ class CustomerCargoContainerViewSet(viewsets.ReadOnlyModelViewSet):
         if getattr(user, 'user_role', None) != 'CUSTOMER':
             return CargoContainer.objects.none()
 
-        qs = CargoContainer.objects.all()
+        # Filter containers to only show those that have the customer's items
+        qs = CargoContainer.objects.filter(
+            Q(cargo_items__client=user) | Q(cargo_items__client__shipping_mark=user.shipping_mark)
+        ).distinct()
 
         today = timezone.now().date()
         default_start = today - timedelta(days=30)
@@ -554,6 +557,26 @@ class CustomerCargoContainerViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(warehouse_type=warehouse_type)
 
         return qs.order_by('-load_date', '-created_at').distinct()
+
+    @action(detail=True, methods=['get'], url_path='items')
+    def items(self, request, pk=None):
+        """Get cargo items for a specific container (customer-specific)"""
+        container = self.get_object()
+        user = request.user
+        
+        # Filter items to only show customer's items
+        items = CargoItem.objects.filter(
+            container=container
+        ).filter(
+            Q(client=user) | Q(client__shipping_mark=user.shipping_mark)
+        ).select_related('client', 'container')
+        
+        serializer = CargoItemSerializer(items, many=True)
+        return Response({
+            'results': serializer.data,
+            'count': items.count(),
+            'container_number': container.container_id,
+        })
 
 
 class CustomerCargoItemViewSet(viewsets.ReadOnlyModelViewSet):

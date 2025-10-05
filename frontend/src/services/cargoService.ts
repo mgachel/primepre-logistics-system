@@ -681,4 +681,109 @@ export const cargoService = {
       return { containers: [], items: [] };
     }
   },
+
+  // ================== CUSTOMER-SPECIFIC CARGO METHODS ==================
+
+  // Get customer's sea cargo containers
+  async getCustomerSeaCargoContainers(
+    filters: CargoFilters = {}
+  ): Promise<PaginatedResponse<BackendCargoContainer>> {
+    try {
+      const params = new URLSearchParams();
+      params.append("cargo_type", "sea");
+      
+      if (filters.search) params.append("search", filters.search);
+      if (filters.status) params.append("status", filters.status);
+      if (filters.page_size) params.append("page_size", String(filters.page_size));
+      if (filters.page) params.append("page", String(filters.page));
+
+      const response = await apiClient.get<PaginatedResponse<BackendCargoContainer>>(
+        `/api/cargo/customer/containers/?${params.toString()}`
+      );
+      return response.data || { results: [], count: 0, next: null, previous: null };
+    } catch (error) {
+      console.error("Error fetching customer sea cargo:", error);
+      return { results: [], count: 0, next: null, previous: null };
+    }
+  },
+
+  // Get customer's air cargo containers
+  async getCustomerAirCargoContainers(
+    filters: CargoFilters = {}
+  ): Promise<PaginatedResponse<BackendCargoContainer>> {
+    try {
+      const params = new URLSearchParams();
+      params.append("cargo_type", "air");
+      
+      if (filters.search) params.append("search", filters.search);
+      if (filters.status) params.append("status", filters.status);
+      if (filters.page_size) params.append("page_size", String(filters.page_size));
+      if (filters.page) params.append("page", String(filters.page));
+
+      const response = await apiClient.get<PaginatedResponse<BackendCargoContainer>>(
+        `/api/cargo/customer/containers/?${params.toString()}`
+      );
+      return response.data || { results: [], count: 0, next: null, previous: null };
+    } catch (error) {
+      console.error("Error fetching customer air cargo:", error);
+      return { results: [], count: 0, next: null, previous: null };
+    }
+  },
+
+  // Get customer's sea cargo dashboard
+  async getCustomerSeaCargoDashboard(): Promise<CargoDashboardStats> {
+    try {
+      const response = await apiClient.get<CargoDashboardStats>(
+        "/api/cargo/customer/dashboard/?cargo_type=sea"
+      );
+      return response.data || { total_containers: 0, in_transit: 0, delivered: 0, pending: 0 };
+    } catch (error) {
+      console.error("Error fetching customer sea cargo dashboard:", error);
+      return { total_containers: 0, in_transit: 0, delivered: 0, pending: 0 };
+    }
+  },
+
+  // Get customer's air cargo dashboard
+  async getCustomerAirCargoDashboard(): Promise<CargoDashboardStats> {
+    try {
+      const response = await apiClient.get<CargoDashboardStats>(
+        "/api/cargo/customer/dashboard/?cargo_type=air"
+      );
+      return response.data || { total_containers: 0, in_transit: 0, delivered: 0, pending: 0 };
+    } catch (error) {
+      console.error("Error fetching customer air cargo dashboard:", error);
+      return { total_containers: 0, in_transit: 0, delivered: 0, pending: 0 };
+    }
+  },
+
+  // Get customer container details
+  async getCustomerContainerDetails(id: number): Promise<BackendCargoContainer> {
+    try {
+      const response = await apiClient.get<BackendCargoContainer>(
+        `/api/cargo/customer/containers/${id}/`
+      );
+      if (!response.data) {
+        throw new Error("Container not found");
+      }
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching customer container details:", error);
+      throw error;
+    }
+  },
+
+  // Get items for a specific customer container
+  async getCustomerContainerItems(
+    containerId: number
+  ): Promise<PaginatedResponse<BackendCargoItem>> {
+    try {
+      const response = await apiClient.get<PaginatedResponse<BackendCargoItem>>(
+        `/api/cargo/customer/containers/${containerId}/items/`
+      );
+      return response.data || { results: [], count: 0, next: null, previous: null };
+    } catch (error) {
+      console.error("Error fetching customer container items:", error);
+      return { results: [], count: 0, next: null, previous: null };
+    }
+  },
 };

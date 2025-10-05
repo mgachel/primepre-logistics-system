@@ -29,6 +29,7 @@ import { DataTable, Column } from "@/components/data-table/DataTable";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
+import { useAuthStore } from "@/stores/authStore";
 import {
   Select,
   SelectContent,
@@ -66,6 +67,8 @@ function mapStatus(
 export default function AirCargo() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === "CUSTOMER";
 
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
@@ -103,18 +106,34 @@ export default function AirCargo() {
             ? "in_transit"
             : statusFilter;
 
-        const [listRes, dashRes] = await Promise.all([
-          cargoService.getContainers({
-            cargo_type: "air",
-            search: searchTerm || undefined,
-            status: statusParam,
-          }),
-          cargoService.getDashboard("air"),
-        ]);
-
-        if (!ignore) {
-          setContainers(listRes.data?.results || []);
-          setDashboard(dashRes.data || null);
+        // Use customer endpoints if user is a customer
+        if (isCustomer) {
+          const [listRes, dashRes] = await Promise.all([
+            cargoService.getCustomerAirCargoContainers({
+              search: searchTerm || undefined,
+              status: statusParam,
+              page_size: 100,
+            }),
+            cargoService.getCustomerAirCargoDashboard(),
+          ]);
+          if (!ignore) {
+            setContainers(Array.isArray(listRes?.results) ? listRes.results : []);
+            setDashboard(dashRes || null);
+          }
+        } else {
+          // Use admin endpoints
+          const [listRes, dashRes] = await Promise.all([
+            cargoService.getContainers({
+              cargo_type: "air",
+              search: searchTerm || undefined,
+              status: statusParam,
+            }),
+            cargoService.getDashboard("air"),
+          ]);
+          if (!ignore) {
+            setContainers(listRes.data?.results || []);
+            setDashboard(dashRes.data || null);
+          }
         }
       } catch (e: unknown) {
         const msg =
@@ -128,7 +147,7 @@ export default function AirCargo() {
     return () => {
       ignore = true;
     };
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, isCustomer]);
 
   // ✅ Reload data
   const reloadData = async () => {
@@ -139,17 +158,29 @@ export default function AirCargo() {
         ? "in_transit"
         : statusFilter;
 
-    const [listRes, dashRes] = await Promise.all([
-      cargoService.getContainers({
-        cargo_type: "air",
-        search: searchTerm || undefined,
-        status: statusParam,
-      }),
-      cargoService.getDashboard("air"),
-    ]);
-
-    setContainers(listRes.data?.results || []);
-    setDashboard(dashRes.data || null);
+    if (isCustomer) {
+      const [listRes, dashRes] = await Promise.all([
+        cargoService.getCustomerAirCargoContainers({
+          search: searchTerm || undefined,
+          status: statusParam,
+          page_size: 100,
+        }),
+        cargoService.getCustomerAirCargoDashboard(),
+      ]);
+      setContainers(Array.isArray(listRes?.results) ? listRes.results : []);
+      setDashboard(dashRes || null);
+    } else {
+      const [listRes, dashRes] = await Promise.all([
+        cargoService.getContainers({
+          cargo_type: "air",
+          search: searchTerm || undefined,
+          status: statusParam,
+        }),
+        cargoService.getDashboard("air"),
+      ]);
+      setContainers(listRes.data?.results || []);
+      setDashboard(dashRes.data || null);
+    }
   };
 
   const handleStatusUpdate = async () => {
@@ -185,88 +216,100 @@ export default function AirCargo() {
 
   const filteredCargo = useMemo(() => containers, [containers]);
 
-  // ✅ Table columns
-  const cols: Column<BackendCargoContainer>[] = [
-    {
-      id: "created_at",
-      header: "Created",
-      accessor: () => "",
-      sort: (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      width: "0px",
-    },
-    {
-      id: "container",
-      header: "Airway Bill No.",
-      accessor: (c) => <span className="font-medium">{c.container_id}</span>,
-      sort: (a, b) => a.container_id.localeCompare(b.container_id),
-      sticky: true,
-      clickable: true,
-    },
-    {
-      id: "loading_date",
-      header: "Flight Date",
-      accessor: (c) =>
-        c.load_date ? (
-          <span className="text-sm">{formatDate(c.load_date)}</span>
-        ) : (
-          <span className="text-sm text-muted-foreground">-</span>
+  // ✅ Table columns - Filter for customers
+  const cols = useMemo(() => {
+    const allCols: Column<BackendCargoContainer>[] = [
+      {
+        id: "created_at",
+        header: "Created",
+        accessor: () => "",
+        sort: (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        width: "0px",
+      },
+      {
+        id: "container",
+        header: "Airway Bill No.",
+        accessor: (c) => <span className="font-medium">{c.container_id}</span>,
+        sort: (a, b) => a.container_id.localeCompare(b.container_id),
+        sticky: true,
+        clickable: true,
+      },
+      {
+        id: "loading_date",
+        header: "Flight Date",
+        accessor: (c) =>
+          c.load_date ? (
+            <span className="text-sm">{formatDate(c.load_date)}</span>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          ),
+        sort: (a, b) => (a.load_date || "").localeCompare(b.load_date || ""),
+      },
+      {
+        id: "eta",
+        header: "ETA",
+        accessor: (c) => (
+          <div>
+            <div
+              className={
+                isOverdue(c.eta) ? "text-red-600 font-medium" : undefined
+              }
+            >
+              {formatDate(c.eta)}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {isOverdue(c.eta)
+                ? `${daysLate(c.eta)} days late`
+                : formatRelative(c.eta) || ""}
+            </div>
+          </div>
         ),
-      sort: (a, b) => (a.load_date || "").localeCompare(b.load_date || ""),
-    },
-    {
-      id: "eta",
-      header: "ETA",
-      accessor: (c) => (
-        <div>
-          <div
-            className={
-              isOverdue(c.eta) ? "text-red-600 font-medium" : undefined
-            }
-          >
-            {formatDate(c.eta)}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {isOverdue(c.eta)
-              ? `${daysLate(c.eta)} days late`
-              : formatRelative(c.eta) || ""}
-          </div>
-        </div>
-      ),
-      sort: (a, b) => (a.eta || "").localeCompare(b.eta || ""),
-    },
-    {
-      id: "weight",
-      header: "Total Weight",
-      accessor: (c) => {
-        const totalWeight = c.total_weight || c.weight || 0;
-        return totalWeight > 0 ? (
-          <span className="text-sm">{totalWeight.toFixed(1)} kg</span>
-        ) : (
-          <span className="text-sm text-muted-foreground">-</span>
-        );
+        sort: (a, b) => (a.eta || "").localeCompare(b.eta || ""),
       },
-      sort: (a, b) => {
-        const weightA = a.total_weight || a.weight || 0;
-        const weightB = b.total_weight || b.weight || 0;
-        return weightA - weightB;
+      {
+        id: "weight",
+        header: "Total Weight",
+        accessor: (c) => {
+          const totalWeight = c.total_weight || c.weight || 0;
+          return totalWeight > 0 ? (
+            <span className="text-sm">{totalWeight.toFixed(1)} kg</span>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          );
+        },
+        sort: (a, b) => {
+          const weightA = a.total_weight || a.weight || 0;
+          const weightB = b.total_weight || b.weight || 0;
+          return weightA - weightB;
+        },
+        align: "right",
       },
-      align: "right",
-    },
-    {
-      id: "status",
-      header: "Status",
-      accessor: (c) => <StatusBadge status={mapStatus(c.status)} />,
-    },
-    {
-      id: "clients",
-      header: "Clients",
-      accessor: (c) => `${c.total_clients}`,
-      sort: (a, b) => a.total_clients - b.total_clients,
-      align: "right",
-      width: "80px",
-    },
-  ];
+      {
+        id: "status",
+        header: "Status",
+        accessor: (c) => <StatusBadge status={mapStatus(c.status)} />,
+      },
+      {
+        id: "clients",
+        header: "Clients",
+        accessor: (c) => `${c.total_clients}`,
+        sort: (a, b) => a.total_clients - b.total_clients,
+        align: "right",
+        width: "80px",
+      },
+    ];
+    
+    if (isCustomer) {
+      // Customers only see: Airway Bill No., Flight Date, and ETA
+      return allCols.filter(col => 
+        col.id === "container" || 
+        col.id === "loading_date" || 
+        col.id === "eta"
+      );
+    }
+    return allCols;
+  }, [isCustomer]);
 
   return (
     <div className="space-y-6">
@@ -275,30 +318,33 @@ export default function AirCargo() {
         <div>
           <h1 className="text-xl lg:text-2xl font-semibold text-foreground flex items-center">
             <Plane className="h-5 w-5 lg:h-6 lg:w-6 mr-3 text-primary" />
-            Air Cargo
+            {isCustomer ? "My Air Cargo" : "Air Cargo"}
           </h1>
           <p className="text-muted-foreground text-sm lg:text-base mt-1">
-            Manage air freight shipments • All times shown in your local time
-            zone
+            {isCustomer
+              ? "View containers where your goods are located"
+              : "Manage air freight shipments • All times shown in your local time zone"}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
-          <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Air Container
-          </Button>
-          <ExcelUploadButton
-            uploadType="air_cargo"
-            variant="outline"
-            onUploadComplete={(response) => {
-              toast({
-                title: "Excel upload completed",
-                description: `Processed ${response.summary.created || 0} air cargo items`,
-              });
-              window.location.reload();
-            }}
-          />
-        </div>
+        {!isCustomer && (
+          <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
+            <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Air Container
+            </Button>
+            <ExcelUploadButton
+              uploadType="air_cargo"
+              variant="outline"
+              onUploadComplete={(response) => {
+                toast({
+                  title: "Excel upload completed",
+                  description: `Processed ${response.summary.created || 0} air cargo items`,
+                });
+                window.location.reload();
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -401,62 +447,72 @@ export default function AirCargo() {
           loading={loading}
           defaultSort={{ column: "created_at", direction: "desc" }}
           empty={<p className="text-muted-foreground">No air cargo yet.</p>}
-          rowActions={(row) => (
-            <>
+          rowActions={(row) =>
+            isCustomer ? (
               <DropdownMenuItem
                 onClick={() => {
-                  navigate(`/containers/${row.container_id}`);
+                  navigate(`/customer/cargo/air/container/${row.container_id}`);
                 }}
               >
                 <Eye className="h-4 w-4 mr-2" /> View Details
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setSelectedStatusContainer(row);
-                  setNewStatus(row.status);
-                  setShowStatusDialog(true);
-                }}
-              >
-                <Settings className="h-4 w-4 mr-2" /> Update Status
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setEditContainer(row);
-                  setEditOpen(true);
-                }}
-              >
-                <Edit className="h-4 w-4 mr-2" /> Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={async () => {
-                  if (
-                    !confirm(
-                      `Delete air container ${row.container_id}? This cannot be undone.`
+            ) : (
+              <>
+                <DropdownMenuItem
+                  onClick={() => {
+                    navigate(`/containers/${row.container_id}`);
+                  }}
+                >
+                  <Eye className="h-4 w-4 mr-2" /> View Details
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSelectedStatusContainer(row);
+                    setNewStatus(row.status);
+                    setShowStatusDialog(true);
+                  }}
+                >
+                  <Settings className="h-4 w-4 mr-2" /> Update Status
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEditContainer(row);
+                    setEditOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4 mr-2" /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={async () => {
+                    if (
+                      !confirm(
+                        `Delete air container ${row.container_id}? This cannot be undone.`
+                      )
                     )
-                  )
-                    return;
-                  try {
-                    await cargoService.deleteBackendContainer(row.container_id);
-                    await reloadData();
-                    toast({
-                      title: "Deleted",
-                      description: `${row.container_id} removed.`,
-                    });
-                  } catch (e: unknown) {
-                    toast({
-                      title: "Delete failed",
-                      description:
-                        e instanceof Error ? e.message : "Unable to delete",
-                      variant: "destructive",
-                    });
-                  }
-                }}
-              >
-                <Trash2 className="h-4 w-4 mr-2" /> Delete
-              </DropdownMenuItem>
-            </>
-          )}
+                      return;
+                    try {
+                      await cargoService.deleteBackendContainer(row.container_id);
+                      await reloadData();
+                      toast({
+                        title: "Deleted",
+                        description: `${row.container_id} removed.`,
+                      });
+                    } catch (e: unknown) {
+                      toast({
+                        title: "Delete failed",
+                        description:
+                          e instanceof Error ? e.message : "Unable to delete",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                </DropdownMenuItem>
+              </>
+            )
+          }
         />
       </div>
 

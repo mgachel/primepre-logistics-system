@@ -485,6 +485,69 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            
+            {/* Customer Cargo Routes - Shared with admin pages */}
+            <Route
+              path="/customer/cargo/sea"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <SeaCargo />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customer/cargo/air"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <AirCargo />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customer/cargo/sea/container/:containerId"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <ContainerDetailsPage />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customer/cargo/air/container/:containerId"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRoute
+                    adminComponent={<Navigate to="/" replace />}
+                    customerComponent={
+                      <AppLayout>
+                        <ContainerDetailsPage />
+                      </AppLayout>
+                    }
+                  />
+                </ProtectedRoute>
+              }
+            />
+            
             <Route
               path="/my-shipments"
               element={
