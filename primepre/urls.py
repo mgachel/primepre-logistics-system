@@ -14,9 +14,10 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve
 from .views import home_view
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -99,6 +100,13 @@ urlpatterns = [
     path('api/daily-updates/', include('daily_updates.urls')),  # Daily updates endpoints
 ]
 
-# Serve media files in development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Serve media files - ALWAYS serve them (both dev and production for Render free tier)
+# For production with cloud storage (S3, etc), remove this and configure cloud storage
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Additional explicit media URL pattern for production reliability
+urlpatterns += [
+    re_path(r'^media/(?P<path>.*)$', serve, {
+        'document_root': settings.MEDIA_ROOT,
+    }),
+]
