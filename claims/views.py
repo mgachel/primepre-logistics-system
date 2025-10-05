@@ -50,9 +50,9 @@ class CustomerClaimListCreateView(generics.ListCreateAPIView):
         return claim
 
 
-class CustomerClaimDetailView(generics.RetrieveAPIView):
+class CustomerClaimDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
-    Customer view to see details of their own claim
+    Customer view to see details of their own claim, update, and delete
     """
     serializer_class = ClaimSerializer
     permission_classes = [permissions.IsAuthenticated]

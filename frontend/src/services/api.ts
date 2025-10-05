@@ -233,20 +233,20 @@ class ApiClient {
     endpoint: string,
     data?: D
   ): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
-      method: "PUT",
-      body: data ? JSON.stringify(data) : undefined,
-    });
+    const options: RequestInit = { method: "PUT" };
+    if (data instanceof FormData) options.body = data;
+    else if (data) options.body = JSON.stringify(data);
+    return this.request<T>(endpoint, options);
   }
 
   async patch<T, D = unknown>(
     endpoint: string,
     data?: D
   ): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
-      method: "PATCH",
-      body: data ? JSON.stringify(data) : undefined,
-    });
+    const options: RequestInit = { method: "PATCH" };
+    if (data instanceof FormData) options.body = data;
+    else if (data) options.body = JSON.stringify(data);
+    return this.request<T>(endpoint, options);
   }
 
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
