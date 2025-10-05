@@ -19,6 +19,9 @@ from .views import (
     # New simplified signup
     SimplifiedSignupView,
     
+    # Shipping mark generation and selection
+    GenerateShippingMarksView, SignupWithShippingMarkView,
+    
     # Single endpoint versions for frontend compatibility
     SingleSignupView, SinglePhoneVerificationView, SingleResendVerificationView,
     
@@ -53,8 +56,12 @@ urlpatterns = [
     # SIMPLIFIED SIGNUP (NEW - NO SMS, AUTO SHIPPING MARKS)
     # ============================================================================
     
-    # New simplified signup endpoint
+    # New simplified signup endpoint (legacy - auto shipping marks)
     path('signup/simplified/', SimplifiedSignupView.as_view(), name='simplified_signup'),
+    
+    # Shipping mark generation and selection
+    path('generate-shipping-marks/', GenerateShippingMarksView.as_view(), name='generate_shipping_marks'),
+    path('signup/with-shipping-mark/', SignupWithShippingMarkView.as_view(), name='signup_with_shipping_mark'),
 
     # ============================================================================
     # SINGLE ENDPOINT AUTHENTICATION (FRONTEND COMPATIBILITY)

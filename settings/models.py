@@ -446,12 +446,14 @@ class ShippingMarkFormatSettings(models.Model):
     
     # Validation Rules
     min_shipping_mark_length = models.IntegerField(
-        default=5,
-        validators=[MinValueValidator(3)]
+        default=10,
+        validators=[MinValueValidator(5)],
+        help_text="Minimum shipping mark length (default: 10)"
     )
     max_shipping_mark_length = models.IntegerField(
-        default=15,
-        validators=[MinValueValidator(5)]
+        default=20,
+        validators=[MinValueValidator(10)],
+        help_text="Maximum shipping mark length (default: 20)"
     )
     
     # Metadata

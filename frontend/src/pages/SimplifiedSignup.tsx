@@ -15,7 +15,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
-import { config } from '@/lib/config';
 
 // Region choices (matching backend)
 const REGION_CHOICES = [
@@ -63,7 +62,7 @@ type SimplifiedSignupData = z.infer<typeof simplifiedSignupSchema>;
 export default function SimplifiedSignup() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { error, clearError, setUser } = useAuthStore();
+  const { error, clearError } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -88,54 +87,17 @@ export default function SimplifiedSignup() {
       setIsLoading(true);
       clearError();
       
-      // Call the simplified signup endpoint
-      const response = await fetch(`${config.apiBaseUrl}/api/auth/signup/simplified/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Store tokens
-        if (result.data.tokens) {
-          localStorage.setItem('access_token', result.data.tokens.access);
-          localStorage.setItem('refresh_token', result.data.tokens.refresh);
+      // Instead of creating account, navigate to shipping mark selection
+      // Pass the signup data to the next page
+      navigate('/signup/select-shipping-mark', {
+        state: {
+          signupData: data
         }
-
-        // Immediately set user data in authStore to ensure proper role-based routing
-        setUser(result.data.user);
-
-        console.log('🎉 New user created:', {
-          user: result.data.user,
-          role: result.data.user.user_role,
-          shipping_mark: result.data.user.shipping_mark
-        });
-
-        toast({
-          title: "Account Created Successfully!",
-          description: `Welcome ${data.first_name}! Your shipping mark is: ${result.data.user.shipping_mark}`,
-        });
-
-        // Small delay to ensure auth state is updated before navigation
-        setTimeout(() => {
-          // Redirect to dashboard (will now route to customer dashboard correctly)
-          navigate('/dashboard');
-        }, 500);
-      } else {
-        toast({
-          title: "Signup Failed",
-          description: result.message || 'An error occurred during signup',
-          variant: "destructive",
-        });
-      }
+      });
     } catch (error) {
       console.error('Signup error:', error);
       toast({
-        title: "Signup Failed",
+        title: "Error",
         description: 'An unexpected error occurred. Please try again.',
         variant: "destructive",
       });

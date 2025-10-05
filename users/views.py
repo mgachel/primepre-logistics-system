@@ -718,6 +718,396 @@ class SimplifiedSignupView(APIView):
 
 
 # ============================================================================
+# SHIPPING MARK GENERATION AND SELECTION API
+# ============================================================================
+
+@method_decorator(csrf_exempt, name='dispatch')
+class GenerateShippingMarksView(APIView):
+    """
+    Generate 4 unique shipping mark suggestions based on user's name and region.
+    Uses regional prefix rules set by admin and enforces length constraints (10-20 chars).
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    
+    def post(self, request):
+        """Generate shipping mark suggestions."""
+        data = request.data
+        
+        logger.info("=" * 80)
+        logger.info("GENERATING SHIPPING MARKS WITH 10-20 CHARACTER LENGTH REQUIREMENT")
+        logger.info("=" * 80)
+        
+        # Validate required fields
+        first_name = data.get('first_name', '').strip()
+        last_name = data.get('last_name', '').strip()
+        region = data.get('region', '').strip()
+        
+        if not first_name or not last_name:
+            return Response({
+                'success': False,
+                'error': 'First name and last name are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            from settings.models import ShippingMarkFormattingRule, ShippingMarkFormatSettings
+            import random
+            import hashlib
+            
+            company_name = data.get('company_name', '').strip()
+            
+            # Use hardcoded length constraints (10-20 characters)
+            # These override any database settings to ensure consistency
+            min_length = 10
+            max_length = 20
+            
+            logger.info(f"Length constraints: MIN={min_length}, MAX={max_length}")
+            
+            # Get applicable rule for region (Ghana regions)
+            rule = ShippingMarkFormattingRule.get_rule_for_client(country='Ghana', region=region)
+            logger.info(f"Using rule: {rule.rule_name if rule else 'No rule (default format)'}")
+            
+            # Get additional identifiers
+            company_name = data.get('company_name', '').strip()
+            nickname = data.get('nickname', '').strip()
+            email = data.get('email', '').strip()
+            
+            # Extract email username if email provided
+            email_username = email.split('@')[0] if email and '@' in email else ''
+            
+            # Generate name combinations
+            seed = f"{first_name}{last_name}{company_name}{nickname}"
+            random.seed(hashlib.md5(seed.encode()).hexdigest())
+            
+            first_upper = first_name.upper()
+            last_upper = last_name.upper()
+            
+            # Clean and prepare additional identifiers
+            company_clean = ''.join(c.upper() for c in company_name if c.isalnum()) if company_name else ''
+            nickname_clean = ''.join(c.upper() for c in nickname if c.isalnum()) if nickname else ''
+            email_clean = ''.join(c.upper() for c in email_username if c.isalnum()) if email_username else ''
+            
+            # Generate various combinations with different sources
+            name_combinations = []
+            
+            # Primary: First + Last name combinations (various lengths)
+            if len(first_upper) >= 2 and len(last_upper) >= 2:
+                name_combinations.extend([
+                    f"{first_upper[:3]}{last_upper[:3]}",      # JOHDOE (6 chars)
+                    f"{first_upper[:4]}{last_upper[:3]}",      # JOHNDOE (7 chars)
+                    f"{first_upper[:4]}{last_upper[:4]}",      # JOHNDOES (8 chars)
+                    f"{first_upper[:5]}{last_upper[:3]}",      # JOHNDOE (8 chars)
+                    f"{first_upper}{last_upper[:4]}",          # JOHNDOES (full first + 4 last)
+                ])
+            
+            # Add company-based combinations (use company to extend name)
+            if company_clean and len(company_clean) >= 3:
+                name_combinations.extend([
+                    f"{first_upper[:3]}{company_clean[:4]}",   # JOHABC (7 chars)
+                    f"{last_upper[:3]}{company_clean[:4]}",    # DOEABC (7 chars)
+                    f"{first_upper[:2]}{last_upper[:2]}{company_clean[:3]}",  # JODOABC (7 chars)
+                    f"{company_clean[:5]}{first_upper[:2]}",   # ABCORJO (7 chars)
+                    f"{company_clean}",                         # Full company name
+                ])
+            
+            # Add nickname-based combinations
+            if nickname_clean and len(nickname_clean) >= 2:
+                name_combinations.extend([
+                    f"{nickname_clean[:4]}{last_upper[:3]}",   # NICKDOE (7 chars)
+                    f"{nickname_clean}{last_upper[:3]}",       # NICKNAMEDOE
+                    f"{first_upper[:3]}{nickname_clean[:4]}",  # JOHNICK (7 chars)
+                ])
+            
+            # Add email-based combinations (if no company/nickname)
+            if email_clean and len(email_clean) >= 3 and not company_clean and not nickname_clean:
+                name_combinations.extend([
+                    f"{first_upper[:3]}{email_clean[:4]}",     # JOHJDOE (7 chars)
+                    f"{last_upper[:3]}{email_clean[:4]}",      # DOEJDOE (7 chars)
+                    f"{email_clean[:5]}{last_upper[:2]}",      # JDOE9DO (7 chars)
+                ])
+            
+            # Ensure we have at least some combinations
+            if not name_combinations:
+                name_combinations = [
+                    f"{first_upper}{last_upper}",
+                    f"{first_upper[:4]}{last_upper[:4]}",
+                    'USER'
+                ]
+            
+            suggestions = []
+            attempted = set()
+            
+            logger.info(f"Name combinations to try: {name_combinations}")
+            
+            # Generate suggestions using rule or default format
+            for name_combo in name_combinations:
+                if len(suggestions) >= 4:
+                    break
+                
+                if rule:
+                    # Use rule format with regional prefix
+                    base_mark = rule.format_template.format(
+                        prefix=rule.prefix_value,
+                        name=name_combo,
+                        counter=""
+                    ).strip()
+                else:
+                    # Default format
+                    base_mark = f"PM {name_combo}"
+                
+                # Remove any double spaces
+                base_mark = ' '.join(base_mark.split())
+                original_mark = base_mark
+                
+                # Ensure length constraints (10-20 characters)
+                current_length = len(base_mark)
+                logger.info(f"Processing: '{base_mark}' (length: {current_length})")
+                
+                if current_length < min_length:
+                    # Extend with meaningful text instead of random numbers
+                    padding_needed = min_length - current_length
+                    
+                    # Try to use company, nickname, email, or last name as extension
+                    extension_sources = []
+                    if company_clean and len(company_clean) >= padding_needed:
+                        extension_sources.append(company_clean)
+                    if nickname_clean and len(nickname_clean) >= padding_needed:
+                        extension_sources.append(nickname_clean)
+                    if email_clean and len(email_clean) >= padding_needed:
+                        extension_sources.append(email_clean)
+                    if len(last_upper) >= padding_needed:
+                        extension_sources.append(last_upper)
+                    if len(first_upper) >= padding_needed:
+                        extension_sources.append(first_upper)
+                    
+                    if extension_sources:
+                        # Use the first available source
+                        extension = extension_sources[0][:padding_needed]
+                        base_mark = base_mark + extension
+                        logger.info(f"  -> Extended to '{base_mark}' (added '{extension}')")
+                    else:
+                        # Last resort: use combination of available text
+                        available_text = (company_clean + nickname_clean + email_clean + last_upper + first_upper)
+                        if len(available_text) >= padding_needed:
+                            extension = available_text[:padding_needed]
+                            base_mark = base_mark + extension
+                            logger.info(f"  -> Extended to '{base_mark}' (added '{extension}')")
+                        else:
+                            # If still not enough, repeat the name
+                            extension = (first_upper + last_upper) * 2
+                            base_mark = base_mark + extension[:padding_needed]
+                            logger.info(f"  -> Extended to '{base_mark}' (repeated name)")
+                
+                elif current_length > max_length:
+                    # Truncate to maximum length
+                    base_mark = base_mark[:max_length]
+                    logger.info(f"  -> Truncated to '{base_mark}' (max {max_length})")
+                
+                # Final validation: must be between min_length and max_length
+                final_length = len(base_mark)
+                logger.info(f"  -> Final: '{base_mark}' (length: {final_length}, valid: {min_length <= final_length <= max_length})")
+                
+                if min_length <= len(base_mark) <= max_length:
+                    # Check uniqueness
+                    if base_mark not in attempted and not CustomerUser.objects.filter(shipping_mark=base_mark).exists():
+                        suggestions.append(base_mark)
+                        attempted.add(base_mark)
+                        logger.info(f"  -> ✓ ADDED to suggestions")
+            
+            # If we don't have 4 suggestions, create variations with extensions
+            variation_index = 0
+            extension_pool = [company_clean, nickname_clean, email_clean, first_upper, last_upper]
+            extension_pool = [e for e in extension_pool if e and len(e) >= 2]  # Filter valid extensions
+            
+            while len(suggestions) < 4 and variation_index < 100:
+                random_combo = random.choice(name_combinations) if name_combinations else "USER"
+                
+                # Add an extension from the pool
+                if extension_pool:
+                    extension_source = extension_pool[variation_index % len(extension_pool)]
+                    extended_combo = f"{random_combo}{extension_source[:3]}"
+                else:
+                    extended_combo = random_combo
+                
+                if rule:
+                    base_mark = rule.format_template.format(
+                        prefix=rule.prefix_value,
+                        name=extended_combo,
+                        counter=""
+                    ).strip()
+                else:
+                    base_mark = f"PM {extended_combo}"
+                
+                # Remove double spaces
+                base_mark = ' '.join(base_mark.split())
+                
+                # Apply length constraints (10-20 characters)
+                current_len = len(base_mark)
+                if current_len < min_length:
+                    # Extend with meaningful text
+                    padding_needed = min_length - current_len
+                    if extension_pool:
+                        ext = extension_pool[variation_index % len(extension_pool)]
+                        base_mark += ext[:padding_needed]
+                    else:
+                        base_mark += (first_upper + last_upper)[:padding_needed]
+                elif current_len > max_length:
+                    base_mark = base_mark[:max_length]
+                
+                # Validate length and uniqueness
+                if min_length <= len(base_mark) <= max_length:
+                    if base_mark not in attempted and not CustomerUser.objects.filter(shipping_mark=base_mark).exists():
+                        suggestions.append(base_mark)
+                        attempted.add(base_mark)
+                
+                variation_index += 1
+            
+            return Response({
+                'success': True,
+                'suggestions': suggestions[:4],  # Ensure exactly 4
+                'message': 'Shipping mark suggestions generated successfully'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error generating shipping marks: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return Response({
+                'success': False,
+                'error': 'Failed to generate shipping marks',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SignupWithShippingMarkView(APIView):
+    """
+    Complete signup with user-selected shipping mark.
+    This is the final step after user selects their shipping mark.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    
+    def post(self, request):
+        """Create user with selected shipping mark."""
+        data = request.data
+        
+        # Validate required fields
+        required_fields = ['first_name', 'last_name', 'email', 'phone', 'region', 'password', 'shipping_mark']
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        if missing_fields:
+            return Response({
+                'success': False,
+                'error': 'Missing required fields',
+                'missing_fields': missing_fields
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Clean and validate inputs
+            import re
+            phone_clean = re.sub(r'[^\d+]', '', data['phone'])
+            shipping_mark = data['shipping_mark'].strip()
+            
+            # Use database transaction for atomicity
+            from django.db import transaction
+            
+            with transaction.atomic():
+                # Check for existing email and phone
+                if CustomerUser.objects.filter(email=data['email']).exists():
+                    return Response({
+                        'success': False,
+                        'error': 'Email already exists',
+                        'message': 'An account with this email address already exists.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                if CustomerUser.objects.filter(phone=phone_clean).exists():
+                    return Response({
+                        'success': False,
+                        'error': 'Phone number already exists',
+                        'message': 'An account with this phone number already exists.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Check if shipping mark is still available
+                if CustomerUser.objects.filter(shipping_mark=shipping_mark).exists():
+                    return Response({
+                        'success': False,
+                        'error': 'shipping_mark_taken',
+                        'message': 'This shipping mark was just taken. Please select another one.'
+                    }, status=status.HTTP_409_CONFLICT)
+                
+                # Validate region
+                valid_regions = [choice[0] for choice in CustomerUser.REGION_CHOICES]
+                if data['region'] not in valid_regions:
+                    return Response({
+                        'success': False,
+                        'error': 'Invalid region',
+                        'valid_regions': valid_regions
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Validate shipping mark format (must start with PM followed by optional number/prefix)
+                # Accept formats: "PM ", "PM-", "PM1 ", "PM2 ", etc.
+                import re
+                if not re.match(r'^PM[\d\s-]', shipping_mark):
+                    return Response({
+                        'success': False,
+                        'error': 'Invalid shipping mark format',
+                        'message': 'Shipping mark must start with "PM" followed by a space, dash, or regional code'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Create user with selected shipping mark
+                user = CustomerUser.objects.create_user(
+                    phone=phone_clean,
+                    password=data['password'],
+                    first_name=data['first_name'].strip(),
+                    last_name=data['last_name'].strip(),
+                    email=data['email'].strip().lower(),
+                    region=data['region'],
+                    nickname=data.get('nickname', '').strip(),
+                    company_name=data.get('company_name', '').strip(),
+                    user_type=data.get('user_type', 'INDIVIDUAL'),
+                    shipping_mark=shipping_mark,  # Use user-selected shipping mark
+                    is_verified=True  # Auto-verify without SMS
+                )
+                
+                # Generate tokens
+                refresh = RefreshToken.for_user(user)
+                access_token = refresh.access_token
+                
+                logger.info(f"User created with selected shipping mark: {user.phone} - {shipping_mark}")
+                
+                return Response({
+                    'success': True,
+                    'message': 'Account created successfully',
+                    'data': {
+                        'user': {
+                            'id': user.id,
+                            'first_name': user.first_name,
+                            'last_name': user.last_name,
+                            'email': user.email,
+                            'phone': user.phone,
+                            'region': user.region,
+                            'shipping_mark': user.shipping_mark,
+                            'user_role': user.user_role,
+                            'user_type': user.user_type,
+                            'is_verified': user.is_verified
+                        },
+                        'tokens': {
+                            'access': str(access_token),
+                            'refresh': str(refresh)
+                        }
+                    }
+                }, status=status.HTTP_201_CREATED)
+                
+        except Exception as e:
+            logger.error(f"Signup with shipping mark error: {str(e)}")
+            return Response({
+                'success': False,
+                'error': 'Account creation failed',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================================================
 # EXISTING API VIEWS (PRESERVED AND UPDATED)
 # ============================================================================
 
