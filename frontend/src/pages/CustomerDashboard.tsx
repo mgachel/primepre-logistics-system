@@ -183,11 +183,8 @@ export default function CustomerDashboard() {
 
       if (response && response.results && Array.isArray(response.results)) {
         setUpdates(response.results);
-        // Auto-expand high priority updates
-        const highPriorityIds = response.results
-          .filter(u => u.priority === 'high' && !u.is_expired)
-          .map(u => u.id);
-        setExpandedIds(new Set(highPriorityIds));
+        // All updates are collapsed by default
+        setExpandedIds(new Set());
       } else {
         setUpdates([]);
       }

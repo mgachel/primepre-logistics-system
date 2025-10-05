@@ -201,7 +201,15 @@ export default function GoodsReceivedGhanaAir() {
 
   // Table columns - different for customers vs admins
   const columns: Column<GoodsReceivedContainer>[] = isCustomer ? [
-    // Customer columns: Only Offloading Date
+    // Customer columns: Airline (AWB ID) and Offloading Date
+    {
+      id: "container",
+      header: "Airline",
+      accessor: (row) => (
+        <div className="font-mono font-medium">{row.container_id}</div>
+      ),
+      sort: (a, b) => a.container_id.localeCompare(b.container_id),
+    },
     {
       id: "offloading_date",
       header: "Offloading Date",
