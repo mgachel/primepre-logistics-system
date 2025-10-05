@@ -36,6 +36,12 @@ class DailyUpdateViewSet(viewsets.ModelViewSet):
     search_fields = ['title', 'content']
     ordering_fields = ['created_at', 'updated_at', 'priority', 'expires_at']
     ordering = ['-created_at']
+    
+    def get_serializer_context(self):
+        """Add request to serializer context for building absolute URLs"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
 
     def get_queryset(self):
         """Override to add custom filtering"""

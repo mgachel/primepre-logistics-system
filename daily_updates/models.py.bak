@@ -1,6 +1,40 @@
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+    
+    def save(self, *args, **kwargs):
+        """Override save to handle attachment metadata"""
+        if self.attachment:
+            # Auto-populate attachment_name if not provided
+            if not self.attachment_name:
+                self.attachment_name = self.attachment.name.split('/')[-1]
+            
+            # Auto-populate attachment_size
+            if self.attachment.file:
+                self.attachment_size = self.attachment.file.size
+        
+        super().save(*args, **kwargs)
+    
+    @property
+    def attachment_file_extension(self):
+        """Get the file extension of the attachment"""
+        if self.attachment:
+            return self.attachment.name.split('.')[-1].lower()
+        return None
+    
+    @property
+    def attachment_size_display(self):
+        """Human-readable file size"""
+        if not self.attachment_size:
+            return None
+        
+        # Convert bytes to human-readable format
+        size = self.attachment_size
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size < 1024.0:
+                return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} TB"xceptions import ValidationError
 
 class DailyUpdate(models.Model):
     PRIORITY_CHOICES = [
@@ -79,37 +113,3 @@ class DailyUpdate(models.Model):
             return None
         delta = self.expires_at - timezone.now()
         return delta.days if delta.days > 0 else 0
-    
-    def save(self, *args, **kwargs):
-        """Override save to handle attachment metadata"""
-        if self.attachment:
-            # Auto-populate attachment_name if not provided
-            if not self.attachment_name:
-                self.attachment_name = self.attachment.name.split('/')[-1]
-            
-            # Auto-populate attachment_size
-            if self.attachment.file:
-                self.attachment_size = self.attachment.file.size
-        
-        super().save(*args, **kwargs)
-    
-    @property
-    def attachment_file_extension(self):
-        """Get the file extension of the attachment"""
-        if self.attachment:
-            return self.attachment.name.split('.')[-1].lower()
-        return None
-    
-    @property
-    def attachment_size_display(self):
-        """Human-readable file size"""
-        if not self.attachment_size:
-            return None
-        
-        # Convert bytes to human-readable format
-        size = self.attachment_size
-        for unit in ['B', 'KB', 'MB', 'GB']:
-            if size < 1024.0:
-                return f"{size:.1f} {unit}"
-            size /= 1024.0
-        return f"{size:.1f} TB"

@@ -171,11 +171,11 @@ export function DailyUpdatesAdmin() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-2">
-          <h1 className="text-2xl font-bold text-foreground">Client Announcements</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Client Announcements</h1>
           {totalCount > 0 && (
             <Badge variant="secondary" className="ml-2">
               {totalCount} total
@@ -188,22 +188,26 @@ export function DailyUpdatesAdmin() {
             variant="outline" 
             size="sm"
             disabled={loading}
+            className="flex-1 sm:flex-none"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Update
+              <Button className="flex-1 sm:flex-none">
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Create Update</span>
+                <span className="sm:hidden">Create</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
+            <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+              <DialogHeader className="flex-shrink-0">
                 <DialogTitle>Create Daily Update</DialogTitle>
               </DialogHeader>
-              <DailyUpdateForm onSubmit={handleCreate} />
+              <div className="overflow-y-auto flex-1 pr-2">
+                <DailyUpdateForm onSubmit={handleCreate} />
+              </div>
             </DialogContent>
           </Dialog>
         </div>
@@ -236,39 +240,41 @@ export function DailyUpdatesAdmin() {
         updates && updates.length > 0 && (
           <Card>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Expires</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {updates.map((update) => (
-                    <DailyUpdateRow
-                      key={update.id}
-                      update={update}
-                      onView={(update) => {
-                        setSelectedUpdate(update);
-                        setViewDialogOpen(true);
-                      }}
-                      onEdit={(update) => {
-                        setSelectedUpdate(update);
-                        setEditDialogOpen(true);
-                      }}
-                      onDelete={(update) => {
-                        setSelectedUpdate(update);
-                        setDeleteDialogOpen(true);
-                      }}
-                      onExtendExpiry={handleExtendExpiry}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[200px]">Title</TableHead>
+                      <TableHead className="min-w-[100px]">Priority</TableHead>
+                      <TableHead className="min-w-[100px]">Created</TableHead>
+                      <TableHead className="min-w-[100px]">Expires</TableHead>
+                      <TableHead className="min-w-[100px]">Status</TableHead>
+                      <TableHead className="text-right min-w-[150px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {updates.map((update) => (
+                      <DailyUpdateRow
+                        key={update.id}
+                        update={update}
+                        onView={(update) => {
+                          setSelectedUpdate(update);
+                          setViewDialogOpen(true);
+                        }}
+                        onEdit={(update) => {
+                          setSelectedUpdate(update);
+                          setEditDialogOpen(true);
+                        }}
+                        onDelete={(update) => {
+                          setSelectedUpdate(update);
+                          setDeleteDialogOpen(true);
+                        }}
+                        onExtendExpiry={handleExtendExpiry}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         )
@@ -276,15 +282,16 @@ export function DailyUpdatesAdmin() {
 
       {/* Pagination */}
       {(hasNextPage || hasPreviousPage) && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-sm text-muted-foreground order-2 sm:order-1">
             Showing page {currentPage} of {Math.ceil(totalCount / 20)}
           </div>
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 order-1 sm:order-2 w-full sm:w-auto">
             <Button 
               variant="outline" 
               disabled={!hasPreviousPage || loading}
               onClick={() => handlePageChange(currentPage - 1)}
+              className="flex-1 sm:flex-none"
             >
               Previous
             </Button>
@@ -292,6 +299,7 @@ export function DailyUpdatesAdmin() {
               variant="outline" 
               disabled={!hasNextPage || loading}
               onClick={() => handlePageChange(currentPage + 1)}
+              className="flex-1 sm:flex-none"
             >
               Next
             </Button>
@@ -301,16 +309,18 @@ export function DailyUpdatesAdmin() {
 
       {/* Dialogs */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Edit Daily Update</DialogTitle>
           </DialogHeader>
-          {selectedUpdate && (
-            <DailyUpdateForm 
-              initialData={selectedUpdate}
-              onSubmit={handleUpdate} 
-            />
-          )}
+          <div className="overflow-y-auto flex-1 pr-2">
+            {selectedUpdate && (
+              <DailyUpdateForm 
+                initialData={selectedUpdate}
+                onSubmit={handleUpdate} 
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

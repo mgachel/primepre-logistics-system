@@ -16,6 +16,12 @@ export interface DailyUpdate {
   created_at_formatted?: string;
   is_expired: boolean;
   days_until_expiry: number | null;
+  attachment?: string | null;
+  attachment_name?: string;
+  attachment_size?: number | null;
+  attachment_file_extension?: string | null;
+  attachment_size_display?: string | null;
+  attachment_url?: string | null;
 }
 
 export interface DailyUpdateCreate {
@@ -146,6 +152,39 @@ class DailyUpdatesService {
   async createDailyUpdate(data: DailyUpdateCreate): Promise<DailyUpdate> {
     const response = await apiClient.post<DailyUpdate>(`${this.baseUrl}/`, data);
     return response.data;
+  }
+
+  /**
+   * Create or update daily update with file upload (Admin only)
+   */
+  async createOrUpdateWithFile(formData: FormData, id?: number): Promise<DailyUpdate> {
+    const baseApiUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+    const url = id ? `${baseApiUrl}${this.baseUrl}/${id}/` : `${baseApiUrl}${this.baseUrl}/`;
+    const method = id ? 'PATCH' : 'POST';
+    
+    // Use fetch API for multipart/form-data instead of apiClient
+    const token = localStorage.getItem('access_token');
+    const response = await fetch(url, {
+      method: method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = 'Failed to upload';
+      try {
+        const error = JSON.parse(errorText);
+        errorMessage = error.message || error.detail || JSON.stringify(error);
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    return await response.json();
   }
 
   /**
