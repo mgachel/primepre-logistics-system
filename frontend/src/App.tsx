@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import SimplifiedSignup from "./pages/SimplifiedSignup";
+import ShippingMarkSelection from "./pages/ShippingMarkSelection";
 import SignupStep2 from "./pages/SignupStep2";
 import SignupStep3 from "./pages/SignupStep3";
 import SignupStep4 from "./pages/SignupStep4";
@@ -88,6 +89,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             {/* New simplified signup */}
             <Route path="/signup" element={<SimplifiedSignup />} />
+            <Route path="/signup/select-shipping-mark" element={<ShippingMarkSelection />} />
             {/* Legacy multi-step signup routes (keep for backward compatibility) */}
             <Route path="/signup/legacy" element={<Signup />} />
             <Route path="/signup/shipping-mark" element={<SignupStep2 />} />
@@ -495,7 +497,7 @@ const App = () => (
                     adminComponent={<Navigate to="/" replace />}
                     customerComponent={
                       <AppLayout>
-                        <SeaCargo />
+                        <SeaCargo />  
                       </AppLayout>
                     }
                   />

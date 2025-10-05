@@ -3,7 +3,7 @@ const requiredEnvVars = [
   'VITE_API_BASE_URL'
 ] as const;
 
-const optionalEnvVars = [
+const _optionalEnvVars = [
   'VITE_APP_NAME',
   'VITE_ENVIRONMENT'
 ] as const;
@@ -22,7 +22,7 @@ if (missingEnvVars.length > 0 && import.meta.env.PROD) {
 // Environment configuration
 export const config = {
   // API Configuration
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'https://primepre-backend.onrender.com',
+  apiBaseUrl: (import.meta.env.VITE_API_BASE_URL || 'https://primepre-backend.onrender.com').replace(/\/+$/, ''),
   
   // App Configuration
   appName: import.meta.env.VITE_APP_NAME || 'PrimePre Logistics',
