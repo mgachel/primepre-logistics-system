@@ -1045,13 +1045,13 @@ class SignupWithShippingMarkView(APIView):
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
                 # Validate shipping mark format (must start with PM followed by optional number/prefix)
-                # Accept formats: "PM ", "PM-", "PM1 ", "PM2 ", etc.
+                # Accept formats: "PM ", "PM-", "PM1 ", "PM2 ", "PM16 ", etc.
                 import re
-                if not re.match(r'^PM[\d\s-]', shipping_mark):
+                if not re.match(r'^PM\d*[\s-]', shipping_mark):
                     return Response({
                         'success': False,
                         'error': 'Invalid shipping mark format',
-                        'message': 'Shipping mark must start with "PM" followed by a space, dash, or regional code'
+                        'message': 'Shipping mark must start with "PM" optionally followed by digits, then a space or dash'
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
                 # Create user with selected shipping mark
