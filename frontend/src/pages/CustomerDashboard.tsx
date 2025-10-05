@@ -12,7 +12,9 @@ import {
   ChevronDown,
   ChevronUp,
   AlertTriangle,
-  Info
+  Info,
+  FileText,
+  Download
 } from 'lucide-react';
 import dailyUpdatesService, { DailyUpdate } from '@/services/dailyUpdatesService';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -107,6 +109,32 @@ const DailyUpdateCard = ({ update, isExpanded, onToggle }: { update: DailyUpdate
                 {update.content}
               </div>
             </div>
+            
+            {update.attachment_url && (
+              <div className="mt-4 p-3 border rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium">{update.attachment_name || 'Attached File'}</p>
+                      {update.attachment_size_display && (
+                        <p className="text-xs text-muted-foreground">{update.attachment_size_display}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                  >
+                    <a href={update.attachment_url} target="_blank" rel="noopener noreferrer" download>
+                      <Download className="h-3 w-3 mr-1" />
+                      Download
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            )}
             
             {isExpiring && (
               <Alert className="mt-4 border-yellow-200 bg-yellow-50">

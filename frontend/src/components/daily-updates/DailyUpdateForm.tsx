@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { CalendarIcon, Loader2 } from 'lucide-react';
+import { CalendarIcon, Loader2, FileUp, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +40,8 @@ export function DailyUpdateForm({ initialData, onSubmit }: DailyUpdateFormProps)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const {
     register,
@@ -66,17 +68,22 @@ export function DailyUpdateForm({ initialData, onSubmit }: DailyUpdateFormProps)
       setIsSubmitting(true);
       setSubmitError(null);
 
-      const submitData: DailyUpdateCreate = {
-        title: data.title.trim(),
-        content: data.content.trim(),
-        priority: data.priority,
-        expires_at: data.expires_at ? data.expires_at.toISOString() : null,
-      };
+      const formData = new FormData();
+      formData.append('title', data.title.trim());
+      formData.append('content', data.content.trim());
+      formData.append('priority', data.priority);
+      if (data.expires_at) {
+        formData.append('expires_at', data.expires_at.toISOString());
+      }
+      if (selectedFile) {
+        formData.append('attachment', selectedFile);
+      }
 
-      await onSubmit(submitData);
+      await dailyUpdatesService.createOrUpdateWithFile(formData, initialData?.id);
       
       if (!initialData) {
         reset(); // Reset form only for new updates
+        setSelectedFile(null);
       }
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Failed to save update');
@@ -85,13 +92,48 @@ export function DailyUpdateForm({ initialData, onSubmit }: DailyUpdateFormProps)
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setFileError('File size must not exceed 10MB');
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'text/plain',
+      'image/jpeg',
+      'image/png',
+      'application/zip',
+      'application/x-rar-compressed',
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      setFileError('Invalid file type. Allowed: PDF, Word, Excel, CSV, TXT, Images, ZIP');
+      return;
+    }
+
+    setFileError(null);
+    setSelectedFile(file);
+  };
+
   const handleDateSelect = (date: Date | undefined) => {
     setValue('expires_at', date);
     setCalendarOpen(false);
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 sm:space-y-6 px-1">
       {submitError && (
         <Alert variant="destructive">
           <AlertDescription>{submitError}</AlertDescription>
@@ -198,6 +240,52 @@ export function DailyUpdateForm({ initialData, onSubmit }: DailyUpdateFormProps)
         </Popover>
         <p className="text-sm text-muted-foreground">
           Leave empty to use default expiry (7 days from creation)
+        </p>
+      </div>
+
+      {/* File Attachment */}
+      <div className="space-y-2">
+        <Label htmlFor="attachment">Attachment (Optional)</Label>
+        <div className="flex items-center space-x-2">
+          <Input
+            id="attachment"
+            type="file"
+            onChange={handleFileChange}
+            className={cn(fileError && 'border-red-500')}
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.zip,.rar"
+          />
+          {selectedFile && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setSelectedFile(null);
+                setFileError(null);
+                const input = document.getElementById('attachment') as HTMLInputElement;
+                if (input) input.value = '';
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        {fileError && (
+          <p className="text-sm text-red-500">{fileError}</p>
+        )}
+        {selectedFile && (
+          <p className="text-sm text-green-600">
+            <FileUp className="h-3 w-3 inline mr-1" />
+            {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+          </p>
+        )}
+        {initialData?.attachment && !selectedFile && (
+          <p className="text-sm text-muted-foreground">
+            Current file: {initialData.attachment_name || 'Attached'}
+          </p>
+        )}
+        <p className="text-sm text-muted-foreground">
+          Max file size: 10MB. Allowed types: PDF, Word, Excel, CSV, TXT, Images, ZIP
         </p>
       </div>
 
