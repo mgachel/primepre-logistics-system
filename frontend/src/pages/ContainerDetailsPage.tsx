@@ -24,12 +24,15 @@ import {
   BackendCargoItem,
 } from "@/services/cargoService";
 import { formatDate } from "@/lib/date";
+import { useAuthStore } from "@/stores/authStore";
 
 export default function ContainerDetailsPage() {
   // ...existing code...
   const { containerId } = useParams<{ containerId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === "CUSTOMER";
 
   const [loading, setLoading] = useState(true);
   const [container, setContainer] = useState<BackendCargoContainer | null>(
@@ -46,25 +49,49 @@ export default function ContainerDetailsPage() {
 
   // Load container and cargo items
   useEffect(() => {
-    if (!containerId) return;
+    if (!containerId) {
+      console.log('ContainerDetailsPage: containerId is undefined or empty');
+      return;
+    }
+
+    console.log('ContainerDetailsPage: Loading container:', containerId, 'isCustomer:', isCustomer);
 
     const loadData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const [containerRes, itemsRes] = await Promise.all([
-          cargoService.getContainer(containerId),
-          cargoService.getCargoItems({ container_id: containerId, page_size: 5000 }),
-        ]);
+        if (isCustomer) {
+          // Use customer endpoints
+          console.log('Using customer endpoints for container:', containerId);
+          const [containerRes, itemsRes] = await Promise.all([
+            cargoService.getCustomerContainerDetails(containerId),
+            cargoService.getCustomerContainerItems(containerId),
+          ]);
 
-        if (containerRes.data) {
-          setContainer(containerRes.data);
+          if (containerRes) {
+            setContainer(containerRes as BackendCargoContainer);
+          } else {
+            setError("Container not found");
+            return;
+          }
+
+          setCargoItems(Array.isArray(itemsRes?.results) ? itemsRes.results : []);
         } else {
-          setError("Container not found");
-          return;
-        }
+          // Use admin endpoints
+          const [containerRes, itemsRes] = await Promise.all([
+            cargoService.getContainer(containerId),
+            cargoService.getCargoItems({ container_id: containerId, page_size: 5000 }),
+          ]);
 
-        setCargoItems(itemsRes.data?.results || []);
+          if (containerRes.data) {
+            setContainer(containerRes.data);
+          } else {
+            setError("Container not found");
+            return;
+          }
+
+          setCargoItems(itemsRes.data?.results || []);
+        }
       } catch (e: unknown) {
         const msg =
           e instanceof Error ? e.message : "Failed to load container details";
@@ -75,7 +102,7 @@ export default function ContainerDetailsPage() {
     };
 
     loadData();
-  }, [containerId]);
+  }, [containerId, isCustomer]);
 
   // Filter and group cargo items by shipping mark based on search
   const groupedByShippingMark = useMemo(() => {
@@ -212,28 +239,30 @@ export default function ContainerDetailsPage() {
           <h1 className="text-xl lg:text-2xl font-semibold">{container.container_id}</h1>
           <p className="text-muted-foreground text-sm lg:text-base">
             {container.cargo_type === "sea" ? "Sea" : "Air"} Cargo •{" "}
-            {cargoItems.length} items
+            {cargoItems.length} {isCustomer ? "of your items" : "items"}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <RefreshCcw className="h-4 w-4" /> Refresh
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowEditContainerDialog(true)}>
-            <Edit className="h-4 w-4" /> Edit Container
-          </Button>
-          <ContainerExcelUploadButton
-            containerId={containerId!}
-            onUploadComplete={(response) => {
-              // Refresh cargo items after successful upload
-              console.log('Excel upload completed:', response);
-              // TODO: Reload cargo items
-            }}
-          />
-          <Button size="sm" onClick={() => setShowAddItemDialog(true)}>
-            <Plus className="h-4 w-4" /> Add Item
-          </Button>
-        </div>
+        {!isCustomer && (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm">
+              <RefreshCcw className="h-4 w-4" /> Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowEditContainerDialog(true)}>
+              <Edit className="h-4 w-4" /> Edit Container
+            </Button>
+            <ContainerExcelUploadButton
+              containerId={containerId || ""}
+              onUploadComplete={(response) => {
+                // Refresh cargo items after successful upload
+                console.log('Excel upload completed:', response);
+                // TODO: Reload cargo items
+              }}
+            />
+            <Button size="sm" onClick={() => setShowAddItemDialog(true)}>
+              <Plus className="h-4 w-4" /> Add Item
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Search Field */}
@@ -299,27 +328,31 @@ export default function ContainerDetailsPage() {
                     columns={cargoColumns}
                     loading={false}
                     empty={<p>No items for {mark}.</p>}
-                    rowActions={(row) => (
-                      <>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            toast({
-                              title: "Edit Item",
-                              description:
-                                "Edit functionality will be implemented",
-                            })
-                          }
-                        >
-                          <Edit className="h-4 w-4 mr-2" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => handleDeleteItem(row.id)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" /> Delete
-                        </DropdownMenuItem>
-                      </>
-                    )}
+                    rowActions={
+                      isCustomer
+                        ? undefined
+                        : (row) => (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  toast({
+                                    title: "Edit Item",
+                                    description:
+                                      "Edit functionality will be implemented",
+                                  })
+                                }
+                              >
+                                <Edit className="h-4 w-4 mr-2" /> Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => handleDeleteItem(row.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </>
+                          )
+                    }
                   />
                 </div>
               )}

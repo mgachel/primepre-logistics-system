@@ -25,6 +25,7 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Edit, Settings, Trash2, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatRelative, isOverdue, daysLate } from "@/lib/date";
+import { useAuthStore } from "@/stores/authStore";
 import {
   Select,
   SelectContent,
@@ -78,6 +79,9 @@ function mapStatus(
 export default function SeaCargo() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === "CUSTOMER";
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
   const [selectedContainer, _setSelectedContainer] =
@@ -111,17 +115,35 @@ export default function SeaCargo() {
             : statusFilter === "in-transit"
             ? "in_transit"
             : statusFilter;
-        const [listRes, dashRes] = await Promise.all([
-          cargoService.getContainers({
-            cargo_type: "sea",
-            search: searchTerm || undefined,
-            status: statusParam,
-          }),
-          cargoService.getDashboard("sea"),
-        ]);
-        if (!ignore) {
-          setContainers(listRes.data?.results || []);
-          setDashboard(dashRes.data || null);
+        
+        // Use customer endpoints if user is a customer
+        if (isCustomer) {
+          const [listRes, dashRes] = await Promise.all([
+            cargoService.getCustomerSeaCargoContainers({
+              search: searchTerm || undefined,
+              status: statusParam,
+              page_size: 100,
+            }),
+            cargoService.getCustomerSeaCargoDashboard(),
+          ]);
+          if (!ignore) {
+            setContainers(Array.isArray(listRes?.results) ? listRes.results : []);
+            setDashboard(dashRes || null);
+          }
+        } else {
+          // Use admin endpoints
+          const [listRes, dashRes] = await Promise.all([
+            cargoService.getContainers({
+              cargo_type: "sea",
+              search: searchTerm || undefined,
+              status: statusParam,
+            }),
+            cargoService.getDashboard("sea"),
+          ]);
+          if (!ignore) {
+            setContainers(listRes.data?.results || []);
+            setDashboard(dashRes.data || null);
+          }
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Failed to load sea cargo";
@@ -134,7 +156,7 @@ export default function SeaCargo() {
     return () => {
       ignore = true;
     };
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, isCustomer]);
 
   // Reload data function
   const reloadData = async () => {
@@ -145,16 +167,30 @@ export default function SeaCargo() {
           : statusFilter === "in-transit"
           ? "in_transit"
           : statusFilter;
-      const [listRes, dashRes] = await Promise.all([
-        cargoService.getContainers({
-          cargo_type: "sea",
-          search: searchTerm || undefined,
-          status: statusParam,
-        }),
-        cargoService.getDashboard("sea"),
-      ]);
-      setContainers(listRes.data?.results || []);
-      setDashboard(dashRes.data || null);
+      
+      if (isCustomer) {
+        const [listRes, dashRes] = await Promise.all([
+          cargoService.getCustomerSeaCargoContainers({
+            search: searchTerm || undefined,
+            status: statusParam,
+            page_size: 100,
+          }),
+          cargoService.getCustomerSeaCargoDashboard(),
+        ]);
+        setContainers(Array.isArray(listRes?.results) ? listRes.results : []);
+        setDashboard(dashRes || null);
+      } else {
+        const [listRes, dashRes] = await Promise.all([
+          cargoService.getContainers({
+            cargo_type: "sea",
+            search: searchTerm || undefined,
+            status: statusParam,
+          }),
+          cargoService.getDashboard("sea"),
+        ]);
+        setContainers(listRes.data?.results || []);
+        setDashboard(dashRes.data || null);
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to reload sea cargo";
       setError(msg);
@@ -197,103 +233,116 @@ export default function SeaCargo() {
 
   const filteredCargo = useMemo(() => containers, [containers]);
 
-  const cols: Column<BackendCargoContainer>[] = [
-    {
-      id: "created_at",
-      header: "Created",
-      accessor: () => "", // Hidden column for sorting only
-      sort: (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      width: "0px", // Hide the column
-    },
-    {
-      id: "select",
-      header: "",
-      accessor: () => null, // DataTable handles this internally for 'select' columns
-      width: "48px",
-      sticky: true,
-    },
-    {
-      id: "container",
-      header: "Container ID",
-      accessor: (c) => <span className="font-medium">{c.container_id}</span>,
-      sort: (a, b) => a.container_id.localeCompare(b.container_id),
-      sticky: true,
-      clickable: true,
-    },
-    {
-      id: "loading_date",
-      header: "Loading Date",
-      accessor: (c) => {
-        if (!c.load_date) {
-          return <span className="text-sm text-muted-foreground">-</span>;
-        }
-        try {
-          return <span className="text-sm">{formatDate(c.load_date)}</span>;
-        } catch {
-          return <span className="text-sm text-muted-foreground">-</span>;
-        }
+  // Filter columns for customers - hide rate and clients columns
+  const cols = useMemo(() => {
+    const allCols: Column<BackendCargoContainer>[] = [
+      {
+        id: "created_at",
+        header: "Created",
+        accessor: () => "", // Hidden column for sorting only
+        sort: (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        width: "0px", // Hide the column
       },
-      sort: (a, b) => (a.load_date || "").localeCompare(b.load_date || ""),
-    },
-    {
-      id: "eta",
-      header: "ETA",
-      accessor: (c) => (
-        <div>
-          <div
-            className={
-              isOverdue(c.eta) ? "text-red-600 font-medium" : undefined
-            }
-          >
-            {formatDate(c.eta)}
+      {
+        id: "select",
+        header: "",
+        accessor: () => null, // DataTable handles this internally for 'select' columns
+        width: "48px",
+        sticky: true,
+      },
+      {
+        id: "container",
+        header: "Container ID",
+        accessor: (c) => <span className="font-medium">{c.container_id}</span>,
+        sort: (a, b) => a.container_id.localeCompare(b.container_id),
+        sticky: true,
+        clickable: true,
+      },
+      {
+        id: "loading_date",
+        header: "Loading Date",
+        accessor: (c) => {
+          if (!c.load_date) {
+            return <span className="text-sm text-muted-foreground">-</span>;
+          }
+          try {
+            return <span className="text-sm">{formatDate(c.load_date)}</span>;
+          } catch {
+            return <span className="text-sm text-muted-foreground">-</span>;
+          }
+        },
+        sort: (a, b) => (a.load_date || "").localeCompare(b.load_date || ""),
+      },
+      {
+        id: "eta",
+        header: "ETA",
+        accessor: (c) => (
+          <div>
+            <div
+              className={
+                isOverdue(c.eta) ? "text-red-600 font-medium" : undefined
+              }
+            >
+              {formatDate(c.eta)}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {isOverdue(c.eta)
+                ? `${daysLate(c.eta)} days late`
+                : formatRelative(c.eta) || ""}
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {isOverdue(c.eta)
-              ? `${daysLate(c.eta)} days late`
-              : formatRelative(c.eta) || ""}
-          </div>
-        </div>
-      ),
-      sort: (a, b) => (a.eta || "").localeCompare(b.eta || ""),
-    },
-    {
-      id: "rate",
-      header: "Rate",
-      accessor: (c) => {
-        if (!c.rates || c.rates === null) {
-          return <span className="text-sm text-muted-foreground">-</span>;
-        }
-        return <span className="text-sm font-medium">${Number(c.rates).toLocaleString()}</span>;
+        ),
+        sort: (a, b) => (a.eta || "").localeCompare(b.eta || ""),
       },
-      sort: (a, b) => (Number(a.rates) || 0) - (Number(b.rates) || 0),
-      align: "right",
-    },
-    {
-      id: "total_cbm",
-      header: "Total CBM",
-      accessor: (c) => {
-        if (!c.cbm || c.cbm === null) {
-          return <span className="text-sm text-muted-foreground">-</span>;
-        }
-        return <span className="text-sm">{c.cbm} m³</span>;
+      {
+        id: "rate",
+        header: "Rate",
+        accessor: (c) => {
+          if (!c.rates || c.rates === null) {
+            return <span className="text-sm text-muted-foreground">-</span>;
+          }
+          return <span className="text-sm font-medium">${Number(c.rates).toLocaleString()}</span>;
+        },
+        sort: (a, b) => (Number(a.rates) || 0) - (Number(b.rates) || 0),
+        align: "right",
       },
-      sort: (a, b) => (a.cbm || 0) - (b.cbm || 0),
-      align: "right",
-    },
-    {
-      id: "status",
-      header: "Status",
-      accessor: (c) => <StatusBadge status={mapStatus(c.status)} />,
-    },
-    {
-      id: "clients",
-      header: "Clients",
-      accessor: (c) => `${c.total_clients}`,
-      sort: (a, b) => a.total_clients - b.total_clients,
-      align: "right",
-      width: "80px",
-    },
-  ];
+      {
+        id: "total_cbm",
+        header: "Total CBM",
+        accessor: (c) => {
+          if (!c.cbm || c.cbm === null) {
+            return <span className="text-sm text-muted-foreground">-</span>;
+          }
+          return <span className="text-sm">{c.cbm} m³</span>;
+        },
+        sort: (a, b) => (a.cbm || 0) - (b.cbm || 0),
+        align: "right",
+      },
+      {
+        id: "status",
+        header: "Status",
+        accessor: (c) => <StatusBadge status={mapStatus(c.status)} />,
+      },
+      {
+        id: "clients",
+        header: "Clients",
+        accessor: (c) => `${c.total_clients}`,
+        sort: (a, b) => a.total_clients - b.total_clients,
+        align: "right",
+        width: "80px",
+      },
+    ];
+    
+    if (isCustomer) {
+      // Customers only see: Container ID, Loading Date, and ETA
+      return allCols.filter(col => 
+        col.id === "container" || 
+        col.id === "loading_date" || 
+        col.id === "eta"
+      );
+    }
+    return allCols;
+  }, [isCustomer]);
 
   return (
     <div className="space-y-6">
@@ -302,31 +351,34 @@ export default function SeaCargo() {
         <div>
           <h1 className="text-xl lg:text-2xl font-semibold text-foreground flex items-center">
             <Ship className="h-5 w-5 lg:h-6 lg:w-6 mr-3 text-primary" />
-            Sea Cargo
+            {isCustomer ? "My Sea Cargo" : "Sea Cargo"}
           </h1>
           <p className="text-muted-foreground text-sm lg:text-base mt-1">
-            Track and manage all sea freight shipments • All times shown in your
-            local time zone
+            {isCustomer
+              ? "View containers where your goods are located"
+              : "Track and manage all sea freight shipments • All times shown in your local time zone"}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
-          <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Cargo
-          </Button>
-          <ExcelUploadButton
-            uploadType="sea_cargo"
-            variant="outline"
-            onUploadComplete={(response) => {
-              toast({
-                title: "Excel upload completed",
-                description: `Successfully processed ${response.summary.created || 0} sea cargo items`,
-              });
-              // Refresh the data
-              window.location.reload();
-            }}
-          />
-        </div>
+        {!isCustomer && (
+          <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
+            <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Cargo
+            </Button>
+            <ExcelUploadButton
+              uploadType="sea_cargo"
+              variant="outline"
+              onUploadComplete={(response) => {
+                toast({
+                  title: "Excel upload completed",
+                  description: `Successfully processed ${response.summary.created || 0} sea cargo items`,
+                });
+                // Refresh the data
+                window.location.reload();
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -442,81 +494,101 @@ export default function SeaCargo() {
           defaultSort={{ column: "created_at", direction: "desc" }}
           empty={
             <div className="text-muted-foreground">
-              No sea cargo yet. Add Cargo or Import from Excel.
+              {isCustomer
+                ? "No containers found with your goods."
+                : "No sea cargo yet. Add Cargo or Import from Excel."}
             </div>
           }
-          rowActions={(row) => (
-            <>
-              <DropdownMenuItem
-                onClick={() => {
-                  navigate(`/containers/${row.container_id}`);
-                }}
-              >
-                <Eye className="h-4 w-4 mr-2" /> View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setSelectedStatusContainer(row);
-                  setNewStatus(row.status);
-                  setShowStatusDialog(true);
-                }}
-              >
-                <Settings className="h-4 w-4 mr-2" /> Update Status
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setEditContainer(row);
-                  setEditOpen(true);
-                }}
-              >
-                <Edit className="h-4 w-4 mr-2" /> Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={async () => {
-                  if (
-                    !confirm(
-                      `Delete container ${row.container_id}? This cannot be undone.`
-                    )
-                  )
-                    return;
-                  try {
-                    await cargoService.deleteBackendContainer(row.container_id);
-                    await reloadData(); // Reload data instead of local state update
-                    toast({
-                      title: "Deleted",
-                      description: `${row.container_id} removed.`,
-                    });
-                  } catch (e: unknown) {
-                    toast({
-                      title: "Delete failed",
-                      description:
-                        e instanceof Error ? e.message : "Unable to delete",
-                      variant: "destructive",
-                    });
-                  }
-                }}
-              >
-                <Trash2 className="h-4 w-4 mr-2" /> Delete
-              </DropdownMenuItem>
-            </>
-          )}
-          renderBulkBar={(rows) => (
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline">
-                Update Status
-              </Button>
-              <Button size="sm" variant="outline">
-                Export
-              </Button>
-              <Button size="sm" variant="outline">
-                Assign
-              </Button>
-              <Button size="sm" variant="destructive">
-                Delete
-              </Button>
-            </div>
-          )}
+          rowActions={
+            isCustomer
+              ? (row) => (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      navigate(
+                        `/customer/cargo/sea/container/${row.container_id}`
+                      );
+                    }}
+                  >
+                    <Eye className="h-4 w-4 mr-2" /> View Details
+                  </DropdownMenuItem>
+                )
+              : (row) => (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        navigate(`/containers/${row.container_id}`);
+                      }}
+                    >
+                      <Eye className="h-4 w-4 mr-2" /> View Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSelectedStatusContainer(row);
+                        setNewStatus(row.status);
+                        setShowStatusDialog(true);
+                      }}
+                    >
+                      <Settings className="h-4 w-4 mr-2" /> Update Status
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setEditContainer(row);
+                        setEditOpen(true);
+                      }}
+                    >
+                      <Edit className="h-4 w-4 mr-2" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={async () => {
+                        if (
+                          !confirm(
+                            `Delete container ${row.container_id}? This cannot be undone.`
+                          )
+                        )
+                          return;
+                        try {
+                          await cargoService.deleteBackendContainer(row.container_id);
+                          await reloadData(); // Reload data instead of local state update
+                          toast({
+                            title: "Deleted",
+                            description: `${row.container_id} removed.`,
+                          });
+                        } catch (e: unknown) {
+                          toast({
+                            title: "Delete failed",
+                            description:
+                              e instanceof Error ? e.message : "Unable to delete",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                    </DropdownMenuItem>
+                  </>
+                )
+          }
+          renderBulkBar={
+            isCustomer
+              ? undefined
+              : (_rows) => (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline">
+                      Update Status
+                    </Button>
+                    <Button size="sm" variant="outline">
+                      Export
+                    </Button>
+                    <Button size="sm" variant="outline">
+                      Assign
+                    </Button>
+                    <Button size="sm" variant="destructive">
+                      Delete
+                    </Button>
+                  </div>
+                )
+          }
         />
       </div>
 
