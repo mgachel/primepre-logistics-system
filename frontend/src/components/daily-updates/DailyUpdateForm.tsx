@@ -194,7 +194,7 @@ export function DailyUpdateForm({ initialData, onSubmit }: DailyUpdateFormProps)
           <p className="text-sm text-red-500">{errors.content.message}</p>
         )}
         <p className="text-sm text-muted-foreground">
-          {watchedValues.content?.length || 0} / 5000 characters
+          {watchedValues.content?.length || 0} / 20,000 characters
         </p>
       </div>
 
