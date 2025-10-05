@@ -488,6 +488,72 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
                 })
 
 
+class BulkUploadStatus(models.TextChoices):
+    """Status values for async customer bulk upload tasks."""
+
+    QUEUED = 'QUEUED', 'Queued'
+    RUNNING = 'RUNNING', 'Running'
+    COMPLETE = 'COMPLETE', 'Complete'
+    FAILED = 'FAILED', 'Failed'
+
+
+class CustomerBulkUploadTask(models.Model):
+    """Tracks background customer bulk upload tasks and their progress."""
+
+    task_id = models.CharField(max_length=64, unique=True)
+    created_by = models.ForeignKey(
+        CustomerUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bulk_upload_tasks'
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=BulkUploadStatus.choices,
+        default=BulkUploadStatus.QUEUED,
+    )
+    total_customers = models.PositiveIntegerField(default=0)
+    created_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    errors = models.JSONField(default=list, blank=True)
+    message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Customer Bulk Upload Task"
+        verbose_name_plural = "Customer Bulk Upload Tasks"
+        indexes = [
+            models.Index(fields=['task_id']),
+            models.Index(fields=['status']),
+        ]
+
+    def __str__(self):
+        return f"BulkUploadTask({self.task_id})"
+
+    def mark_running(self, message="Task is processing..."):
+        self.status = BulkUploadStatus.RUNNING
+        self.message = message
+        self.save(update_fields=['status', 'message', 'updated_at'])
+
+    def mark_complete(self, created, failed, errors=None, message="Bulk creation complete"):
+        self.status = BulkUploadStatus.COMPLETE
+        self.created_count = created
+        self.failed_count = failed
+        if errors is not None:
+            self.errors = errors
+        self.message = message
+        self.save(update_fields=['status', 'created_count', 'failed_count', 'errors', 'message', 'updated_at'])
+
+    def mark_failed(self, errors, message="Task failed"):
+        self.status = BulkUploadStatus.FAILED
+        self.errors = errors
+        self.failed_count = max(self.failed_count, len(errors))
+        self.message = message
+        self.save(update_fields=['status', 'errors', 'failed_count', 'message', 'updated_at'])
+
+
 class VerificationPin(models.Model):
     """Model to handle phone verification PINs during signup"""
     user = models.ForeignKey(CustomerUser, on_delete=models.CASCADE)

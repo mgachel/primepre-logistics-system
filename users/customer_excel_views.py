@@ -16,7 +16,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import transaction
 from django.core.exceptions import ValidationError
-from users.models import CustomerUser
+from users.models import CustomerUser, CustomerBulkUploadTask, BulkUploadStatus
 from users.customer_excel_utils import (
     process_customer_excel_upload,
     create_customer_from_data,
@@ -678,6 +678,20 @@ class CustomerBulkCreateAsyncView(APIView):
                 f"[ASYNC-BULK-CREATE-QUEUE] Task: {task_id} | "
                 f"Customers: {len(customers_data)} | User: {request.user.id}"
             )
+
+            # Persist task tracker for status polling
+            CustomerBulkUploadTask.objects.update_or_create(
+                task_id=task_id,
+                defaults={
+                    'created_by': request.user if request.user.is_authenticated else None,
+                    'status': BulkUploadStatus.QUEUED,
+                    'total_customers': len(customers_data),
+                    'created_count': 0,
+                    'failed_count': 0,
+                    'errors': [],
+                    'message': 'Task queued'
+                }
+            )
             
             # Queue the background task
             from .async_customer_tasks import bulk_create_customers_task
@@ -695,7 +709,8 @@ class CustomerBulkCreateAsyncView(APIView):
                 'message': f'Bulk creation queued: {len(customers_data)} customers',
                 'task_id': task_id,
                 'total_customers': len(customers_data),
-                'estimated_time_seconds': len(customers_data) // 10  # ~10 customers/sec
+                'estimated_time_seconds': max(5, len(customers_data) // 10),  # ~10 customers/sec
+                'status': BulkUploadStatus.QUEUED,
             }, status=status.HTTP_202_ACCEPTED)
             
         except Exception as e:
@@ -717,54 +732,73 @@ class CustomerBulkCreateStatusView(APIView):
     def get(self, request, task_id):
         """Get task status and results."""
         try:
-            from django_q.models import Task
-            
-            # Find task in database
-            try:
-                task = Task.objects.get(name=f'bulk_create_{task_id}')
-            except Task.DoesNotExist:
-                return Response({
-                    'success': False,
-                    'message': 'Task not found',
-                    'status': 'NOT_FOUND'
-                }, status=status.HTTP_404_NOT_FOUND)
-            
-            # Check task status
-            if task.success is None:
-                # Task still running
-                return Response({
-                    'success': True,
-                    'status': 'RUNNING',
-                    'message': 'Task is processing...',
-                    'task_id': task_id
-                }, status=status.HTTP_200_OK)
-            
-            elif task.success:
-                # Task completed successfully
-                result = task.result
-                return Response({
-                    'success': True,
-                    'status': 'COMPLETE',
-                    'message': 'Bulk creation complete',
-                    'task_id': task_id,
-                    'created': result.get('created', 0),
-                    'failed': result.get('failed', 0),
-                    'errors': result.get('errors', [])
-                }, status=status.HTTP_200_OK)
-            
-            else:
-                # Task failed
-                return Response({
-                    'success': False,
-                    'status': 'FAILED',
-                    'message': 'Task failed',
-                    'task_id': task_id,
-                    'error': str(task.result)
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                
-        except Exception as e:
-            logger.error(f"[ASYNC-STATUS-ERROR] Task: {task_id} | {str(e)}", exc_info=True)
+            tracker = CustomerBulkUploadTask.objects.get(task_id=task_id)
+        except CustomerBulkUploadTask.DoesNotExist:
             return Response({
                 'success': False,
-                'message': f'Status check failed: {str(e)}'
+                'status': 'NOT_FOUND',
+                'message': 'Task not found',
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"[ASYNC-STATUS-ERROR] Task lookup failed: {task_id} | {str(e)}", exc_info=True)
+            return Response({
+                'success': False,
+                'message': f'Status lookup failed: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Permission check: allow creator, staff, or superusers to query
+        if (
+            tracker.created_by_id
+            and tracker.created_by_id != getattr(request.user, 'id', None)
+            and not getattr(request.user, 'is_staff', False)
+            and not getattr(request.user, 'is_superuser', False)
+        ):
+            return Response({
+                'success': False,
+                'status': 'FORBIDDEN',
+                'message': 'You do not have access to this task'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Determine progress metrics
+        processed = tracker.created_count + tracker.failed_count
+        total = tracker.total_customers or 0
+        progress_percent = 0
+        if total > 0:
+            progress_percent = min(100, int((processed / total) * 100))
+
+        # Provide default messages when not set
+        default_messages = {
+            BulkUploadStatus.QUEUED: 'Task queued and awaiting a worker',
+            BulkUploadStatus.RUNNING: 'Task is processing... hold tight!',
+            BulkUploadStatus.COMPLETE: 'Bulk creation complete',
+            BulkUploadStatus.FAILED: 'Task failed',
+        }
+        message = tracker.message or default_messages.get(tracker.status, 'Status update')
+
+        # Compose response payload
+        response_data = {
+            'task_id': tracker.task_id,
+            'status': tracker.status,
+            'success': tracker.status in {
+                BulkUploadStatus.QUEUED,
+                BulkUploadStatus.RUNNING,
+                BulkUploadStatus.COMPLETE,
+            },
+            'message': message,
+            'created': tracker.created_count,
+            'failed': tracker.failed_count,
+            'total_customers': total,
+            'progress_percent': progress_percent,
+            'errors': (tracker.errors or [])[:100],
+            'updated_at': tracker.updated_at.isoformat(),
+        }
+
+        # Include completion flag for frontend convenience
+        response_data['is_complete'] = tracker.status == BulkUploadStatus.COMPLETE
+        response_data['is_failed'] = tracker.status == BulkUploadStatus.FAILED
+
+        http_status = status.HTTP_200_OK
+        if tracker.status == BulkUploadStatus.FAILED:
+            response_data['success'] = False
+
+        return Response(response_data, status=http_status)

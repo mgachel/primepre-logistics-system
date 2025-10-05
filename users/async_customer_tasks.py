@@ -7,7 +7,7 @@ import logging
 from django.db import transaction
 from django_q.tasks import async_task, result
 from .customer_excel_utils import create_customer_from_data
-from .models import CustomerUser  # FIXED: Was CustomUser, should be CustomerUser
+from .models import CustomerUser, CustomerBulkUploadTask, BulkUploadStatus  # Track async task progress
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +36,24 @@ def bulk_create_customers_task(customers_data, created_by_user_id, task_id):
     created_count = 0
     failed_count = 0
     errors = []
+    tracker = None
     
     try:
         # Get the user who created this batch
         created_by_user = CustomerUser.objects.get(id=created_by_user_id)
+
+        # Load tracker for status updates
+        try:
+            tracker = CustomerBulkUploadTask.objects.get(task_id=task_id)
+            tracker.total_customers = len(customers_data)
+            tracker.created_count = 0
+            tracker.failed_count = 0
+            tracker.errors = []
+            tracker.save(update_fields=['total_customers', 'created_count', 'failed_count', 'errors', 'updated_at'])
+            tracker.mark_running()
+        except CustomerBulkUploadTask.DoesNotExist:
+            tracker = None
+            logger.warning(f"[ASYNC-BULK-CREATE-WARN] Tracker missing for task {task_id}")
         
         # Process in batches of 25 (same as sync version)
         batch_size = 25
@@ -72,11 +86,20 @@ def bulk_create_customers_task(customers_data, created_by_user_id, task_id):
                     error_msg = f"Row {idx}: {str(e)}"
                     errors.append(error_msg)
                     logger.error(f"[ASYNC-BULK-CREATE-FAIL] Task: {task_id} | {error_msg}")
+
+                if tracker and (idx % batch_size == 0 or idx == len(customers_data)):
+                    tracker.created_count = created_count
+                    tracker.failed_count = failed_count
+                    tracker.errors = errors[:100]
+                    tracker.save(update_fields=['created_count', 'failed_count', 'errors', 'updated_at'])
         
         logger.info(
             f"[ASYNC-BULK-CREATE-COMPLETE] Task: {task_id} | "
             f"Created: {created_count} | Failed: {failed_count}"
         )
+
+        if tracker:
+            tracker.mark_complete(created_count, failed_count, errors[:100])
         
         return {
             'success': True,
@@ -88,6 +111,11 @@ def bulk_create_customers_task(customers_data, created_by_user_id, task_id):
         
     except Exception as e:
         logger.error(f"[ASYNC-BULK-CREATE-ERROR] Task: {task_id} | {str(e)}", exc_info=True)
+        if tracker:
+            tracker.created_count = created_count
+            tracker.failed_count = failed_count
+            tracker.save(update_fields=['created_count', 'failed_count', 'updated_at'])
+            tracker.mark_failed(errors[:100] + [str(e)])
         return {
             'success': False,
             'created': created_count,
