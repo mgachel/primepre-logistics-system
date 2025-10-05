@@ -165,7 +165,7 @@ export default function Login() {
           </div>
 
           <div className="text-center">
-            <h2 className="text-3xl font-bold tracking-tight">Welcome back</h2>
+            <h2 className="text-3xl font-bold tracking-tight">Welcome</h2>
             <p className="text-muted-foreground mt-2">Sign in to your account</p>
           </div>
 
@@ -246,11 +246,6 @@ export default function Login() {
                 Don't have an account?{' '}
                 <Link to="/signup" className="text-primary hover:underline">Sign up</Link>
               </div>
-            </div>
-            <div className="text-center">
-              <Link to="/verify-account" className="text-primary hover:underline">
-                Need to verify your account?
-              </Link>
             </div>
           </div>
 
