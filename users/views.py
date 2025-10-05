@@ -855,8 +855,15 @@ class GenerateShippingMarksView(APIView):
                     # Default format
                     base_mark = f"PM {name_combo}"
                 
-                # Remove any double spaces
+                # Ensure proper spacing: normalize and ensure space after PM prefix
+                # Remove any double spaces first
                 base_mark = ' '.join(base_mark.split())
+                
+                # Ensure there's a space between PM+number and the name
+                import re
+                if not re.match(r'^PM\d+\s', base_mark) and re.match(r'^PM\d+', base_mark):
+                    # Add space after PM+digits if missing
+                    base_mark = re.sub(r'^(PM\d+)([A-Z])', r'\1 \2', base_mark)
                 original_mark = base_mark
                 
                 # Ensure length constraints (10-20 characters)
@@ -916,10 +923,28 @@ class GenerateShippingMarksView(APIView):
                         ).exists()
                         
                         if is_unique:
+                            # Also check if the name portion (after PM prefix) already exists
+                            # Extract the name portion (everything after "PM" + optional digits + space)
+                            import re
+                            name_match = re.search(r'^PM\d*\s*(.+)$', base_mark)
+                            if name_match:
+                                name_portion = name_match.group(1).strip()
+                                
+                                # Check if any shipping mark ends with this name portion
+                                # This prevents "PM1 JOHDOE" and "PM6 JOHDOE" both being suggested
+                                similar_exists = CustomerUser.objects.filter(
+                                    shipping_mark__iregex=r'PM\d*\s*' + re.escape(name_portion) + r'$'
+                                ).exists()
+                                
+                                if similar_exists:
+                                    logger.info(f"  -> Skipped (name portion '{name_portion}' already exists with different prefix)")
+                                    is_unique = False
+                        
+                        if is_unique:
                             suggestions.append(base_mark)
                             attempted.add(base_mark)
                             logger.info(f"  -> ✓ ADDED to suggestions")
-                        else:
+                        elif not is_unique:
                             logger.info(f"  -> Skipped (already exists in database)")
             
             # If we don't have 4 suggestions, create variations with extensions
@@ -946,8 +971,13 @@ class GenerateShippingMarksView(APIView):
                 else:
                     base_mark = f"PM {extended_combo}"
                 
-                # Remove double spaces
+                # Remove double spaces and ensure proper spacing
                 base_mark = ' '.join(base_mark.split())
+                
+                # Ensure space between PM+number and name
+                import re
+                if not re.match(r'^PM\d+\s', base_mark) and re.match(r'^PM\d+', base_mark):
+                    base_mark = re.sub(r'^(PM\d+)([A-Z])', r'\1 \2', base_mark)
                 
                 # Apply length constraints (10-20 characters)
                 current_len = len(base_mark)
@@ -970,6 +1000,20 @@ class GenerateShippingMarksView(APIView):
                         is_unique = not CustomerUser.objects.filter(
                             shipping_mark__iexact=base_mark
                         ).exists()
+                        
+                        if is_unique:
+                            # Check name portion uniqueness
+                            import re
+                            name_match = re.search(r'^PM\d*\s*(.+)$', base_mark)
+                            if name_match:
+                                name_portion = name_match.group(1).strip()
+                                similar_exists = CustomerUser.objects.filter(
+                                    shipping_mark__iregex=r'PM\d*\s*' + re.escape(name_portion) + r'$'
+                                ).exists()
+                                
+                                if similar_exists:
+                                    logger.info(f"  -> Skipped (name portion '{name_portion}' exists): '{base_mark}'")
+                                    is_unique = False
                         
                         if is_unique:
                             suggestions.append(base_mark)
