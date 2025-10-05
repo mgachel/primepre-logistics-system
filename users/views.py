@@ -908,11 +908,19 @@ class GenerateShippingMarksView(APIView):
                 logger.info(f"  -> Final: '{base_mark}' (length: {final_length}, valid: {min_length <= final_length <= max_length})")
                 
                 if min_length <= len(base_mark) <= max_length:
-                    # Check uniqueness
-                    if base_mark not in attempted and not CustomerUser.objects.filter(shipping_mark=base_mark).exists():
-                        suggestions.append(base_mark)
-                        attempted.add(base_mark)
-                        logger.info(f"  -> ✓ ADDED to suggestions")
+                    # Check uniqueness (case-insensitive)
+                    if base_mark not in attempted:
+                        # Check database for exact match (case-insensitive)
+                        is_unique = not CustomerUser.objects.filter(
+                            shipping_mark__iexact=base_mark
+                        ).exists()
+                        
+                        if is_unique:
+                            suggestions.append(base_mark)
+                            attempted.add(base_mark)
+                            logger.info(f"  -> ✓ ADDED to suggestions")
+                        else:
+                            logger.info(f"  -> Skipped (already exists in database)")
             
             # If we don't have 4 suggestions, create variations with extensions
             variation_index = 0
@@ -954,17 +962,39 @@ class GenerateShippingMarksView(APIView):
                 elif current_len > max_length:
                     base_mark = base_mark[:max_length]
                 
-                # Validate length and uniqueness
+                # Validate length and uniqueness (case-insensitive check)
                 if min_length <= len(base_mark) <= max_length:
-                    if base_mark not in attempted and not CustomerUser.objects.filter(shipping_mark=base_mark).exists():
-                        suggestions.append(base_mark)
-                        attempted.add(base_mark)
+                    # Check if not already in our attempted list
+                    if base_mark not in attempted:
+                        # Double-check uniqueness in database (case-insensitive)
+                        is_unique = not CustomerUser.objects.filter(
+                            shipping_mark__iexact=base_mark
+                        ).exists()
+                        
+                        if is_unique:
+                            suggestions.append(base_mark)
+                            attempted.add(base_mark)
+                            logger.info(f"  -> Added unique variation: '{base_mark}'")
+                        else:
+                            logger.info(f"  -> Skipped (exists in DB): '{base_mark}'")
                 
                 variation_index += 1
             
+            # Final verification: Ensure all suggestions are truly unique in database
+            verified_suggestions = []
+            for mark in suggestions[:4]:
+                if not CustomerUser.objects.filter(shipping_mark__iexact=mark).exists():
+                    verified_suggestions.append(mark)
+                else:
+                    logger.warning(f"Final check: Removed duplicate '{mark}' from suggestions")
+            
+            # If we lost suggestions due to duplicates, log it
+            if len(verified_suggestions) < 4:
+                logger.warning(f"Only {len(verified_suggestions)} unique suggestions generated (needed 4)")
+            
             return Response({
                 'success': True,
-                'suggestions': suggestions[:4],  # Ensure exactly 4
+                'suggestions': verified_suggestions,
                 'message': 'Shipping mark suggestions generated successfully'
             }, status=status.HTTP_200_OK)
             
