@@ -105,16 +105,71 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
 
 
 class AdminUserUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for updating admin users"""
+    """Serializer for updating admin users and customers"""
+    
+    # Allow email to be optional/blank
+    email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     
     class Meta:
         model = CustomerUser
         fields = [
-            'first_name', 'last_name', 'company_name', 'email', 'region', 
-            'user_role', 'is_active', 'accessible_warehouses',
-            'can_create_users', 'can_manage_inventory', 'can_view_analytics',
-            'can_manage_admins'
+            'first_name', 'last_name', 'nickname', 'company_name', 'email', 'phone',
+            'region', 'shipping_mark', 'user_role', 'user_type', 'is_active', 
+            'is_verified', 'accessible_warehouses', 'can_create_users', 
+            'can_manage_inventory', 'can_view_analytics', 'can_manage_admins'
         ]
+    
+    def validate_phone(self, value):
+        """Validate phone uniqueness"""
+        # If phone hasn't changed, skip validation
+        if self.instance and self.instance.phone == value:
+            return value
+        
+        # Check if phone is already in use by another user
+        existing = CustomerUser.objects.filter(phone=value)
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+        
+        if existing.exists():
+            raise serializers.ValidationError("This phone number is already in use.")
+        
+        return value
+    
+    def validate_shipping_mark(self, value):
+        """Validate shipping mark uniqueness"""
+        # If shipping mark hasn't changed, skip validation
+        if self.instance and self.instance.shipping_mark == value:
+            return value
+        
+        # Check if shipping mark is already in use by another user
+        existing = CustomerUser.objects.filter(shipping_mark=value)
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+        
+        if existing.exists():
+            raise serializers.ValidationError("This shipping mark is already in use.")
+        
+        return value
+    
+    def validate_email(self, value):
+        """Validate email uniqueness if provided"""
+        # Convert empty string to None for consistency
+        if value == '' or value is None:
+            return None
+        
+        # If email hasn't changed, skip validation
+        if self.instance and self.instance.email == value:
+            return value
+        
+        # Check if email is already in use by another user (excluding null/empty)
+        existing = CustomerUser.objects.filter(email=value).exclude(email__isnull=True).exclude(email='')
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+        
+        if existing.exists():
+            raise serializers.ValidationError("This email is already in use.")
+        
+        return value
     
     def validate(self, data):
         requesting_user = self.context['request'].user
