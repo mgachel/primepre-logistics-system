@@ -237,20 +237,6 @@ export default function SeaCargo() {
   const cols = useMemo(() => {
     const allCols: Column<BackendCargoContainer>[] = [
       {
-        id: "created_at",
-        header: "Created",
-        accessor: () => "", // Hidden column for sorting only
-        sort: (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        width: "0px", // Hide the column
-      },
-      {
-        id: "select",
-        header: "",
-        accessor: () => null, // DataTable handles this internally for 'select' columns
-        width: "48px",
-        sticky: true,
-      },
-      {
         id: "container",
         header: "Container ID",
         accessor: (c) => <span className="font-medium">{c.container_id}</span>,
@@ -492,7 +478,7 @@ export default function SeaCargo() {
           rows={filteredCargo}
           columns={cols}
           loading={loading}
-          defaultSort={{ column: "created_at", direction: "desc" }}
+          defaultSort={{ column: "container", direction: "desc" }}
           empty={
             <div className="text-muted-foreground">
               {isCustomer
