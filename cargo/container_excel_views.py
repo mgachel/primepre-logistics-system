@@ -1,6 +1,8 @@
 """
 New Excel upload views for container items with shipping mark matching.
 Handles Excel file processing, shipping mark matching, and batch item creation.
+
+VERSION: 2.0 - Optimized batch processing for resolved mappings (Oct 6, 2025)
 """
 import tempfile
 import os
