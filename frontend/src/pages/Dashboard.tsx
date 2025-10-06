@@ -151,13 +151,7 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Recent activity (lighter query, only for admin/staff)
-  const { data: recentActivity, isLoading: loadingRecent } = useQuery({
-    queryKey: ["recent-activity"],
-    queryFn: () => dashboardService.getRecentActivity(),
-    enabled: !isCustomer && !!user,
-    staleTime: 5 * 60 * 1000,
-  });
+
 
   const stats = useMemo(() => {
     // Use the optimized goodsStats instead of separate china/ghana queries
@@ -230,20 +224,7 @@ export default function Dashboard() {
     });
   }, [containerData]);
 
-  // Transform recent activity data for the UI
-  const recentEvents = useMemo(() => {
-    if (!recentActivity?.data) return [];
-    
-    // Assuming recentActivity.data is an array of activity items
-    const activities = Array.isArray(recentActivity.data) ? recentActivity.data : [];
-    
-    return activities.map((activity: Record<string, unknown>) => ({
-      title: activity.title as string || activity.description as string || 'Activity',
-      detail: activity.detail as string || activity.message as string || '',
-      when: activity.timestamp as string || activity.created_at as string || activity.date as string,
-      status: activity.status as string || 'completed',
-    }));
-  }, [recentActivity]);
+
 
   type Row = {
     type: "sea" | "air";
@@ -338,7 +319,6 @@ export default function Dashboard() {
     queryClient.invalidateQueries({ queryKey: ["goods-stats"] });
     queryClient.invalidateQueries({ queryKey: ["containers-summary"] });
     queryClient.invalidateQueries({ queryKey: ["admin-user-stats"] });
-    queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
     queryClient.invalidateQueries({ queryKey: ["customer-claims"] });
   };
 
@@ -443,9 +423,9 @@ export default function Dashboard() {
       </div>
 
       {/* Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6">
+      <div className={`grid grid-cols-1 gap-4 lg:gap-6 ${isCustomer ? 'xl:grid-cols-3' : ''}`}>
         {/* Transiting Cargo */}
-        <div className="logistics-card xl:col-span-2">
+        <div className={`logistics-card ${isCustomer ? 'xl:col-span-2' : ''}`}>
           <div className="p-6 border-b border-border">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Cargo in Transit</h3>
@@ -516,57 +496,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Recent Activity - Only show for admin/manager users */}
-        {!isCustomer && (
-          <div>
-            <div className="logistics-card">
-              <div className="p-6 border-b border-border">
-                <h3 className="text-lg font-semibold">Recent Activity</h3>
-              </div>
-              <div className="p-6">
-                {loadingRecent ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        <Skeleton className="w-2 h-2 rounded-full mt-2" />
-                        <div className="flex-1">
-                          <Skeleton className="h-4 w-40 mb-2" />
-                          <Skeleton className="h-3 w-24" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {recentEvents.length > 0 ? recentEvents.map((e, index) => (
-                      <div key={index} className="flex items-start gap-3">
-                        <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{e.title}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {e.detail}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-muted-foreground">
-                              {e.when  
-                                ? new Date(e.when).toLocaleDateString()
-                                : ""}
-                            </span>
-                            <StatusBadge status={e.status === 'completed' ? 'completed' : 'pending'} />
-                          </div>
-                        </div>
-                      </div>
-                    )) : (
-                      <div className="text-center text-muted-foreground">
-                        No recent activity
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+
         
         {/* Customer-specific quick actions */}
         {isCustomer && (
@@ -617,9 +547,6 @@ export default function Dashboard() {
             });
             queryClient.invalidateQueries({ 
               queryKey: ["admin-user-stats"] 
-            });
-            queryClient.invalidateQueries({ 
-              queryKey: ["recent-activity"] 
             });
           }
         }}
