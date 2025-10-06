@@ -290,6 +290,29 @@ class ContainerItemsCreateView(APIView):
             # Track customers that need summary updates
             customers_to_update = set()
             
+            # OPTIMIZATION: Batch fetch all existing customers in one query
+            batch_start = time.time()
+            customer_ids_to_fetch = []
+            for mapping in resolved_mappings:
+                action = (mapping or {}).get('action')
+                if action == 'map_existing':
+                    customer_id = mapping.get('customer_id')
+                    if customer_id:
+                        customer_ids_to_fetch.append(customer_id)
+            
+            # Fetch all customers in one query
+            existing_customers = {}
+            if customer_ids_to_fetch:
+                existing_customers = {
+                    c.id: c for c in CustomerUser.objects.filter(id__in=customer_ids_to_fetch)
+                }
+            
+            logger.info(
+                "Batch fetched %d customers in %.2f seconds",
+                len(existing_customers),
+                time.time() - batch_start
+            )
+            
             # First, resolve all customers (create new ones if needed)
             customer_map = {}  # mapping index -> customer object
             for idx, mapping in enumerate(resolved_mappings):
@@ -318,10 +341,11 @@ class ContainerItemsCreateView(APIView):
                             })
                             continue
 
-                        try:
-                            customer = CustomerUser.objects.get(id=customer_id)
+                        # Use pre-fetched customer from batch query
+                        customer = existing_customers.get(customer_id)
+                        if customer:
                             customer_map[idx] = customer
-                        except CustomerUser.DoesNotExist:
+                        else:
                             errors.append({
                                 'error': f"Customer with id {customer_id} not found",
                                 'mapping': mapping,
@@ -414,10 +438,17 @@ class ContainerItemsCreateView(APIView):
             
             # Bulk create cargo items in a single transaction
             if items_to_create:
+                bulk_create_start = time.time()
                 try:
                     with transaction.atomic():
                         cargo_items_bulk = [item[0] for item in items_to_create]
                         CargoItem.objects.bulk_create(cargo_items_bulk)
+                        
+                        logger.info(
+                            "Bulk created %d cargo items in %.2f seconds",
+                            len(cargo_items_bulk),
+                            time.time() - bulk_create_start
+                        )
                         
                         # Track created items for response
                         for cargo_item, customer, source_row, action in items_to_create:
@@ -454,13 +485,46 @@ class ContainerItemsCreateView(APIView):
             
             # Update summaries for affected customers (batch operation)
             if customers_to_update:
+                summary_start = time.time()
                 try:
-                    for customer_id in customers_to_update:
-                        summary, _ = ClientShipmentSummary.objects.get_or_create(
+                    # Batch fetch existing summaries
+                    existing_summaries = {
+                        (s.container_id, s.client_id): s
+                        for s in ClientShipmentSummary.objects.filter(
                             container=container,
-                            client_id=customer_id
+                            client_id__in=customers_to_update
                         )
+                    }
+                    
+                    # Create missing summaries in bulk
+                    summaries_to_create = []
+                    for customer_id in customers_to_update:
+                        key = (container.id, customer_id)
+                        if key not in existing_summaries:
+                            summaries_to_create.append(
+                                ClientShipmentSummary(
+                                    container=container,
+                                    client_id=customer_id
+                                )
+                            )
+                    
+                    if summaries_to_create:
+                        ClientShipmentSummary.objects.bulk_create(summaries_to_create)
+                    
+                    # Update all summaries
+                    all_summaries = ClientShipmentSummary.objects.filter(
+                        container=container,
+                        client_id__in=customers_to_update
+                    )
+                    
+                    for summary in all_summaries:
                         summary.update_totals()
+                    
+                    logger.info(
+                        "Updated %d client summaries in %.2f seconds",
+                        len(customers_to_update),
+                        time.time() - summary_start
+                    )
                 except Exception as exc:
                     logger.error(
                         "Error updating client shipment summaries: %s",
