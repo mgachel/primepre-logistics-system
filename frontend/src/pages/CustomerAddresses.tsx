@@ -90,16 +90,6 @@ const AddressCard = ({ address, shippingMark }: { address: WarehouseAddress, shi
             </Button>
           </div>
         </div>
-
-        {/* Created Date */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-sm">Created</span>
-          </div>
-          <p className="text-sm text-muted-foreground pl-6">
-            {new Date(address.created_at).toLocaleDateString()}
-          </p>
-        </div>
       </CardContent>
     </Card>
   );
@@ -232,9 +222,6 @@ export default function CustomerAddresses() {
           <div className="flex gap-2 justify-center">
             <Button variant="outline" size="sm">
               Contact Support
-            </Button>
-            <Button variant="outline" size="sm">
-              Contact Form
             </Button>
           </div>
         </CardContent>

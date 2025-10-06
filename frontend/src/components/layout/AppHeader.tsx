@@ -12,7 +12,7 @@ import {
 import { User, ChevronDown } from 'lucide-react';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthStore } from '@/stores/authStore';
 
 interface AppHeaderProps {
   sidebarCollapsed: boolean;
@@ -23,10 +23,18 @@ interface AppHeaderProps {
 
 export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen }: AppHeaderProps) {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuthStore();
 
-  const handleLogout = async () => {
-    await logout();
+  // Debug: Log user info
+  console.log('AppHeader User Info:', {
+    user_role: user?.user_role,
+    shipping_mark: user?.shipping_mark,
+    full_name: user?.full_name,
+    is_customer: user?.user_role?.toUpperCase() === 'CUSTOMER'
+  });
+
+  const handleLogout = () => {
+    logout();
     navigate('/login');
   };
 
@@ -87,11 +95,8 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
         )}
 
         {/* Search */}
-        <div className={cn("flex-1", isMobile ? "ml-2" : "max-w-md")}> 
-          <div className="flex items-center">
-            <GlobalSearch />
-            <span className="ml-2 hidden md:inline text-xs text-muted-foreground">Search tracking IDs, clients, containers, routes</span>
-          </div>
+        <div className={cn("flex-1", isMobile ? "ml-2 mr-2" : "mx-4 max-w-2xl")}> 
+          <GlobalSearch variant="inline" />
         </div>
 
         {/* Actions */}
@@ -109,8 +114,18 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
                   <User className="h-4 w-4 text-primary-foreground" />
                 </div>
                 <div className="hidden md:block text-left">
-                  <div className="text-sm font-medium">{user?.full_name || `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || 'User'}</div>
-                  <div className="text-xs text-muted-foreground">{user?.email || 'user@example.com'}</div>
+                  <div className="text-sm font-medium">
+                    {user?.user_role?.toUpperCase() === 'CUSTOMER' 
+                      ? (user?.shipping_mark || user?.full_name || `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || 'Customer')
+                      : (user?.user_role?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()) || 'Staff')
+                    }
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {user?.user_role?.toUpperCase() === 'CUSTOMER' 
+                      ? (user?.full_name || `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || 'Customer')
+                      : (user?.full_name || `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || user?.email || 'Staff Member')
+                    }
+                  </div>
                 </div>
                 <ChevronDown className="h-4 w-4" />
               </Button>

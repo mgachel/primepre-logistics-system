@@ -80,7 +80,11 @@ function GoodsReceivedCard({
   );
 }
 
-export function GlobalSearch() {
+interface GlobalSearchProps {
+  variant?: 'button' | 'inline';
+}
+
+export function GlobalSearch({ variant = 'button' }: GlobalSearchProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
@@ -288,13 +292,25 @@ export function GlobalSearch() {
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label="Search by tracking number"
-          >
-            <Search className="h-4 w-4" />
-          </Button>
+          {variant === 'inline' ? (
+            <div className="relative w-full cursor-pointer">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search"
+                className="w-full h-10 pl-10 pr-4 bg-muted/50 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all cursor-pointer hover:bg-muted/70"
+                readOnly
+              />
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Search by tracking number"
+            >
+              <Search className="h-4 w-4" />
+            </Button>
+          )}
         </DialogTrigger>
 
         <DialogContent className="w-[95vw] max-w-6xl max-h-[90vh] overflow-hidden">
@@ -424,7 +440,7 @@ export function GlobalSearch() {
                     Global Tracking Search
                   </h3>
                   <p className="text-muted-foreground">
-                    Enter a tracking number or shipping mark to search across all shipments
+                    Enter a tracking number to search across all shipments
                   </p>
                 </div>
               )}

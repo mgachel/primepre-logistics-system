@@ -170,7 +170,6 @@ export default function Clients() {
     queryClient.invalidateQueries({ queryKey: ["goods-stats"] });
     queryClient.invalidateQueries({ queryKey: ["containers-summary"] });
     queryClient.invalidateQueries({ queryKey: ["admin-user-stats"] });
-    queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
     queryClient.invalidateQueries({ queryKey: ["customer-claims"] });
     loadClients();
   }, [queryClient, loadClients]);
