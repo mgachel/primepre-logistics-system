@@ -3,6 +3,7 @@ import {
   Search,
   Plus,
   Eye,
+  Edit,
   Trash2,
   Mail,
   History,
@@ -23,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NewClientDialog } from "@/components/dialogs/NewClientDialog";
+import { EditClientDialog } from "@/components/dialogs/EditClientDialog";
 import { SendMessageDialog } from "@/components/dialogs/SendMessageDialog";
 import { CustomerExcelUploadDialog } from "@/components/dialogs/CustomerExcelUploadDialog";
 import { useQueryClient } from "@tanstack/react-query";
@@ -51,6 +53,7 @@ export default function Clients() {
   const [showNewClientDialog, setShowNewClientDialog] = useState(false);
   const [showExcelUploadDialog, setShowExcelUploadDialog] = useState(false);
   const [showSendMessageDialog, setShowSendMessageDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [selectedUserForMessage, setSelectedUserForMessage] =
     useState<User | null>(null);
   const [detailsUser, setDetailsUser] = useState<User | null>(null);
@@ -261,26 +264,26 @@ export default function Clients() {
       sticky: true,
     },
     {
+      id: "shipping_mark",
+      header: "Shipping Mark",
+      accessor: (c) => (
+        <div className="font-mono text-sm font-medium bg-primary/10 px-2 py-1 rounded">
+          {c.shipping_mark}
+        </div>
+      ),
+      sort: (a, b) => (a.shipping_mark || "").localeCompare(b.shipping_mark || ""),
+      sticky: true,
+    },
+    {
       id: "name",
       header: "Client",
       accessor: (c) => (
         <div>
-          <div
-            className="font-medium underline cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              setDetailsUser(c._raw);
-              setDetailsOpen(true);
-            }}
-          >
-            {c.name}
-          </div>
+          <div className="font-medium">{c.name}</div>
           <div className="text-sm text-muted-foreground">{c.email}</div>
         </div>
       ),
       sort: (a, b) => a.name.localeCompare(b.name),
-      sticky: true,
-      clickable: true,
     },
     {
       id: "contact",
@@ -298,16 +301,6 @@ export default function Clients() {
         </div>
       ),
       sort: (a, b) => (a.company_name || "").localeCompare(b.company_name || ""),
-    },
-    {
-      id: "shipping_mark",
-      header: "Shipping Mark",
-      accessor: (c) => (
-        <div className="font-mono text-sm bg-muted px-2 py-1 rounded">
-          {c.shipping_mark}
-        </div>
-      ),
-      sort: (a, b) => (a.shipping_mark || "").localeCompare(b.shipping_mark || ""),
     },
     {
       id: "region",
@@ -496,6 +489,15 @@ export default function Clients() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
+                  setDetailsUser(row._raw);
+                  setShowEditDialog(true);
+                }}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Client
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
                   setSelectedUserForMessage(row._raw);
                   setShowSendMessageDialog(true);
                 }}
@@ -563,10 +565,6 @@ export default function Clients() {
               </DropdownMenuItem>
             </>
           )}
-          onRowClick={(row) => {
-            setDetailsUser(row._raw);
-            setDetailsOpen(true);
-          }}
           pagination={{
             page,
             pageSize,
@@ -728,6 +726,13 @@ export default function Clients() {
       <NewClientDialog
         open={showNewClientDialog}
         onOpenChange={setShowNewClientDialog}
+      />
+
+      <EditClientDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        client={detailsUser}
+        onSuccess={handleRefresh}
       />
 
       <CustomerExcelUploadDialog
