@@ -220,14 +220,6 @@ export default function AirCargo() {
   const cols = useMemo(() => {
     const allCols: Column<BackendCargoContainer>[] = [
       {
-        id: "created_at",
-        header: "Created",
-        accessor: () => "",
-        sort: (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        width: "0px",
-      },
-      {
         id: "container",
         header: "Airway Bill No.",
         accessor: (c) => <span className="font-medium">{c.container_id}</span>,
@@ -446,7 +438,7 @@ export default function AirCargo() {
           rows={filteredCargo}
           columns={cols}
           loading={loading}
-          defaultSort={{ column: "created_at", direction: "desc" }}
+          defaultSort={{ column: "container", direction: "desc" }}
           empty={<p className="text-muted-foreground">No air cargo yet.</p>}
           rowActions={(row) =>
             isCustomer ? (
