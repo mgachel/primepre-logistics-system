@@ -220,6 +220,9 @@ class ContainerItemsCreateView(APIView):
             "resolved_mappings": [...] // Admin resolution for unmatched items
         }
         """
+        import time
+        start_time = time.time()
+        
         logger.info(
             "ContainerItemsCreateView received request from user %s",
             getattr(request.user, 'id', 'anonymous')
@@ -228,6 +231,13 @@ class ContainerItemsCreateView(APIView):
             container_id = request.data.get('container_id')
             matched_items = request.data.get('matched_items', [])
             resolved_mappings = request.data.get('resolved_mappings', [])
+            
+            logger.info(
+                "Processing %d matched items and %d resolved mappings for container %s",
+                len(matched_items),
+                len(resolved_mappings),
+                container_id
+            )
             
             # Validate request size to prevent memory issues
             total_items = len(matched_items) + len(resolved_mappings)
@@ -276,7 +286,12 @@ class ContainerItemsCreateView(APIView):
                         'type': 'matched_items_batch_error'
                     })
 
-            # Process resolved mappings (each in its own transaction)
+            # Process resolved mappings in batches for better performance
+            # Track customers that need summary updates
+            customers_to_update = set()
+            
+            # First, resolve all customers (create new ones if needed)
+            customer_map = {}  # mapping index -> customer object
             for idx, mapping in enumerate(resolved_mappings):
                 try:
                     action = (mapping or {}).get('action')
@@ -293,109 +308,174 @@ class ContainerItemsCreateView(APIView):
                         })
                         continue
 
-                    # Each mapping gets its own transaction to prevent deadlocks
-                    with transaction.atomic():
-                        if action == 'map_existing':
-                            customer_id = mapping.get('customer_id')
-                            if not customer_id:
-                                errors.append({
-                                    'error': 'Customer ID is required when mapping to an existing customer',
-                                    'mapping': mapping,
-                                    'source_row_number': source_row
-                                })
-                                continue
-
-                            try:
-                                customer = CustomerUser.objects.get(id=customer_id)
-                            except CustomerUser.DoesNotExist:
-                                errors.append({
-                                    'error': f"Customer with id {customer_id} not found",
-                                    'mapping': mapping,
-                                    'source_row_number': source_row
-                                })
-                                continue
-                        elif action == 'create_new':
-                            try:
-                                customer_payload = dict(mapping.get('new_customer_data', {}))
-                                if candidate.get('shipping_mark_normalized') and not customer_payload.get('shipping_mark'):
-                                    customer_payload['shipping_mark'] = candidate['shipping_mark_normalized']
-
-                                customer = create_customer_from_data(
-                                    customer_payload,
-                                    request.user if hasattr(request, 'user') and request.user.is_authenticated else None
-                                )
-                            except Exception as exc:
-                                errors.append({
-                                    'error': str(exc),
-                                    'mapping': mapping,
-                                    'source_row_number': source_row
-                                })
-                                continue
-                        else:
+                    if action == 'map_existing':
+                        customer_id = mapping.get('customer_id')
+                        if not customer_id:
                             errors.append({
-                                'error': f'Unknown action "{action}" in resolved mapping',
+                                'error': 'Customer ID is required when mapping to an existing customer',
                                 'mapping': mapping,
                                 'source_row_number': source_row
                             })
                             continue
 
-                        cbm_value = candidate.get('cbm')
-                        if cbm_value is not None:
-                            try:
-                                cbm_value = float(cbm_value)
-                            except (TypeError, ValueError):
-                                cbm_value = None
+                        try:
+                            customer = CustomerUser.objects.get(id=customer_id)
+                            customer_map[idx] = customer
+                        except CustomerUser.DoesNotExist:
+                            errors.append({
+                                'error': f"Customer with id {customer_id} not found",
+                                'mapping': mapping,
+                                'source_row_number': source_row
+                            })
+                            continue
+                            
+                    elif action == 'create_new':
+                        try:
+                            customer_payload = dict(mapping.get('new_customer_data', {}))
+                            if candidate.get('shipping_mark_normalized') and not customer_payload.get('shipping_mark'):
+                                customer_payload['shipping_mark'] = candidate['shipping_mark_normalized']
 
-                        cargo_item = CargoItem(
-                            container=container,
-                            client=customer,
-                            tracking_id=candidate.get('tracking_number') or '',
-                            item_description=candidate.get('description') or '',
-                            quantity=candidate.get('quantity') or 0,
-                            cbm=cbm_value
-                        )
-                        cargo_item.save()
-
-                        summary, _ = ClientShipmentSummary.objects.get_or_create(
-                            container=container,
-                            client=customer
-                        )
-                        summary.update_totals()
-
-                        created_items.append({
-                            'cargo_item_id': str(cargo_item.id),
-                            'tracking_id': cargo_item.tracking_id,
-                            'source_row_number': source_row,
-                            'customer_name': customer.get_full_name() or customer.phone,
-                            'action_taken': action
+                            customer = create_customer_from_data(
+                                customer_payload,
+                                request.user if hasattr(request, 'user') and request.user.is_authenticated else None
+                            )
+                            customer_map[idx] = customer
+                        except Exception as exc:
+                            errors.append({
+                                'error': str(exc),
+                                'mapping': mapping,
+                                'source_row_number': source_row
+                            })
+                            continue
+                    else:
+                        errors.append({
+                            'error': f'Unknown action "{action}" in resolved mapping',
+                            'mapping': mapping,
+                            'source_row_number': source_row
                         })
-
-                except IntegrityError as exc:
-                    logger.warning(
-                        "Integrity error while creating cargo item for container %s row %s: %s",
-                        container_id,
-                        source_row,
-                        exc,
-                    )
-                    errors.append({
-                        'error': 'Integrity error while creating cargo item',
-                        'details': str(exc),
-                        'mapping': mapping,
-                        'source_row_number': source_row
-                    })
+                        continue
+                        
                 except Exception as exc:
                     logger.error(
-                        "Error creating cargo item from resolved mapping for container %s row %s: %s",
-                        container_id,
-                        source_row,
+                        "Error resolving customer for mapping %s: %s",
+                        idx,
                         exc,
-                        exc_info=True,
+                        exc_info=True
                     )
                     errors.append({
                         'error': str(exc),
-                        'mapping': mapping,
-                        'source_row_number': source_row
+                        'mapping': mapping
                     })
+            
+            # Now batch create cargo items
+            items_to_create = []
+            for idx, mapping in enumerate(resolved_mappings):
+                try:
+                    if idx not in customer_map:
+                        continue
+                    
+                    action = (mapping or {}).get('action')
+                    if action == 'skip':
+                        continue
+                        
+                    customer = customer_map[idx]
+                    candidate = (mapping or {}).get('candidate') or {}
+                    source_row = candidate.get('source_row_number')
+                    
+                    cbm_value = candidate.get('cbm')
+                    if cbm_value is not None:
+                        try:
+                            cbm_value = float(cbm_value)
+                        except (TypeError, ValueError):
+                            cbm_value = None
+
+                    cargo_item = CargoItem(
+                        container=container,
+                        client=customer,
+                        tracking_id=candidate.get('tracking_number') or '',
+                        item_description=candidate.get('description') or '',
+                        quantity=candidate.get('quantity') or 0,
+                        cbm=cbm_value
+                    )
+                    items_to_create.append((cargo_item, customer, source_row, action))
+                    customers_to_update.add(customer.id)
+                    
+                except Exception as exc:
+                    logger.error(
+                        "Error preparing cargo item from resolved mapping %s: %s",
+                        idx,
+                        exc,
+                        exc_info=True
+                    )
+                    errors.append({
+                        'error': str(exc),
+                        'mapping': mapping
+                    })
+            
+            # Bulk create cargo items in a single transaction
+            if items_to_create:
+                try:
+                    with transaction.atomic():
+                        cargo_items_bulk = [item[0] for item in items_to_create]
+                        CargoItem.objects.bulk_create(cargo_items_bulk)
+                        
+                        # Track created items for response
+                        for cargo_item, customer, source_row, action in items_to_create:
+                            created_items.append({
+                                'cargo_item_id': str(cargo_item.id),
+                                'tracking_id': cargo_item.tracking_id,
+                                'source_row_number': source_row,
+                                'customer_name': customer.get_full_name() or customer.phone,
+                                'action_taken': action
+                            })
+                except IntegrityError as exc:
+                    logger.error(
+                        "Integrity error during bulk cargo item creation for container %s: %s",
+                        container_id,
+                        exc,
+                        exc_info=True
+                    )
+                    errors.append({
+                        'error': 'Integrity error while creating cargo items in bulk',
+                        'details': str(exc),
+                        'type': 'bulk_create_error'
+                    })
+                except Exception as exc:
+                    logger.error(
+                        "Error during bulk cargo item creation for container %s: %s",
+                        container_id,
+                        exc,
+                        exc_info=True
+                    )
+                    errors.append({
+                        'error': str(exc),
+                        'type': 'bulk_create_error'
+                    })
+            
+            # Update summaries for affected customers (batch operation)
+            if customers_to_update:
+                try:
+                    for customer_id in customers_to_update:
+                        summary, _ = ClientShipmentSummary.objects.get_or_create(
+                            container=container,
+                            client_id=customer_id
+                        )
+                        summary.update_totals()
+                except Exception as exc:
+                    logger.error(
+                        "Error updating client shipment summaries: %s",
+                        exc,
+                        exc_info=True
+                    )
+                    # Don't fail the request if summary update fails
+            
+            elapsed_time = time.time() - start_time
+            logger.info(
+                "ContainerItemsCreateView completed in %.2f seconds. Created: %d, Errors: %d",
+                elapsed_time,
+                len(created_items),
+                len(errors)
+            )
             
             return Response({
                 'success': True,
@@ -403,7 +483,8 @@ class ContainerItemsCreateView(APIView):
                 'errors': errors,
                 'statistics': {
                     'total_created': len(created_items),
-                    'total_errors': len(errors)
+                    'total_errors': len(errors),
+                    'processing_time_seconds': round(elapsed_time, 2)
                 }
             }, status=status.HTTP_201_CREATED)
             

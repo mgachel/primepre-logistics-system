@@ -126,7 +126,14 @@ class ApiClient {
     }
 
     try {
+      // Add timeout to prevent indefinite waiting (60 seconds for large uploads)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      
+      config.signal = controller.signal;
+
       let response = await fetch(url, config);
+      clearTimeout(timeoutId);
 
       // Handle 401 → attempt refresh
       if (response.status === 401) {
@@ -174,10 +181,26 @@ class ApiClient {
       return { data, success: true, message: "Success" };
     } catch (error) {
       console.error("API request failed:", error);
+      
+      // Better error messages for common issues
+      let errorMessage = "An error occurred";
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = "Request timed out. The server is taking too long to respond. Please try again with fewer items or contact support.";
+        } else if (error.message.includes('502')) {
+          errorMessage = "Server is temporarily unavailable (502 Bad Gateway). The backend service may be restarting or overloaded. Please wait a moment and try again.";
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('Load failed')) {
+          errorMessage = "Unable to connect to the server. Please check your internet connection and try again. If the problem persists, the backend service may be down.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       return {
         data: {} as T,
         success: false,
-        message: error instanceof Error ? error.message : "An error occurred",
+        message: errorMessage,
       };
     }
   }
@@ -209,7 +232,18 @@ class ApiClient {
       }
       if (parts.length) return parts.join(" | ");
     }
-    return `HTTP error! status: ${status}`;
+    
+    // Provide helpful messages for common HTTP errors
+    switch (status) {
+      case 502:
+        return "Server is temporarily unavailable (502 Bad Gateway). The backend service may be restarting or overloaded. Please wait a moment and try again.";
+      case 503:
+        return "Service temporarily unavailable (503). Please try again in a few moments.";
+      case 504:
+        return "Server timeout (504). The request took too long to process. Try uploading fewer items at once.";
+      default:
+        return `HTTP error! status: ${status}`;
+    }
   }
 
   // =============================
