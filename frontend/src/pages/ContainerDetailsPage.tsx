@@ -175,7 +175,7 @@ export default function ContainerDetailsPage() {
           shipping_mark: item.client_shipping_mark || "NO MARK",
           quantity: item.quantity || 0,
           cbm: item.cbm || 0,
-          tracking_number: item.tracking_id || "",
+          tracking_numbers: item.tracking_id ? [item.tracking_id] : [],
         })),
       };
 
@@ -278,7 +278,7 @@ export default function ContainerDetailsPage() {
           </p>
         </div>
         {!isCustomer && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm">
               <RefreshCcw className="h-4 w-4" /> Refresh
             </Button>

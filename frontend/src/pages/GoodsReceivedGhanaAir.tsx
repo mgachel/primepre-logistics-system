@@ -276,20 +276,20 @@ export default function GoodsReceivedGhanaAir() {
     },
     {
       id: "rates",
-      header: "Rates",
+      header: "Rates ($)",
       accessor: (row) => (
         <div className="text-sm font-medium">
-          {row.rates ? `¥${row.rates}` : "Not set"}
+          {row.rates ? `$${row.rates}` : "Not set"}
         </div>
       ),
       width: "100px",
     },
     {
       id: "dollar_rate",
-      header: "Dollar Rate",
+      header: "Dollar Rate (₵)",
       accessor: (row) => (
         <div className="text-sm font-medium">
-          {row.dollar_rate ? `$${row.dollar_rate}` : "Not set"}
+          {row.dollar_rate ? `₵${row.dollar_rate}` : "Not set"}
         </div>
       ),
       width: "110px",
