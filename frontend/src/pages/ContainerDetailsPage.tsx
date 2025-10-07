@@ -26,7 +26,7 @@ import {
 } from "@/services/cargoService";
 import { formatDate } from "@/lib/date";
 import { useAuthStore } from "@/stores/authStore";
-import { generatePackingListPDF } from "@/lib/pdfGenerator";
+import { generatePackingListPDF, generateClientListPDF } from "@/lib/pdfGenerator";
 
 export default function ContainerDetailsPage() {
   // ...existing code...
@@ -194,6 +194,39 @@ export default function ContainerDetailsPage() {
     }
   };
 
+  const handleDownloadClientListPDF = () => {
+    if (!container) return;
+
+    try {
+      // Map cargo items to the format expected by the PDF generator
+      const pdfData = {
+        containerNumber: container.container_id,
+        loadingDate: container.load_date || "",
+        eta: container.eta || "",
+        cargoType: container.cargo_type,
+        items: cargoItems.map(item => ({
+          shipping_mark: item.client_shipping_mark || "NO MARK",
+          quantity: item.quantity || 0,
+          cbm: item.cbm || 0,
+          tracking_numbers: item.tracking_id ? [item.tracking_id] : [],
+        })),
+      };
+
+      generateClientListPDF(pdfData);
+
+      toast({
+        title: "Client List PDF Generated",
+        description: "Client list has been downloaded successfully",
+      });
+    } catch (e: unknown) {
+      toast({
+        title: "PDF Generation Failed",
+        description: e instanceof Error ? e.message : "Failed to generate client list PDF",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Invoice generation removed - only available for goods received containers
 
   // Cargo items table columns (for expanded view)
@@ -287,6 +320,9 @@ export default function ContainerDetailsPage() {
             </Button>
             <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
               <FileDown className="h-4 w-4" /> Download PDF
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDownloadClientListPDF}>
+              <FileDown className="h-4 w-4" /> Client List PDF
             </Button>
             <ContainerExcelUploadButton
               containerId={containerId || ""}
