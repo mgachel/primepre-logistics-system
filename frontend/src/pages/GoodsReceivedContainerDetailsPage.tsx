@@ -407,19 +407,36 @@ export default function GoodsReceivedContainerDetailsPage() {
         <div className="font-mono text-sm">{item.supply_tracking}</div>
       ),
     },
-    {
-      id: "description",
-      header: "Description",
-      accessor: (item) => (
-        <div className="max-w-48 truncate">{item.description || "N/A"}</div>
-      ),
-    },
-    {
-      id: "quantity",
-      header: "Qty",
-      accessor: (item) => <div className="text-center">{item.quantity}</div>,
-      align: "center" as const,
-    },
+    // Length, Breadth, Height for sea goods received only
+    ...(container?.container_type === "sea"
+      ? [
+          {
+            id: "length",
+            header: "Length (cm)",
+            accessor: (item: GoodsReceivedItem) => (
+              <div className="text-center">{item.length || '-'}</div>
+            ),
+            align: "center" as const,
+          },
+          {
+            id: "breadth",
+            header: "Breadth (cm)",
+            accessor: (item: GoodsReceivedItem) => (
+              <div className="text-center">{item.breadth || '-'}</div>
+            ),
+            align: "center" as const,
+          },
+          {
+            id: "height",
+            header: "Height (cm)",
+            accessor: (item: GoodsReceivedItem) => (
+              <div className="text-center">{item.height || '-'}</div>
+            ),
+            align: "center" as const,
+          },
+        ]
+      : []),
+    // CBM for sea, Weight for air
     ...(container?.container_type === "sea"
       ? [
           {

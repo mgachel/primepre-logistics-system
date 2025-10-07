@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   MessageSquare,
   Upload,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ import { formatDate } from "@/lib/date";
 import { persistGet, persistSet } from "@/lib/persist";
 import { cargoService, BackendCargoItem } from "@/services/cargoService";
 import { useToast } from "@/hooks/use-toast";
+import { exportClientsToExcel } from "@/lib/excelExporter";
 
 export default function Clients() {
   const { toast } = useToast();
@@ -176,6 +178,51 @@ export default function Clients() {
     queryClient.invalidateQueries({ queryKey: ["customer-claims"] });
     loadClients();
   }, [queryClient, loadClients]);
+
+  const handleExportToExcel = useCallback(async () => {
+    try {
+      // Fetch ALL clients for export (not just current page)
+      const response = await adminService.getAllUsers({
+        user_role: "CUSTOMER",
+        ordering: "-date_joined",
+        page_size: 10000, // Get all clients
+      });
+
+      const allClients = response.data?.results || [];
+
+      if (allClients.length === 0) {
+        toast({
+          title: "No Clients",
+          description: "There are no clients to export",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Map to export format
+      const exportData = allClients.map(client => ({
+        shipping_mark: client.shipping_mark || '-',
+        first_name: client.first_name || '-',
+        last_name: client.last_name || '-',
+        email: client.email || '-',
+        phone: client.phone || '-',
+      }));
+
+      const filename = exportClientsToExcel(exportData);
+
+      toast({
+        title: "Export Successful",
+        description: `${allClients.length} clients exported to ${filename}`,
+      });
+    } catch (error) {
+      console.error("Failed to export clients:", error);
+      toast({
+        title: "Export Failed",
+        description: error instanceof Error ? error.message : "Failed to export clients",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
   // Load ALL shipments for the selected client when details drawer opens
   useEffect(() => {
@@ -349,7 +396,7 @@ export default function Clients() {
             Manage your clients and their information
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => setShowNewClientDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Client
@@ -360,6 +407,13 @@ export default function Clients() {
           >
             <Upload className="h-4 w-4 mr-2" />
             Upload Excel
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleExportToExcel}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download Excel
           </Button>
           <Button variant="outline" onClick={handleRefresh}>
             <RefreshCcw className="h-4 w-4 mr-2" />
