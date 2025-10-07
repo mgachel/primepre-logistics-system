@@ -7,6 +7,7 @@ import {
   Edit,
   Trash2,
   Search,
+  FileDown,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import {
 } from "@/services/cargoService";
 import { formatDate } from "@/lib/date";
 import { useAuthStore } from "@/stores/authStore";
+import { generatePackingListPDF } from "@/lib/pdfGenerator";
 
 export default function ContainerDetailsPage() {
   // ...existing code...
@@ -159,6 +161,39 @@ export default function ContainerDetailsPage() {
     }
   };
 
+  const handleDownloadPDF = () => {
+    if (!container) return;
+
+    try {
+      // Map cargo items to the format expected by the PDF generator
+      const pdfData = {
+        containerNumber: container.container_id,
+        loadingDate: container.load_date || "",
+        eta: container.eta || "",
+        cargoType: container.cargo_type,
+        items: cargoItems.map(item => ({
+          shipping_mark: item.client_shipping_mark || "NO MARK",
+          quantity: item.quantity || 0,
+          cbm: item.cbm || 0,
+          tracking_number: item.tracking_id || "",
+        })),
+      };
+
+      generatePackingListPDF(pdfData);
+
+      toast({
+        title: "PDF Generated",
+        description: "Packing list has been downloaded successfully",
+      });
+    } catch (e: unknown) {
+      toast({
+        title: "PDF Generation Failed",
+        description: e instanceof Error ? e.message : "Failed to generate PDF",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Invoice generation removed - only available for goods received containers
 
   // Cargo items table columns (for expanded view)
@@ -249,6 +284,9 @@ export default function ContainerDetailsPage() {
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowEditContainerDialog(true)}>
               <Edit className="h-4 w-4" /> Edit Container
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
+              <FileDown className="h-4 w-4" /> Download PDF
             </Button>
             <ContainerExcelUploadButton
               containerId={containerId || ""}
