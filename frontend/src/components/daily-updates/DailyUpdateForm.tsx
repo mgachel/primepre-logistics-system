@@ -22,7 +22,7 @@ const formSchema = z.object({
     .max(200, 'Title must be less than 200 characters'),
   content: z.string()
     .min(10, 'Content must be at least 10 characters long')
-    .max(5000, 'Content must be less than 5000 characters'),
+    .max(20000, 'Content must not exceed 20,000 characters'),
   priority: z.enum(['low', 'medium', 'high'], {
     required_error: 'Please select a priority level',
   }),
@@ -187,6 +187,7 @@ export function DailyUpdateForm({ initialData, onSubmit }: DailyUpdateFormProps)
           id="content"
           placeholder="Enter update content..."
           rows={6}
+          maxLength={20000}
           {...register('content')}
           className={cn(errors.content && 'border-red-500')}
         />

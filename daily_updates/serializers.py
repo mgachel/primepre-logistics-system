@@ -43,6 +43,10 @@ class DailyUpdateSerializer(serializers.ModelSerializer):
         """Validate content field"""
         if len(value.strip()) < 5:
             raise serializers.ValidationError("Content must be at least 5 characters long.")
+        if len(value.strip()) > 20000:
+            raise serializers.ValidationError(
+                f"Content must not exceed 20,000 characters. Current length: {len(value.strip())} characters."
+            )
         return value.strip()
 
     def validate_attachment(self, value):

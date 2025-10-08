@@ -560,7 +560,7 @@ class GoodsReceivedItemSerializer(serializers.ModelSerializer):
 class GoodsReceivedContainerSerializer(serializers.ModelSerializer):
     """Serializer for goods received containers."""
     
-    goods_items = GoodsReceivedItemSerializer(many=True, read_only=True)
+    goods_items = serializers.SerializerMethodField()
     items_by_shipping_mark = serializers.SerializerMethodField()
     
     class Meta:
@@ -573,9 +573,38 @@ class GoodsReceivedContainerSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['container_id', 'total_weight', 'total_cbm', 'total_items_count', 'created_at', 'updated_at']
     
+    def get_goods_items(self, obj):
+        """Get goods items, filtered by search query if present in context."""
+        items = obj.goods_items.all()
+        
+        # If search query is present in context, filter items
+        search_query = self.context.get('search_query', None)
+        if search_query:
+            from django.db.models import Q
+            items = items.filter(
+                Q(shipping_mark__icontains=search_query) |
+                Q(supply_tracking__icontains=search_query) |
+                Q(description__icontains=search_query) |
+                Q(customer_name__icontains=search_query)
+            )
+        
+        return GoodsReceivedItemSerializer(items, many=True).data
+    
     def get_items_by_shipping_mark(self, obj):
         """Group items by shipping mark for organized display."""
         items = obj.goods_items.all()
+        
+        # If search query is present in context, filter items
+        search_query = self.context.get('search_query', None)
+        if search_query:
+            from django.db.models import Q
+            items = items.filter(
+                Q(shipping_mark__icontains=search_query) |
+                Q(supply_tracking__icontains=search_query) |
+                Q(description__icontains=search_query) |
+                Q(customer_name__icontains=search_query)
+            )
+        
         grouped = {}
         
         for item in items:
