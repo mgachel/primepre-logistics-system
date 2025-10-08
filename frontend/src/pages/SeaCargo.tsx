@@ -4,6 +4,7 @@ import {
   Search,
   Plus,
   Ship,
+  Plane,
   Calendar,
   Package,
   RefreshCcw,
@@ -331,6 +332,24 @@ export default function SeaCargo() {
 
   return (
     <div className="space-y-6">
+      {/* Cargo Type Navigation Tabs */}
+      <div className="flex gap-2 border-b border-border pb-2">
+        <button
+          onClick={() => navigate(isCustomer ? '/customer/cargo/sea' : '/cargos/sea')}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground"
+        >
+          <Ship className="h-4 w-4" />
+          Sea Goods
+        </button>
+        <button
+          onClick={() => navigate(isCustomer ? '/customer/cargo/air' : '/cargos/air')}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+        >
+          <Plane className="h-4 w-4" />
+          Air Goods
+        </button>
+      </div>
+
       {/* Page Header */}
       <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>

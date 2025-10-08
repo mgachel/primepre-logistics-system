@@ -143,11 +143,12 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
     <div
       className={cn(
         "fixed left-0 top-0 h-full bg-gray-200 border-r border-border transition-all duration-300",
-        isMobile 
+        isMobile
           ? mobileMenuOpen ? "w-sidebar z-50" : "-translate-x-full z-30"
-          : isCollapsed ? "w-sidebar-collapsed z-30" : "w-sidebar z-30",
+          : isCollapsed ? "w-16 sm:w-20 md:w-sidebar-collapsed z-30" : "w-sidebar z-30",
         "md:z-30"
       )}
+      style={isMobile && !mobileMenuOpen ? { display: 'none' } : {}}
     >
       {/* Header */}
       <div className="flex h-16 items-center justify-between px-4 border-b border-border">
@@ -156,18 +157,15 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
             <img src="/primepre-logo-1.png" alt="PRIMEPRE" className="h-8" />
           )}
         </div>
+        {/* Replace collapsed sidebar expand button with Start button */}
         {!isMobile ? (
           <button
             onClick={onToggle}
-            className="p-2 rounded-md hover:bg-muted transition-colors"
+            className="p-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/80 transition-colors"
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {isCollapsed ? (
-              <Menu className="h-4 w-4" />
-            ) : (
-              <X className="h-4 w-4" />
-            )}
+            {isCollapsed ? "Start" : <X className="h-4 w-4" />}
           </button>
         ) : (
           <button
