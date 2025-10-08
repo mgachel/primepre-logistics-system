@@ -109,13 +109,15 @@ export function GlobalSearch({ variant = 'button' }: GlobalSearchProps) {
       setLoading(true);
       try {
         // Search both goods received (Ghana containers + China items) and cargo simultaneously
+        // Backend now handles comprehensive search across all relevant fields
         const [ghanaSeaRes, ghanaAirRes, chinaSeaRes, chinaAirRes, cargoRes] = await Promise.all([
-          // Ghana uses container architecture
+          // Ghana uses container architecture - backend searches container_id, notes, and ALL nested item fields
           goodsReceivedContainerService.getGhanaSeaContainers({ search: q, page_size: 100 }),
           goodsReceivedContainerService.getGhanaAirContainers({ search: q, page_size: 100 }),
-          // China uses individual items
+          // China uses individual items - backend searches supply_tracking, description, shipping_mark, supplier_name, customer_name
           warehouseService.getChinaSeaGoods({ search: q, page_size: 100 }),
           warehouseService.getChinaAirGoods({ search: q, page_size: 100 }),
+          // Cargo - backend searches tracking_id, supplier_tracking, item_description, container_id, shipping_mark, names
           cargoService.searchShipments(q)
         ]);
 
@@ -132,20 +134,9 @@ export function GlobalSearch({ variant = 'button' }: GlobalSearchProps) {
           
           console.log('🚢 GHANA SEA CONTAINERS COUNT:', ghanaSeaContainers.length);
           console.log('✈️ GHANA AIR CONTAINERS COUNT:', ghanaAirContainers.length);
-          console.log('First Ghana Sea Container:', ghanaSeaContainers[0]);
-          console.log('First Ghana Air Container:', ghanaAirContainers[0]);
-          
-          // Log the full structure of the first container to see the exact format
-          if (ghanaSeaContainers.length > 0) {
-            console.log('Full Ghana Sea Container structure:', JSON.stringify(ghanaSeaContainers[0], null, 2));
-          }
-          if (ghanaAirContainers.length > 0) {
-            console.log('Full Ghana Air Container structure:', JSON.stringify(ghanaAirContainers[0], null, 2));
-          }
           
           const ghanaSeaItems = ghanaSeaContainers.reduce((items: any[], container: any) => {
             console.log('Processing Ghana Sea container:', container);
-            console.log('Container goods_items:', container.goods_items);
             if (container.goods_items && Array.isArray(container.goods_items)) {
               const itemsWithLocation = container.goods_items.map((item: any) => ({
                 ...item,
@@ -160,7 +151,6 @@ export function GlobalSearch({ variant = 'button' }: GlobalSearchProps) {
           
           const ghanaAirItems = ghanaAirContainers.reduce((items: any[], container: any) => {
             console.log('Processing Ghana Air container:', container);
-            console.log('Container goods_items:', container.goods_items);
             if (container.goods_items && Array.isArray(container.goods_items)) {
               const itemsWithLocation = container.goods_items.map((item: any) => ({
                 ...item,
@@ -186,56 +176,15 @@ export function GlobalSearch({ variant = 'button' }: GlobalSearchProps) {
             method_of_shipping: 'AIR'
           }));
           
-          // Combine all goods received items
+          // Combine all goods received items - backend already filtered, no need for frontend filtering
           const allGoodsArray = [...ghanaSeaItems, ...ghanaAirItems, ...chinaSeaItems, ...chinaAirItems];
           
-          if (allGoodsArray.length > 0) {
-            console.log('First goods received item structure:', allGoodsArray[0]);
-            console.log('All field names in first goods received item:', Object.keys(allGoodsArray[0]));
-          }
-          console.log('All goods array length:', allGoodsArray.length);
+          console.log('✅ Total goods received items found:', allGoodsArray.length);
+          console.log('✅ Total cargo items found:', cargoRes.length);
 
-          // Handle goods received results
-          
-          // Filter goods received by search query (match tracking numbers, shipping marks, and descriptions)
-          const filteredGoods = allGoodsArray.filter((item: any) => {
-            const searchLower = q.toLowerCase();
-            // Search in supply_tracking, shipping_mark, and description fields
-            const supplyTrackingMatch = item.supply_tracking?.toLowerCase().includes(searchLower);
-            const shippingMarkMatch = item.shipping_mark?.toLowerCase().includes(searchLower);
-            const descriptionMatch = item.description?.toLowerCase().includes(searchLower);
-            
-            console.log('Filtering goods received item:', {
-              item: item,
-              searchTerm: searchLower,
-              supply_tracking: item.supply_tracking,
-              shipping_mark: item.shipping_mark,
-              description: item.description,
-              warehouseLocation: item.warehouseLocation,
-              supplyTrackingMatch,
-              shippingMarkMatch,
-              descriptionMatch,
-              willInclude: supplyTrackingMatch || shippingMarkMatch || descriptionMatch
-            });
-            
-            return supplyTrackingMatch || shippingMarkMatch || descriptionMatch;
-          });
-
-          // Filter cargo results to only show items that match the search query
-          const filteredCargo = cargoRes.filter(item => {
-            const searchLower = q.toLowerCase();
-            const trackingMatch = item.trackingNumber?.toLowerCase().includes(searchLower);
-            const supplyTrackingMatch = item.supplierTrackingNumber?.toLowerCase().includes(searchLower);
-            const shippingMarkMatch = item.shippingMark?.toLowerCase().includes(searchLower);
-            
-            return trackingMatch || supplyTrackingMatch || shippingMarkMatch;
-          });
-          
-          console.log('Filtered Goods Received:', filteredGoods);
-          console.log('Filtered Cargo:', filteredCargo);
-
-          setGoodsReceivedResults(filteredGoods);
-          setCargoResults(filteredCargo);
+          // Backend already performed comprehensive search, so we trust the results
+          setGoodsReceivedResults(allGoodsArray);
+          setCargoResults(cargoRes);
         }
       } catch (error) {
         console.error('Search error:', error);

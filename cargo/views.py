@@ -482,7 +482,17 @@ class CustomerCargoContainerViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CargoContainerSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['cargo_type', 'status', 'location', 'warehouse_type']
-    search_fields = ['container_id', 'route', 'cargo_items__tracking_id', 'cargo_items__client__shipping_mark']
+    # Enhanced search fields for comprehensive tracking number search across containers and items
+    search_fields = [
+        'container_id', 
+        'route', 
+        'cargo_items__tracking_id',
+        'cargo_items__supplier_tracking',
+        'cargo_items__item_description',
+        'cargo_items__client__shipping_mark',
+        'cargo_items__client__first_name',
+        'cargo_items__client__last_name',
+    ]
     ordering_fields = ['load_date', 'eta', 'created_at', 'stay_days', 'delay_days']
     ordering = ['-load_date', '-created_at']
 
@@ -591,7 +601,16 @@ class CustomerCargoItemViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CargoItemSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['status']
-    search_fields = ['tracking_id', 'item_description', 'container__container_id']
+    # Enhanced search fields for comprehensive tracking number search
+    search_fields = [
+        'tracking_id',
+        'supplier_tracking', 
+        'item_description', 
+        'container__container_id',
+        'client__shipping_mark',
+        'client__first_name',
+        'client__last_name',
+    ]
     ordering_fields = ['created_at', 'updated_at', 'quantity']
     ordering = ['-created_at']
 

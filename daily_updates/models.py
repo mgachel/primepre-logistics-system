@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxLengthValidator
 
 class DailyUpdate(models.Model):
     PRIORITY_CHOICES = [
@@ -10,7 +11,10 @@ class DailyUpdate(models.Model):
     ]
 
     title = models.CharField(max_length=200, help_text="Brief title for the daily update")
-    content = models.TextField(help_text="Detailed content of the update")
+    content = models.TextField(
+        validators=[MaxLengthValidator(20000)],
+        help_text="Detailed content of the update (max 20,000 characters)"
+    )
     priority = models.CharField(
         max_length=10,
         choices=PRIORITY_CHOICES,

@@ -47,7 +47,13 @@ class BaseGoodsReceivedViewSet(viewsets.ModelViewSet):
 
     # generic safe filters/search/order (fields present in both models)
     filterset_fields = ['status', 'shipping_mark', 'supply_tracking']
-    search_fields = ['shipping_mark', 'supply_tracking', 'description']
+    # Enhanced search fields for comprehensive tracking number search
+    # Note: Fields like customer__first_name will only work for models with customer FK (China)
+    search_fields = [
+        'shipping_mark', 
+        'supply_tracking', 
+        'description',
+    ]
     ordering_fields = ['date_received', 'created_at', 'status', 'cbm', 'weight']
     ordering = ['-date_received']
 
@@ -673,6 +679,17 @@ class GoodsReceivedChinaViewSet(BaseGoodsReceivedViewSet):
     
     # Add method_of_shipping to filterset_fields to enable proper filtering
     filterset_fields = ['status', 'shipping_mark', 'supply_tracking', 'method_of_shipping']
+    
+    # Enhanced search fields specific to China warehouse
+    # Includes customer relationship fields for comprehensive tracking number search
+    search_fields = [
+        'shipping_mark', 
+        'supply_tracking', 
+        'description',
+        'customer__first_name',  # Search by customer's first name
+        'customer__last_name',   # Search by customer's last name
+        'customer__shipping_mark',  # Search by customer's shipping mark (redundant but safe)
+    ]
 
     def get_template_data(self):
         current_date = timezone.now().strftime('%d/%m/%Y')
@@ -809,7 +826,14 @@ class CustomerGoodsReceivedChinaViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['status', 'method_of_shipping']  # China model doesn't have 'location'
-    search_fields = ['supply_tracking', 'description', 'shipping_mark']
+    # Enhanced search fields for comprehensive tracking number search
+    search_fields = [
+        'supply_tracking', 
+        'description', 
+        'shipping_mark',
+        'supplier_name',
+        'customer_name',
+    ]
     ordering_fields = ['date_received', 'created_at', 'status']
     ordering = ['-date_received']
     serializer_class = GoodsReceivedChinaSerializer
@@ -961,7 +985,15 @@ class GoodsReceivedContainerViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['container_type', 'location', 'status']
-    search_fields = ['container_id', 'notes']
+    # Enhanced search fields to include nested goods_items fields
+    search_fields = [
+        'container_id', 
+        'notes',
+        'goods_items__shipping_mark',
+        'goods_items__supply_tracking',
+        'goods_items__description',
+        'goods_items__customer_name',
+    ]
     ordering_fields = ['created_at', 'arrival_date', 'status']
     ordering = ['-created_at']
     
@@ -971,7 +1003,7 @@ class GoodsReceivedContainerViewSet(viewsets.ModelViewSet):
         
         queryset = GoodsReceivedContainer.objects.all().prefetch_related('goods_items')
         
-        # Custom search functionality - search in both container fields and item fields
+        # Enhanced custom search functionality - search in both container fields and item fields
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(
@@ -979,10 +1011,19 @@ class GoodsReceivedContainerViewSet(viewsets.ModelViewSet):
                 Q(notes__icontains=search) |
                 Q(goods_items__shipping_mark__icontains=search) |
                 Q(goods_items__supply_tracking__icontains=search) |
-                Q(goods_items__description__icontains=search)
+                Q(goods_items__description__icontains=search) |
+                Q(goods_items__customer_name__icontains=search)
             ).distinct()
         
         return queryset
+    
+    def get_serializer_context(self):
+        """Add search query to serializer context so it can filter items."""
+        context = super().get_serializer_context()
+        search = self.request.query_params.get('search')
+        if search:
+            context['search_query'] = search
+        return context
     
     def get_serializer_class(self):
         from .serializers import (
@@ -1244,7 +1285,15 @@ class CustomerGoodsReceivedContainerViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['container_type', 'location', 'status']
-    search_fields = ['container_id', 'notes']
+    # Enhanced search fields including nested goods_items
+    search_fields = [
+        'container_id', 
+        'notes',
+        'goods_items__shipping_mark',
+        'goods_items__supply_tracking',
+        'goods_items__description',
+        'goods_items__customer_name',
+    ]
     ordering_fields = ['created_at', 'arrival_date', 'status']
     ordering = ['-created_at']
     
@@ -1254,7 +1303,7 @@ class CustomerGoodsReceivedContainerViewSet(viewsets.ReadOnlyModelViewSet):
         # Get all containers but we'll filter items later
         queryset = super().get_queryset().prefetch_related('goods_items')
         
-        # Custom search functionality
+        # Enhanced custom search functionality
         search = self.request.query_params.get('search')
         if search:
             user_shipping_mark = self.request.user.shipping_mark
@@ -1263,7 +1312,8 @@ class CustomerGoodsReceivedContainerViewSet(viewsets.ReadOnlyModelViewSet):
                 Q(notes__icontains=search) |
                 Q(goods_items__shipping_mark__icontains=search, goods_items__shipping_mark=user_shipping_mark) |
                 Q(goods_items__supply_tracking__icontains=search, goods_items__shipping_mark=user_shipping_mark) |
-                Q(goods_items__description__icontains=search, goods_items__shipping_mark=user_shipping_mark)
+                Q(goods_items__description__icontains=search, goods_items__shipping_mark=user_shipping_mark) |
+                Q(goods_items__customer_name__icontains=search, goods_items__shipping_mark=user_shipping_mark)
             ).distinct()
         
         # Only show containers that have items for this customer
@@ -1276,6 +1326,14 @@ class CustomerGoodsReceivedContainerViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = queryset.filter(Exists(has_customer_items))
         
         return queryset
+    
+    def get_serializer_context(self):
+        """Add search query to serializer context so it can filter items."""
+        context = super().get_serializer_context()
+        search = self.request.query_params.get('search')
+        if search:
+            context['search_query'] = search
+        return context
     
     def list(self, request, *args, **kwargs):
         """List containers that have items for the current customer."""
