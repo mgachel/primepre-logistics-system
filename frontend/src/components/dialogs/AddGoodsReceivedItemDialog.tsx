@@ -236,55 +236,59 @@ export function AddGoodsReceivedItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[95vw] max-w-[425px] sm:max-w-[500px] md:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Add Goods Received Item</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="w-[95vw] max-w-[425px] sm:max-w-[500px] md:max-w-[600px] lg:max-w-[650px] max-h-[90vh] flex flex-col gap-0 p-0">
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 shrink-0">
+          <DialogTitle className="text-lg sm:text-xl">Add Goods Received Item</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Add a new item to this goods received container.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="supplyTracking">Supply Tracking *</Label>
-              <Input
-                id="supplyTracking"
-                value={supplyTracking}
-                onChange={(e) => setSupplyTracking(e.target.value)}
-                placeholder="e.g., SPT-001234"
-                required
-              />
+        <div className="overflow-y-auto px-4 sm:px-6 flex-1">
+          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 pb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div>
+                <Label htmlFor="supplyTracking" className="text-xs sm:text-sm">Supply Tracking *</Label>
+                <Input
+                  id="supplyTracking"
+                  value={supplyTracking}
+                  onChange={(e) => setSupplyTracking(e.target.value)}
+                  placeholder="e.g., SPT-001234"
+                  required
+                  className="h-9 sm:h-10 text-sm"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="quantity" className="text-xs sm:text-sm">Quantity *</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  placeholder="e.g., 10"
+                  required
+                  className="h-9 sm:h-10 text-sm"
+                />
+              </div>
             </div>
 
             <div>
-              <Label htmlFor="quantity">Quantity *</Label>
+              <Label htmlFor="description" className="text-xs sm:text-sm">Description</Label>
               <Input
-                id="quantity"
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                placeholder="e.g., 10"
-                required
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Brief description of the item"
+                className="h-9 sm:h-10 text-sm"
               />
             </div>
-          </div>
 
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Input
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief description of the item"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Client *</Label>
-            <Popover
-              open={clientPopoverOpen}
+            <div className="space-y-1">
+              <Label className="text-xs sm:text-sm">Client *</Label>
+              <Popover
+                open={clientPopoverOpen}
               onOpenChange={setClientPopoverOpen}
             >
               <PopoverTrigger asChild>
@@ -293,19 +297,20 @@ export function AddGoodsReceivedItemDialog({
                   variant="outline"
                   role="combobox"
                   aria-expanded={clientPopoverOpen}
-                  className="w-full justify-between"
+                  className="w-full justify-between h-9 sm:h-10 text-sm"
                 >
                   {selectedClient
                     ? selectedClient.shippingMark || selectedClient.displayName || `Client #${selectedClient.id}`
                     : "Select client..."}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="p-0">
+              <PopoverContent className="p-0 w-[calc(100vw-2rem)] sm:w-[400px]">
                 <Command shouldFilter={false}>
                   <CommandInput
-                    placeholder="Search clients by name or shipping mark..."
+                    placeholder="Search clients..."
                     value={clientQuery}
                     onValueChange={setClientQuery}
+                    className="text-sm"
                   />
                   <CommandList>
                     <CommandEmpty>
@@ -319,7 +324,7 @@ export function AddGoodsReceivedItemDialog({
                       {clients.map((c) => (
                         <CommandItem
                           key={c.id}
-                          className="flex flex-col items-start gap-1"
+                          className="flex flex-col items-start gap-1 text-sm"
                           onSelect={() => {
                             setSelectedClient(c);
                             setClientQuery("");
@@ -342,108 +347,118 @@ export function AddGoodsReceivedItemDialog({
             </Popover>
           </div>
 
-          {/* Physical Properties */}
-          {containerType === 'sea' && (
-            <>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="length">Length (cm) *</Label>
-                  <Input
-                    id="length"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    value={length}
-                    onChange={(e) => setLength(e.target.value)}
-                    placeholder="e.g., 50"
-                    required
-                  />
+            {/* Physical Properties */}
+            {containerType === 'sea' && (
+              <>
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                  <div>
+                    <Label htmlFor="length" className="text-xs sm:text-sm">Length (cm) *</Label>
+                    <Input
+                      id="length"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={length}
+                      onChange={(e) => setLength(e.target.value)}
+                      placeholder="50"
+                      required
+                      className="h-9 sm:h-10 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="breadth" className="text-xs sm:text-sm">Breadth (cm) *</Label>
+                    <Input
+                      id="breadth"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={breadth}
+                      onChange={(e) => setBreadth(e.target.value)}
+                      placeholder="30"
+                      required
+                      className="h-9 sm:h-10 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="height" className="text-xs sm:text-sm">Height (cm) *</Label>
+                    <Input
+                      id="height"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={height}
+                      onChange={(e) => setHeight(e.target.value)}
+                      placeholder="20"
+                      required
+                      className="h-9 sm:h-10 text-sm"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <Label htmlFor="breadth">Breadth (cm) *</Label>
+                  <Label htmlFor="cbm" className="text-xs sm:text-sm">CBM (auto-calculated)</Label>
                   <Input
-                    id="breadth"
+                    id="cbm"
                     type="number"
-                    step="0.1"
-                    min="0"
-                    value={breadth}
-                    onChange={(e) => setBreadth(e.target.value)}
-                    placeholder="e.g., 30"
-                    required
+                    step="0.001"
+                    value={cbm}
+                    readOnly
+                    className="bg-muted h-9 sm:h-10 text-sm"
+                    placeholder="Calculated from dimensions"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="height">Height (cm) *</Label>
-                  <Input
-                    id="height"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    value={height}
-                    onChange={(e) => setHeight(e.target.value)}
-                    placeholder="e.g., 20"
-                    required
-                  />
-                </div>
-              </div>
+              </>
+            )}
+
+            {containerType === 'air' && (
               <div>
-                <Label htmlFor="cbm">CBM (auto-calculated)</Label>
+                <Label htmlFor="weight" className="text-xs sm:text-sm">Weight (kg) *</Label>
                 <Input
-                  id="cbm"
+                  id="weight"
                   type="number"
-                  step="0.001"
-                  value={cbm}
-                  readOnly
-                  className="bg-muted"
-                  placeholder="Calculated from dimensions"
+                  step="0.1"
+                  min="0"
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  placeholder="e.g., 15.5"
+                  required
+                  className="h-9 sm:h-10 text-sm"
                 />
               </div>
-            </>
-          )}
+            )}
 
-          {containerType === 'air' && (
             <div>
-              <Label htmlFor="weight">Weight (kg) *</Label>
-              <Input
-                id="weight"
-                type="number"
-                step="0.1"
-                min="0"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-                placeholder="e.g., 15.5"
-                required
+              <Label htmlFor="notes" className="text-xs sm:text-sm">Additional Notes</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Any additional information..."
+                rows={3}
+                className="text-sm resize-none"
               />
             </div>
-          )}
+          </form>
+        </div>
 
-
-
-          <div>
-            <Label htmlFor="notes">Additional Notes</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any additional information about this item..."
-              rows={3}
-            />
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Adding..." : "Add Item"}
-            </Button>
-          </DialogFooter>
-        </form>
+        <DialogFooter className="px-4 sm:px-6 py-3 sm:py-4 shrink-0 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={loading}
+            className="h-9 sm:h-10 text-sm"
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            disabled={loading}
+            onClick={handleSubmit}
+            className="h-9 sm:h-10 text-sm"
+          >
+            {loading ? "Adding..." : "Add Item"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

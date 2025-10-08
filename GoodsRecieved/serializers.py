@@ -647,7 +647,40 @@ class CreateGoodsReceivedItemSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             'customer': {'required': False, 'allow_null': True},
+            'length': {'required': False, 'allow_null': True},
+            'breadth': {'required': False, 'allow_null': True},
+            'height': {'required': False, 'allow_null': True},
+            'cbm': {'required': False, 'allow_null': True},
         }
+    
+    def validate(self, data):
+        """Validate that for sea cargo, either dimensions OR CBM is provided."""
+        container = data.get('container')
+        
+        # If container is provided and it's a sea container
+        if container and container.container_type == 'sea':
+            length = data.get('length')
+            breadth = data.get('breadth')
+            height = data.get('height')
+            cbm = data.get('cbm')
+            
+            has_dimensions = all([length, breadth, height])
+            has_cbm = cbm is not None and cbm > 0
+            
+            if not has_dimensions and not has_cbm:
+                raise serializers.ValidationError({
+                    "cbm": "For sea cargo, either provide dimensions (length, breadth, height) for auto-calculation or enter CBM directly."
+                })
+            
+            # If dimensions are provided, validate them
+            if has_dimensions:
+                for dim_name, dim_value in [("length", length), ("breadth", breadth), ("height", height)]:
+                    if dim_value <= 0:
+                        raise serializers.ValidationError({
+                            dim_name: f"{dim_name.capitalize()} must be greater than 0."
+                        })
+        
+        return data
     
     def create(self, validated_data):
         print(f"DEBUG: Creating goods received item with data: {validated_data}")
