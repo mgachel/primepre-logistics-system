@@ -67,34 +67,10 @@ const adminNavigation = [
 // Customer Navigation
 const customerNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  {
-    name: "My Goods",
-    children: [
-      { name: "Air Goods", href: "/customer/cargo/air", icon: Plane },
-      { name: "Sea Goods", href: "/customer/cargo/sea", icon: Ship },
-    ],
-  },
-  {
-    name: "Invoices",
-    children: [
-      { name: "Air Goods", href: "/goods/ghana/air", icon: Plane },
-      { name: "Sea Goods", href: "/goods/ghana/sea", icon: Ship },
-    ],
-  },
-  {
-    name: "Daily Updates",
-    children: [
-      { name: "Air Goods", href: "/daily-updates/air-goods", icon: Plane },
-      { name: "Sea Goods", href: "/daily-updates/sea-goods", icon: Ship },
-    ],
-  },
-  {
-    name: "Shipments",
-    children: [
-      { name: "Air Goods", href: "/shipments/air-containers", icon: Plane },
-      { name: "Sea Goods", href: "/shipments/sea-containers", icon: Ship },
-    ],
-  },
+  { name: "My Goods", href: "/customer/cargo/sea", icon: Ship },
+  { name: "Invoices", href: "/goods/ghana/sea", icon: Package },
+  { name: "Daily Updates", href: "/daily-updates/sea-goods", icon: Bell },
+  { name: "Shipments", href: "/shipments/sea-containers", icon: Warehouse },
   { name: "My Claims", href: "/my-claims", icon: FileText },
   { name: "My Notes", href: "/my-notes", icon: StickyNote },
   { name: "Addresses", href: "/my-addresses", icon: MapPin },
