@@ -46,58 +46,22 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
       )}
     >
       <div className="flex h-full items-center justify-between px-6">
-        {/* Mobile hamburger menu */}
-        {isMobile && (
-          <button
-            onClick={onToggle}
-            className="p-2 rounded-md hover:bg-muted transition-colors md:hidden"
-            aria-label="Toggle mobile menu"
-            title="Toggle mobile menu"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </button>
-        )}
+        {/* Sidebar toggle replaced with Start button */}
+        <button
+          onClick={onToggle}
+          className="px-4 py-2.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/80 transition-colors text-base font-semibold"
+          aria-label="Toggle sidebar"
+          title="Toggle sidebar"
+        >
+          Start
+        </button>
 
-        {/* Desktop sidebar toggle */}
-        {!isMobile && (
-          <button
-            onClick={onToggle}
-            className="p-2 rounded-md hover:bg-muted transition-colors"
-            aria-label="Toggle sidebar"
-            title="Toggle sidebar"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </button>
+        {/* Search (hidden for customers) */}
+        {(user?.user_role && user.user_role.toUpperCase() !== "CUSTOMER") && (
+          <div className={cn("flex-1", isMobile ? "ml-2 mr-2" : "mx-4 max-w-2xl")}> 
+            <GlobalSearch variant="inline" />
+          </div>
         )}
-
-        {/* Search */}
-        <div className={cn("flex-1", isMobile ? "ml-2 mr-2" : "mx-4 max-w-2xl")}> 
-          <GlobalSearch variant="inline" />
-        </div>
 
         {/* Actions */}
         <div className="flex items-center space-x-4">

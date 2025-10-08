@@ -112,46 +112,34 @@ export default function CustomerCargoContainerDetailsPage() {
   // Define table columns for items
   const itemColumns: Column<BackendCargoItem>[] = [
     {
-      key: "customer_name",
+      accessor: "client_name",
       header: "Customer",
-      render: (item) => (
-        <div className="font-medium">{item.customer_name || "N/A"}</div>
-      ),
+      cell: (item) => <div className="font-medium">{item.client_name || "N/A"}</div>,
     },
     {
-      key: "shipping_mark",
+      accessor: "client_shipping_mark",
       header: "Shipping Mark",
-      render: (item) => (
-        <div className="text-sm">{item.shipping_mark || "N/A"}</div>
-      ),
+      cell: (item) => <div className="text-sm">{item.client_shipping_mark || "N/A"}</div>,
     },
     {
-      key: "description",
+      accessor: "item_description",
       header: "Description",
-      render: (item) => (
-        <div className="text-sm">{item.description || "N/A"}</div>
-      ),
+      cell: (item) => <div className="text-sm">{item.item_description || "N/A"}</div>,
     },
     {
-      key: "quantity",
+      accessor: "quantity",
       header: "Quantity",
-      render: (item) => (
-        <div className="text-sm">{item.quantity || 0}</div>
-      ),
+      cell: (item) => <div className="text-sm">{item.quantity || 0}</div>,
     },
     {
-      key: "cbm",
+      accessor: "cbm",
       header: "CBM",
-      render: (item) => (
-        <div className="text-sm">{item.cbm ? `${item.cbm} m³` : "N/A"}</div>
-      ),
+      cell: (item) => <div className="text-sm">{item.cbm ? `${item.cbm} m³` : "N/A"}</div>,
     },
     {
-      key: "weight",
+      accessor: "weight",
       header: "Weight",
-      render: (item) => (
-        <div className="text-sm">{item.weight ? `${item.weight} kg` : "N/A"}</div>
-      ),
+      cell: (item) => <div className="text-sm">{item.weight ? `${item.weight} kg` : "N/A"}</div>,
     },
   ];
 
@@ -186,6 +174,23 @@ export default function CustomerCargoContainerDetailsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Subtabs for Sea Goods and Air Goods */}
+      <div className="flex items-center gap-4 mb-2">
+        <Button
+          variant={container.cargo_type === "sea" ? "default" : "outline"}
+          size="sm"
+          onClick={() => navigate("/customer/cargo/sea")}
+        >
+          <Ship className="h-4 w-4 mr-1" /> Sea Goods
+        </Button>
+        <Button
+          variant={container.cargo_type === "air" ? "default" : "outline"}
+          size="sm"
+          onClick={() => navigate("/customer/cargo/air")}
+        >
+          <Plane className="h-4 w-4 mr-1" /> Air Goods
+        </Button>
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -196,7 +201,7 @@ export default function CustomerCargoContainerDetailsPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
               <TypeIcon className="h-8 w-8" />
-              {container.container_number}
+              {container.container_id}
             </h1>
             <p className="text-muted-foreground mt-1">
               {container.cargo_type === "sea" ? "Sea Cargo" : "Air Cargo"} Container Details
@@ -216,19 +221,19 @@ export default function CustomerCargoContainerDetailsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Container No.</p>
-                <p className="text-sm font-semibold mt-1">{container.container_number}</p>
+                <p className="text-sm font-semibold mt-1">{container.container_id}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
-                  {container.cargo_type === "sea" ? "Vessel" : "Flight"}
+                  {container.cargo_type === "sea" ? "Route" : "Flight"}
                 </p>
-                <p className="text-sm font-semibold mt-1">{container.vessel || "N/A"}</p>
+                <p className="text-sm font-semibold mt-1">{container.route || "N/A"}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
-                  {container.cargo_type === "sea" ? "Voyage" : "Flight No."}
+                  {container.cargo_type === "sea" ? "Stay Days" : "Delay Days"}
                 </p>
-                <p className="text-sm font-semibold mt-1">{container.voyage_number || "N/A"}</p>
+                <p className="text-sm font-semibold mt-1">{container.stay_days ?? container.delay_days ?? "N/A"}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Status</p>
@@ -250,7 +255,7 @@ export default function CustomerCargoContainerDetailsPage() {
                   Loading Date
                 </p>
                 <p className="text-sm font-semibold mt-1">
-                  {container.loading_date ? formatDate(container.loading_date) : "N/A"}
+                  {container.load_date ? formatDate(container.load_date) : "N/A"}
                 </p>
               </div>
               <div>
