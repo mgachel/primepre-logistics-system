@@ -501,7 +501,7 @@ class ContainerItemsCreateView(APIView):
                     # Create missing summaries in bulk
                     summaries_to_create = []
                     for customer_id in customers_to_update:
-                        key = (container.id, customer_id)
+                        key = (container.container_id, customer_id)
                         if key not in existing_summaries:
                             summaries_to_create.append(
                                 ClientShipmentSummary(
