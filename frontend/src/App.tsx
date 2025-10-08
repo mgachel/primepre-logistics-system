@@ -21,6 +21,7 @@ import SignupStep4 from "./pages/SignupStep4";
 import SignupVerify from "./pages/SignupVerify";
 import VerifyAccount from "./pages/VerifyAccount";
 import ForgotPassword from "./pages/ForgotPassword";
+import ContactAdminForReset from "./pages/ContactAdminForReset";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import Clients from "./pages/Clients";
 import SeaCargo from "./pages/SeaCargo";
@@ -99,6 +100,7 @@ const App = () => (
             {/* New account verification via shipping mark */}
             <Route path="/verify-account" element={<VerifyAccount />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/contact-admin-for-reset" element={<ContactAdminForReset />} />
             {/* Dashboard - Role-based */}
             <Route
               path="/"

@@ -276,6 +276,14 @@ class ContainerItemsCreateView(APIView):
                     create_results = matcher.create_cargo_items(matched_items)
                     created_items.extend(create_results.get('created_items', []))
                     errors.extend(create_results.get('errors', []))
+                    
+                    # Update container totals after matched items creation
+                    # (Individual saves should trigger updates, but ensure it's done)
+                    if created_items:
+                        if container.cargo_type == 'sea':
+                            container.update_total_cbm()
+                        elif container.cargo_type == 'air':
+                            container.update_total_weight()
                 except Exception as exc:
                     logger.error(
                         "Error processing matched items for container %s: %s",
@@ -534,6 +542,31 @@ class ContainerItemsCreateView(APIView):
                         exc_info=True
                     )
                     # Don't fail the request if summary update fails
+            
+            # Update container totals (CBM for sea cargo, weight for air cargo)
+            # This is critical after bulk_create since it bypasses save() signals
+            try:
+                if container.cargo_type == 'sea':
+                    container.update_total_cbm()
+                    logger.info(
+                        "Updated container %s total CBM to %.2f after bulk item creation",
+                        container.container_id,
+                        container.cbm or 0
+                    )
+                elif container.cargo_type == 'air':
+                    container.update_total_weight()
+                    logger.info(
+                        "Updated container %s total weight to %.2f after bulk item creation",
+                        container.container_id,
+                        container.weight or 0
+                    )
+            except Exception as exc:
+                logger.error(
+                    "Error updating container totals for %s: %s",
+                    container.container_id,
+                    exc,
+                    exc_info=True
+                )
             
             elapsed_time = time.time() - start_time
             logger.info(

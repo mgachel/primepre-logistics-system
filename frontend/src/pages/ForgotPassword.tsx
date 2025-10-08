@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle2, Phone, KeyRound } from 'lucide-react';
+import { AlertCircle, Phone, KeyRound } from 'lucide-react';
 import { authService } from '@/services/authService';
 
 export default function ForgotPassword() {
@@ -13,25 +13,22 @@ export default function ForgotPassword() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
 
-  const handleReset = async (e: React.FormEvent) => {
+  const handleCheckPhone = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setSuccess(false);
     setLoading(true);
 
     try {
+      // Check if phone exists in the system
       const res = await authService.phoneForgotPassword(phone);
       
       if (res.success) {
-        setSuccess(true);
-        // Redirect to login after 3 seconds
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
+        // Phone found - redirect to contact admin page with phone number
+        navigate('/contact-admin-for-reset', { state: { phone } });
       } else {
-        setError(res.message || 'Failed to reset password. Please try again.');
+        // Phone not found
+        setError(res.message || 'Phone number not found in our system. Please sign up for a new account.');
       }
     } catch {
       setError('An unexpected error occurred. Please try again.');
@@ -67,14 +64,18 @@ export default function ForgotPassword() {
               </li>
               <li className="flex gap-2">
                 <span className="font-semibold">2.</span>
-                <span>Your password will be instantly reset to <strong>"PrimeMade"</strong></span>
+                <span>If found, you'll see admin contact information</span>
               </li>
               <li className="flex gap-2">
                 <span className="font-semibold">3.</span>
-                <span>Login with your phone and the password "PrimeMade"</span>
+                <span>Contact the admin to reset your password to <strong>"PrimeMade"</strong></span>
               </li>
               <li className="flex gap-2">
                 <span className="font-semibold">4.</span>
+                <span>Login with your phone and the password "PrimeMade"</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-semibold">5.</span>
                 <span>Change your password from your profile settings</span>
               </li>
             </ol>
@@ -93,9 +94,9 @@ export default function ForgotPassword() {
           </div>
           
           <div className="text-center">
-            <h2 className="text-3xl font-bold tracking-tight">Reset Password</h2>
+            <h2 className="text-3xl font-bold tracking-tight">Forgot Password?</h2>
             <p className="text-muted-foreground mt-2">
-              Enter your phone number to reset your password to "PrimeMade"
+              Enter your phone number to get admin contact information
             </p>
           </div>
 
@@ -107,61 +108,46 @@ export default function ForgotPassword() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              
-              {success && (
-                <Alert className="border-green-200 bg-green-50">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
-                    <strong>Password reset successful!</strong>
-                    <br />
-                    Your password has been reset to <strong>"PrimeMade"</strong>.
-                    <br />
-                    Redirecting to login page...
-                  </AlertDescription>
-                </Alert>
-              )}
 
-              {!success && (
-                <form onSubmit={handleReset} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      Phone Number
-                    </Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="0201234567 or +233201234567"
-                      required
-                      className="h-11"
-                      disabled={loading}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Enter the phone number you used to register
-                    </p>
-                  </div>
+              <form onSubmit={handleCheckPhone} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    Phone Number
+                  </Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="0201234567 or +233201234567"
+                    required
+                    className="h-11"
+                    disabled={loading}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter the phone number you used to register
+                  </p>
+                </div>
 
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex gap-2">
-                      <KeyRound className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                      <div className="text-sm text-blue-800">
-                        <strong>Note:</strong> Your password will be instantly reset to <strong>"PrimeMade"</strong>. 
-                        You can login immediately and change it from your profile settings.
-                      </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex gap-2">
+                    <KeyRound className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-blue-800">
+                      <strong>Note:</strong> If your phone number is found, you'll receive admin contact information. 
+                      Contact them to reset your password to <strong>"PrimeMade"</strong>.
                     </div>
                   </div>
+                </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full h-11"
-                    disabled={loading}
-                  >
-                    {loading ? 'Resetting Password...' : 'Reset Password to "PrimeMade"'}
-                  </Button>
-                </form>
-              )}
+                <Button
+                  type="submit"
+                  className="w-full h-11"
+                  disabled={loading}
+                >
+                  {loading ? 'Checking...' : 'Continue'}
+                </Button>
+              </form>
             </CardContent>
           </Card>
 

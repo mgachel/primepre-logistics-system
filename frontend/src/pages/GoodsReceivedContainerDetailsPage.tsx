@@ -8,6 +8,7 @@ import {
   Edit,
   Trash2,
   Search,
+  Eye,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -30,6 +30,9 @@ import {
 } from "@/services/goodsReceivedContainerService";
 import { EditGoodsReceivedContainerDialog } from "@/components/dialogs/EditGoodsReceivedContainerDialog";
 import { AddGoodsReceivedItemDialog } from "@/components/dialogs/AddGoodsReceivedItemDialog";
+import { EditGoodsReceivedItemDialog } from "@/components/dialogs/EditGoodsReceivedItemDialog";
+import { AddShippingMarkGroupDialog } from "@/components/dialogs/AddShippingMarkGroupDialog";
+import { ViewShippingMarkGroupDialog } from "@/components/dialogs/ViewShippingMarkGroupDialog";
 import { ExcelUploadButton } from "@/components/ui/ExcelUploadButton";
 import { formatDate } from "@/lib/date";
 
@@ -49,9 +52,14 @@ export default function GoodsReceivedContainerDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedMark, setExpandedMark] = useState<string | null>(null);
   const [showAddItemDialog, setShowAddItemDialog] = useState(false);
+  const [showAddShippingMarkGroupDialog, setShowAddShippingMarkGroupDialog] = useState(false);
   const [showEditContainerDialog, setShowEditContainerDialog] = useState(false);
+  const [showEditItemDialog, setShowEditItemDialog] = useState(false);
+  const [itemToEdit, setItemToEdit] = useState<GoodsReceivedItem | null>(null);
   const [showInvoicePreview, setShowInvoicePreview] = useState(false);
   const [invoiceData, setInvoiceData] = useState<{shippingMark: string, items: GoodsReceivedItem[], totalAmount: number} | null>(null);
+  const [showViewGroupDialog, setShowViewGroupDialog] = useState(false);
+  const [viewGroupData, setViewGroupData] = useState<{shippingMark: string, items: GoodsReceivedItem[]} | null>(null);
   
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -142,6 +150,11 @@ export default function GoodsReceivedContainerDetailsPage() {
     return groups;
   }, [goodsItems, searchQuery, isCustomer, customerShippingMark]);
 
+  const handleEditItem = (item: GoodsReceivedItem) => {
+    setItemToEdit(item);
+    setShowEditItemDialog(true);
+  };
+
   const handleDeleteItem = async (itemId: string) => {
     if (
       !confirm(
@@ -171,6 +184,11 @@ export default function GoodsReceivedContainerDetailsPage() {
   const handlePreviewInvoice = (shippingMark: string, items: GoodsReceivedItem[], totalAmount: number) => {
     setInvoiceData({ shippingMark, items, totalAmount });
     setShowInvoicePreview(true);
+  };
+
+  const handleViewGroup = (shippingMark: string, items: GoodsReceivedItem[]) => {
+    setViewGroupData({ shippingMark, items });
+    setShowViewGroupDialog(true);
   };
 
   const generateInvoiceHTML = (shippingMark: string, items: GoodsReceivedItem[], totalAmount: number) => {
@@ -550,8 +568,11 @@ export default function GoodsReceivedContainerDetailsPage() {
                 }}
                 size="sm"
               />
-              <Button size="sm" onClick={() => setShowAddItemDialog(true)}>
-                <Plus className="h-4 w-4" /> Add Item
+              <Button size="sm" onClick={() => setShowAddShippingMarkGroupDialog(true)} className="bg-primary">
+                <Plus className="h-4 w-4" /> Add Shipping Mark Group
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowAddItemDialog(true)}>
+                <Plus className="h-4 w-4" /> Add Single Item
               </Button>
             </>
           )}
@@ -659,20 +680,35 @@ export default function GoodsReceivedContainerDetailsPage() {
                   </div>
                 </div>
                 
-                {/* Download Invoice Button */}
-                {container?.dollar_rate && (
+                {/* Action Buttons */}
+                <div className="flex gap-2 ml-4">
+                  {/* View Group Button - Available to all users */}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handlePreviewInvoice(mark, items, totalAmount);
+                      handleViewGroup(mark, items);
                     }}
-                    className="ml-4"
                   >
-                    Preview Invoice
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Items
                   </Button>
-                )}
+                  
+                  {/* Download Invoice Button - Only when dollar rate is set */}
+                  {container?.dollar_rate && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePreviewInvoice(mark, items, totalAmount);
+                      }}
+                    >
+                      Preview Invoice
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* Expanded Items Table */}
@@ -684,6 +720,10 @@ export default function GoodsReceivedContainerDetailsPage() {
                     rows={items}
                     rowActions={!isCustomer ? (item) => (
                       <>
+                        <DropdownMenuItem onClick={() => handleEditItem(item)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Item
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDeleteItem(item.id)}>
                           <Trash2 className="h-4 w-4 mr-2 text-red-500" />
                           Delete Item
@@ -730,6 +770,48 @@ export default function GoodsReceivedContainerDetailsPage() {
           }}
         />
       )}
+
+      {/* Add Shipping Mark Group Dialog */}
+      {showAddShippingMarkGroupDialog && (
+        <AddShippingMarkGroupDialog
+          open={showAddShippingMarkGroupDialog}
+          onOpenChange={setShowAddShippingMarkGroupDialog}
+          containerId={containerId || ""}
+          containerType={container?.container_type}
+          location={container?.location}
+          onSuccess={() => {
+            refreshData(); // Refresh data after adding items
+          }}
+        />
+      )}
+
+      {/* Edit Item Dialog */}
+      {showEditItemDialog && itemToEdit && (
+        <EditGoodsReceivedItemDialog
+          open={showEditItemDialog}
+          onOpenChange={(open) => {
+            setShowEditItemDialog(open);
+            if (!open) setItemToEdit(null);
+          }}
+          item={itemToEdit}
+          containerType={container?.container_type}
+          location={container?.location}
+          onSuccess={() => {
+            refreshData(); // Refresh data after editing item
+          }}
+        />
+      )}
+
+      {/* View Shipping Mark Group Dialog */}
+      {showViewGroupDialog && viewGroupData && (
+        <ViewShippingMarkGroupDialog
+          open={showViewGroupDialog}
+          onOpenChange={setShowViewGroupDialog}
+          shippingMark={viewGroupData.shippingMark}
+          items={viewGroupData.items}
+          containerType={container?.container_type || 'sea'}
+        />
+      )}
       
       {/* Invoice Preview Dialog */}
       <Dialog open={showInvoicePreview} onOpenChange={setShowInvoicePreview}>
@@ -751,18 +833,6 @@ export default function GoodsReceivedContainerDetailsPage() {
               />
             )}
           </div>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowInvoicePreview(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleDownloadFromPreview}>
-              Download Invoice
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

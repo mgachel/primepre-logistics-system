@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Upload,
   Download,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -616,6 +617,41 @@ export default function Clients() {
                     Unblock Client
                   </>
                 )}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={async () => {
+                  const clientName = row._raw.full_name || row._raw.email || `Client #${row._raw.id}`;
+                  
+                  if (
+                    !confirm(
+                      `Reset password for ${clientName}?\n\nThe password will be reset to: PrimeMade`
+                    )
+                  )
+                    return;
+
+                  try {
+                    await adminService.resetUserPassword(row._raw.id, {
+                      new_password: "PrimeMade",
+                    });
+                    
+                    toast({
+                      title: "Password Reset",
+                      description: `Password for ${clientName} has been reset to "PrimeMade"`,
+                    });
+                  } catch (e: unknown) {
+                    toast({
+                      title: "Failed to Reset Password",
+                      description:
+                        e instanceof Error
+                          ? e.message
+                          : "Unable to reset password",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <KeyRound className="h-4 w-4 mr-2" />
+                Reset Password
               </DropdownMenuItem>
             </>
           )}
