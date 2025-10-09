@@ -397,8 +397,9 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
         if len(clean_name) < 2:
             clean_name = clean_name.ljust(2, 'X')  # Pad with X if name too short
         
-        # Generate base shipping mark with space between prefix and regional prefix + name
-        base_mark = f"{default_prefix}{regional_prefix} {clean_name}"
+        # Generate base shipping mark with spaces: prefix + space + regional_prefix + space + name
+        # This allows regional_prefix to be anything (numbers, letters, etc.)
+        base_mark = f"{default_prefix} {regional_prefix} {clean_name}"
         
         # Ensure uniqueness by adding counter if needed
         shipping_mark = base_mark
@@ -413,7 +414,7 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
                 # Fallback to random generation
                 import secrets
                 random_suffix = secrets.token_hex(2).upper()
-                shipping_mark = f"{default_prefix}{regional_prefix}{random_suffix}"
+                shipping_mark = f"{default_prefix} {regional_prefix} {random_suffix}"
                 break
         
         return shipping_mark
