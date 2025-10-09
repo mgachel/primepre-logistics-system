@@ -254,11 +254,11 @@ export default function GoodsReceivedContainerDetailsPage() {
     const startY = logoLoaded ? 45 : 20;
     pdf.setFontSize(18);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('GOODS RECEIVED INVOICE', pageWidth / 2, startY, { align: 'center' });
+    pdf.text('GOODS IN GHANA INVOICE', pageWidth / 2, startY, { align: 'center' });
     
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('PrimePre Logistics System', pageWidth / 2, startY + 7, { align: 'center' });
+    pdf.text('PrimePre Logistics', pageWidth / 2, startY + 7, { align: 'center' });
     
     // Invoice details - Left side
     let yPos = startY + 20;
@@ -861,8 +861,8 @@ export default function GoodsReceivedContainerDetailsPage() {
 
               {/* Header */}
               <div className="text-center mb-8">
-                <h1 className="text-2xl font-bold mb-2">GOODS RECEIVED INVOICE</h1>
-                <p className="text-gray-600">PrimePre Logistics System</p>
+                <h1 className="text-2xl font-bold mb-2">GOODS IN GHANA INVOICE</h1>
+                <p className="text-gray-600">PrimePre Logistics</p>
               </div>
 
               {/* Invoice Details Grid */}
@@ -870,7 +870,7 @@ export default function GoodsReceivedContainerDetailsPage() {
                 {/* Left Side */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="font-semibold">Container ID:</span>
+                    <span className="font-semibold">Container:</span>
                     <span>{container?.container_id}</span>
                   </div>
                   <div className="flex justify-between text-sm">
