@@ -11,39 +11,29 @@ def remove_duplicate_container_clients(apps, schema_editor):
     """
     CargoItem = apps.get_model('cargo', 'CargoItem')
     
-    # Force close any open transaction to avoid pending trigger events
-    from django.db import connection
-    connection.close()
-    connection.ensure_connection()
-    
-    # Get all container-client combinations
-    from django.db.models import Count
-    duplicates = CargoItem.objects.values('container', 'client').annotate(
-        count=Count('id')
-    ).filter(count__gt=1)
-    
-    deleted_count = 0
-    for dup in duplicates:
-        # Get all items with this container-client combo
-        items = CargoItem.objects.filter(
-            container_id=dup['container'],
-            client_id=dup['client']
-        ).order_by('-created_at')
+    # Use raw SQL to avoid trigger issues with ORM deletes
+    # First, identify duplicates and keep only the most recent one
+    with schema_editor.connection.cursor() as cursor:
+        # Delete duplicates, keeping only the row with the latest created_at for each (container, client) pair
+        cursor.execute("""
+            DELETE FROM cargo_cargoitem
+            WHERE id IN (
+                SELECT id
+                FROM (
+                    SELECT id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY container_id, client_id 
+                               ORDER BY created_at DESC
+                           ) as row_num
+                    FROM cargo_cargoitem
+                ) t
+                WHERE row_num > 1
+            );
+        """)
+        deleted_count = cursor.rowcount
         
-        # Keep the first (most recent), delete the rest
-        items_to_delete = list(items[1:])
-        count = len(items_to_delete)
-        for item in items_to_delete:
-            item.delete()
-        
-        deleted_count += count
-    
-    if deleted_count > 0:
-        print(f"Removed {deleted_count} duplicate CargoItem entries")
-    
-    # Commit the transaction explicitly
-    from django.db import transaction
-    transaction.commit()
+        if deleted_count > 0:
+            print(f"Removed {deleted_count} duplicate CargoItem entries")
 
 
 class Migration(migrations.Migration):
@@ -54,11 +44,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # First, remove duplicates with atomic=False to avoid pending trigger events
+        # First, remove duplicates using raw SQL to avoid trigger events
         migrations.RunPython(
             remove_duplicate_container_clients, 
-            migrations.RunPython.noop,
-            atomic=False  # This is the key - run outside of transaction
+            migrations.RunPython.noop
         ),
         # Then proceed with constraint changes
         migrations.RemoveConstraint(
