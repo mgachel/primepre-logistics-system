@@ -10,6 +10,8 @@ import {
   Search,
   Eye,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -56,10 +58,10 @@ export default function GoodsReceivedContainerDetailsPage() {
   const [showEditContainerDialog, setShowEditContainerDialog] = useState(false);
   const [showEditItemDialog, setShowEditItemDialog] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<GoodsReceivedItem | null>(null);
-  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
-  const [invoiceData, setInvoiceData] = useState<{shippingMark: string, items: GoodsReceivedItem[], totalAmount: number} | null>(null);
   const [showViewGroupDialog, setShowViewGroupDialog] = useState(false);
   const [viewGroupData, setViewGroupData] = useState<{shippingMark: string, items: GoodsReceivedItem[]} | null>(null);
+  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
+  const [previewInvoiceData, setPreviewInvoiceData] = useState<{shippingMark: string, items: GoodsReceivedItem[], totalAmount: number, invoiceNumber: string} | null>(null);
   
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -182,238 +184,230 @@ export default function GoodsReceivedContainerDetailsPage() {
   };
 
   const handlePreviewInvoice = (shippingMark: string, items: GoodsReceivedItem[], totalAmount: number) => {
-    setInvoiceData({ shippingMark, items, totalAmount });
+    // Generate invoice number
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const invoiceNumber = `PM${dateStr}${randomNum}`;
+    
+    // Set preview data and show dialog
+    setPreviewInvoiceData({ shippingMark, items, totalAmount, invoiceNumber });
     setShowInvoicePreview(true);
+  };
+
+  const handleDownloadPDF = () => {
+    if (!previewInvoiceData) return;
+    
+    generateInvoicePDF(
+      previewInvoiceData.shippingMark,
+      previewInvoiceData.items,
+      previewInvoiceData.totalAmount,
+      previewInvoiceData.invoiceNumber
+    );
+  };
+
+  const generateInvoicePDF = async (shippingMark: string, items: GoodsReceivedItem[], totalAmount: number, invoiceNumber: string) => {
+    try {
+      // Calculate totals
+      const totalQty = items.reduce((sum, item) => sum + (parseInt(item.quantity?.toString() || '0') || 0), 0);
+      const totalCBM = items.reduce((sum, item) => sum + (parseFloat(item.cbm?.toString() || '0') || 0), 0);
+      const totalWeight = items.reduce((sum, item) => sum + (parseFloat(item.weight?.toString() || '0') || 0), 0);
+      
+      // Create PDF
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      
+      // Load logo and add to PDF
+      const loadLogo = (): Promise<boolean> => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            try {
+              // Add logo at the top center
+              const imgWidth = 50;
+              const imgHeight = 25;
+              pdf.addImage(img, 'PNG', (pageWidth - imgWidth) / 2, 10, imgWidth, imgHeight);
+              console.log('Logo added successfully');
+              resolve(true);
+            } catch (error) {
+              console.error('Error adding logo:', error);
+              resolve(false);
+            }
+          };
+          img.onerror = (error) => {
+            console.error('Failed to load logo:', error);
+            resolve(false);
+          };
+          // Use the actual path from public folder
+          img.src = '/primepre-logo-1.png';
+        });
+      };
+      
+      // Try loading logo
+      const logoLoaded = await loadLogo();
+      
+      if (!logoLoaded) {
+        console.log('Logo failed to load, generating PDF without logo');
+      }
+    
+    // Header
+    const startY = logoLoaded ? 45 : 20;
+    pdf.setFontSize(18);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('GOODS RECEIVED INVOICE', pageWidth / 2, startY, { align: 'center' });
+    
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('PrimePre Logistics System', pageWidth / 2, startY + 7, { align: 'center' });
+    
+    // Invoice details - Left side
+    let yPos = startY + 20;
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Container ID:', 14, yPos);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(container?.container_id || '', 50, yPos);
+    
+    yPos += 6;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Shipping Mark:', 14, yPos);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(shippingMark, 50, yPos);
+    
+    yPos += 6;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Container Type:', 14, yPos);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(container?.container_type?.toUpperCase() || '', 50, yPos);
+    
+    yPos += 6;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Offloading Date:', 14, yPos);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(container?.arrival_date ? new Date(container.arrival_date).toLocaleDateString() : 'N/A', 50, yPos);
+    
+    // Invoice details - Right side
+    yPos = startY + 20;
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`Invoice #${invoiceNumber}`, pageWidth - 14, yPos, { align: 'right' });
+    
+    yPos += 8;
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Date:', pageWidth - 60, yPos);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(new Date().toLocaleDateString(), pageWidth - 14, yPos, { align: 'right' });
+    
+    yPos += 6;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Total Amount:', pageWidth - 60, yPos);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' });
+    
+    // Prepare table data
+      const tableData = items.map(item => {
+        const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
+        const cbmRate = parseFloat(container?.rates?.toString() || '0');
+        let amount = 0;
+        let measurementValue = 0;
+        
+        if (container?.container_type === 'air') {
+          // Ghana Air: Weight * Dollar Rate * Rate
+          const weight = parseFloat(item.weight?.toString() || '0') || 0;
+          amount = weight * dollarRate * cbmRate;
+          measurementValue = weight;
+        } else {
+          // Ghana Sea: CBM * Dollar Rate * CBM Rate
+          const cbm = parseFloat(item.cbm?.toString() || '0') || 0;
+          amount = cbm * dollarRate * cbmRate;
+          measurementValue = cbm;
+        }
+        
+        return [
+          item.supply_tracking,
+          item.quantity?.toString() || '0',
+          measurementValue.toFixed(container?.container_type === 'air' ? 1 : 3),
+          `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        ];
+      });
+      
+      // Add totals row
+      tableData.push([
+        'TOTAL',
+        totalQty.toString(),
+        (container?.container_type === 'air' ? totalWeight.toFixed(1) : totalCBM.toFixed(3)),
+        `GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ]);
+      
+      // Generate table
+      autoTable(pdf, {
+        startY: 95,
+        head: [[
+          'Supply Tracking',
+          'Quantity',
+          container?.container_type === 'air' ? 'Weight (kg)' : 'CBM',
+          'Amount (GHS)'
+        ]],
+        body: tableData,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [240, 240, 240],
+          textColor: [0, 0, 0],
+          fontStyle: 'bold',
+          fontSize: 9
+        },
+        bodyStyles: {
+          fontSize: 8
+        },
+        columnStyles: {
+          1: { halign: 'right' },
+          2: { halign: 'right' },
+          3: { halign: 'right', fontStyle: 'bold' }
+        },
+        didParseCell: (data) => {
+          // Style the last row (totals) differently
+          if (data.row.index === tableData.length - 1) {
+            data.cell.styles.fillColor = [240, 240, 240];
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.lineWidth = 0.5;
+            data.cell.styles.lineColor = [0, 0, 0];
+          }
+        },
+        margin: { left: 14, right: 14 }
+      });
+      
+      // Footer
+      const finalY = (pdf as any).lastAutoTable.finalY || 200;
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(100, 100, 100);
+      const footerText = `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`;
+      pdf.text(footerText, pageWidth / 2, finalY + 15, { align: 'center' });
+      
+      // Save PDF
+      pdf.save(`invoice-${invoiceNumber}-${shippingMark}.pdf`);
+      
+      toast({
+        title: "Invoice Downloaded",
+        description: "PDF invoice has been downloaded successfully",
+      });
+      
+      // Close preview dialog
+      setShowInvoicePreview(false);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF invoice",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleViewGroup = (shippingMark: string, items: GoodsReceivedItem[]) => {
     setViewGroupData({ shippingMark, items });
     setShowViewGroupDialog(true);
-  };
-
-  const generateInvoiceHTML = (shippingMark: string, items: GoodsReceivedItem[], totalAmount: number) => {
-    // Calculate totals
-    const totalQty = items.reduce((sum, item) => sum + (parseInt(item.quantity?.toString() || '0') || 0), 0);
-    const totalCBM = items.reduce((sum, item) => sum + (parseFloat(item.cbm?.toString() || '0') || 0), 0);
-    const totalWeight = items.reduce((sum, item) => sum + (parseFloat(item.weight?.toString() || '0') || 0), 0);
-    
-    // Generate invoice number: PM + date + random number
-    const today = new Date();
-    const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    const invoiceNumber = `PM${dateStr}${randomNum}`;
-    
-    // Generate invoice HTML for goods received
-    const invoiceHTML = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Goods Received Invoice - ${shippingMark}</title>
-          <style>
-            body { 
-              font-family: 'Arial', sans-serif; 
-              margin: 0; 
-              padding: 30px; 
-              background: white; 
-              color: #333;
-              height: 100vh;
-              box-sizing: border-box;
-              display: flex;
-              flex-direction: column;
-            }
-            .header { 
-              text-align: center; 
-              margin-bottom: 25px; 
-              border-bottom: 1px solid #ddd; 
-              padding-bottom: 15px; 
-            }
-            .header h1 { 
-              color: #333; 
-              margin: 0; 
-              font-size: 24px; 
-              font-weight: 600;
-            }
-            .header .company { 
-              color: #666; 
-              margin-top: 8px; 
-              font-size: 14px; 
-            }
-            .invoice-details { 
-              display: grid; 
-              grid-template-columns: 1fr 1fr; 
-              gap: 30px; 
-              margin-bottom: 25px; 
-            }
-            .info-section { 
-              padding: 0; 
-            }
-            .info-row { 
-              margin-bottom: 6px; 
-              font-size: 13px; 
-              display: flex;
-              justify-content: space-between;
-            }
-            .info-row strong {
-              color: #333;
-              min-width: 120px;
-            }
-            .invoice-number { 
-              text-align: right; 
-            }
-            .invoice-number h2 { 
-              color: #333; 
-              margin: 0 0 10px 0; 
-              font-size: 18px;
-            }
-            .invoice-number div {
-              font-size: 13px;
-              margin-bottom: 6px;
-            }
-            table { 
-              width: 100%; 
-              border-collapse: collapse; 
-              margin-bottom: 20px;
-              flex: 1;
-            }
-            th, td { 
-              border: 1px solid #ddd; 
-              padding: 8px 10px; 
-              text-align: left; 
-              font-size: 13px;
-            }
-            th { 
-              background-color: #f5f5f5; 
-              color: #333; 
-              font-weight: 600; 
-            }
-            tbody tr:nth-child(even) { 
-              background-color: #fafafa; 
-            }
-            .amount-cell { 
-              text-align: right; 
-              font-family: 'Courier New', monospace; 
-            }
-            .total-row { 
-              background-color: #f0f0f0 !important; 
-              font-weight: bold; 
-            }
-            .total-row td { 
-              border-top: 2px solid #333; 
-              padding: 10px;
-            }
-            .footer { 
-              text-align: center; 
-              margin-top: auto; 
-              color: #666; 
-              font-size: 11px; 
-              border-top: 1px solid #eee; 
-              padding-top: 15px; 
-            }
-            @media print {
-              body { 
-                margin: 0; 
-                padding: 20px;
-                height: auto;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>GOODS RECEIVED INVOICE</h1>
-            <div class="company">PrimePre Logistics System</div>
-          </div>
-          
-          <div class="invoice-details">
-            <div class="info-section">
-              <div class="info-row"><strong>Container ID:</strong> <span>${container?.container_id}</span></div>
-              <div class="info-row"><strong>Shipping Mark:</strong> <span>${shippingMark}</span></div>
-              <div class="info-row"><strong>Container Type:</strong> <span>${container?.container_type?.toUpperCase()}</span></div>
-              <div class="info-row"><strong>Offloading Date:</strong> <span>${container?.arrival_date ? new Date(container.arrival_date).toLocaleDateString() : 'N/A'}</span></div>
-            </div>
-            
-            <div class="invoice-number">
-              <h2>Invoice #${invoiceNumber}</h2>
-              <div><strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
-              <div><strong>Total Amount:</strong> ₵${totalAmount.toFixed(2)}</div>
-            </div>
-          </div>
-          
-          <table>
-            <thead>
-              <tr>
-                <th>Supply Tracking</th>
-                <th>Quantity</th>
-                <th>${container?.container_type === 'air' ? 'Weight (kg)' : 'CBM'}</th>
-                <th>Amount (₵)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${items.map(item => {
-                const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
-                const cbmRate = parseFloat(container?.rates?.toString() || '0');
-                let amount = 0;
-                let measurementValue = 0;
-                
-                if (container?.container_type === 'air') {
-                  // Ghana Air: Weight * Dollar Rate * Rate
-                  const weight = parseFloat(item.weight?.toString() || '0') || 0;
-                  amount = weight * dollarRate * cbmRate;
-                  measurementValue = weight;
-                } else {
-                  // Ghana Sea: CBM * Dollar Rate * CBM Rate
-                  const cbm = parseFloat(item.cbm?.toString() || '0') || 0;
-                  amount = cbm * dollarRate * cbmRate;
-                  measurementValue = cbm;
-                }
-                
-                return `
-                  <tr>
-                    <td>${item.supply_tracking}</td>
-                    <td class="amount-cell">${item.quantity}</td>
-                    <td class="amount-cell">${measurementValue.toFixed(container?.container_type === 'air' ? 1 : 3)}</td>
-                    <td class="amount-cell">₵${amount.toFixed(2)}</td>
-                  </tr>
-                `;
-              }).join('')}
-              <tr class="total-row">
-                <td><strong>TOTAL</strong></td>
-                <td class="amount-cell"><strong>${totalQty}</strong></td>
-                <td class="amount-cell"><strong>${container?.container_type === 'air' ? totalWeight.toFixed(1) : totalCBM.toFixed(3)}</strong></td>
-                <td class="amount-cell"><strong>₵${totalAmount.toFixed(2)}</strong></td>
-              </tr>
-            </tbody>
-          </table>
-          
-          <div class="footer">
-            <p>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
-          </div>
-        </body>
-      </html>
-    `;
-    
-    return invoiceHTML;
-  };  const handleDownloadFromPreview = () => {
-    if (!invoiceData) return;
-    
-    const invoiceHTML = generateInvoiceHTML(invoiceData.shippingMark, invoiceData.items, invoiceData.totalAmount);
-    
-    // Generate invoice number for filename
-    const today = new Date();
-    const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    const invoiceNumber = `PM${dateStr}${randomNum}`;
-    
-    // Create and trigger download
-    const blob = new Blob([invoiceHTML], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `invoice-${invoiceNumber}-${invoiceData.shippingMark}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   const mapStatus = (status: string): "pending" | "in-transit" | "delivered" | "delayed" => {
@@ -722,7 +716,7 @@ export default function GoodsReceivedContainerDetailsPage() {
                       }}
                       className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
                     >
-                      Invoice
+                      Download PDF
                     </Button>
                   )}
                 </div>
@@ -829,37 +823,157 @@ export default function GoodsReceivedContainerDetailsPage() {
           containerType={container?.container_type || 'sea'}
         />
       )}
-      
+
       {/* Invoice Preview Dialog */}
-      <Dialog open={showInvoicePreview} onOpenChange={setShowInvoicePreview}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle>Invoice Preview</DialogTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownloadFromPreview}
-              className="ml-auto"
-            >
-              Download Invoice
-            </Button>
-          </DialogHeader>
-          
-          <div className="invoice-preview">
-            {invoiceData && (
-              <div 
-                dangerouslySetInnerHTML={{
-                  __html: generateInvoiceHTML(
-                    invoiceData.shippingMark,
-                    invoiceData.items,
-                    invoiceData.totalAmount
-                  )
-                }}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {showInvoicePreview && previewInvoiceData && (
+        <Dialog open={showInvoicePreview} onOpenChange={setShowInvoicePreview}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <DialogTitle>Invoice Preview</DialogTitle>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleDownloadPDF}
+                  className="ml-4"
+                >
+                  Download PDF
+                </Button>
+              </div>
+            </DialogHeader>
+            
+            <div className="bg-white p-8 rounded-lg border">
+              {/* Logo */}
+              <div className="flex justify-center mb-6">
+                <img 
+                  src="/primepre-logo-1.png" 
+                  alt="PrimePre Logo" 
+                  className="h-20 w-auto object-contain"
+                  onError={(e) => {
+                    console.error('Logo failed to load in preview');
+                    e.currentTarget.style.display = 'none';
+                  }}
+                  onLoad={() => {
+                    console.log('Logo loaded successfully in preview');
+                  }}
+                />
+              </div>
+
+              {/* Header */}
+              <div className="text-center mb-8">
+                <h1 className="text-2xl font-bold mb-2">GOODS RECEIVED INVOICE</h1>
+                <p className="text-gray-600">PrimePre Logistics System</p>
+              </div>
+
+              {/* Invoice Details Grid */}
+              <div className="grid grid-cols-2 gap-8 mb-8">
+                {/* Left Side */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold">Container ID:</span>
+                    <span>{container?.container_id}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold">Shipping Mark:</span>
+                    <span>{previewInvoiceData.shippingMark}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold">Container Type:</span>
+                    <span>{container?.container_type?.toUpperCase()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold">Offloading Date:</span>
+                    <span>{container?.arrival_date ? new Date(container.arrival_date).toLocaleDateString() : 'N/A'}</span>
+                  </div>
+                </div>
+
+                {/* Right Side */}
+                <div className="text-right space-y-2">
+                  <h2 className="text-lg font-bold">Invoice #{previewInvoiceData.invoiceNumber}</h2>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold">Date:</span>
+                    <span>{new Date().toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold">Total Amount:</span>
+                    <span className="text-lg font-bold text-green-600">
+                      GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Supply Tracking</th>
+                      <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Quantity</th>
+                      <th className="border border-gray-300 px-4 py-2 text-right font-semibold">
+                        {container?.container_type === 'air' ? 'Weight (kg)' : 'CBM'}
+                      </th>
+                      <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Amount (GH₵)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewInvoiceData.items.map((item, index) => {
+                      const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
+                      const cbmRate = parseFloat(container?.rates?.toString() || '0');
+                      let amount = 0;
+                      let measurementValue = 0;
+                      
+                      if (container?.container_type === 'air') {
+                        const weight = parseFloat(item.weight?.toString() || '0') || 0;
+                        amount = weight * dollarRate * cbmRate;
+                        measurementValue = weight;
+                      } else {
+                        const cbm = parseFloat(item.cbm?.toString() || '0') || 0;
+                        amount = cbm * dollarRate * cbmRate;
+                        measurementValue = cbm;
+                      }
+
+                      return (
+                        <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                          <td className="border border-gray-300 px-4 py-2">{item.supply_tracking}</td>
+                          <td className="border border-gray-300 px-4 py-2 text-right">{item.quantity}</td>
+                          <td className="border border-gray-300 px-4 py-2 text-right">
+                            {measurementValue.toFixed(container?.container_type === 'air' ? 1 : 3)}
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2 text-right font-medium">
+                            GH₵ {amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {/* Total Row */}
+                    <tr className="bg-gray-100 font-bold">
+                      <td className="border border-gray-300 px-4 py-3">TOTAL</td>
+                      <td className="border border-gray-300 px-4 py-3 text-right">
+                        {previewInvoiceData.items.reduce((sum, item) => sum + (parseInt(item.quantity?.toString() || '0') || 0), 0)}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-3 text-right">
+                        {container?.container_type === 'air'
+                          ? previewInvoiceData.items.reduce((sum, item) => sum + (parseFloat(item.weight?.toString() || '0') || 0), 0).toFixed(1)
+                          : previewInvoiceData.items.reduce((sum, item) => sum + (parseFloat(item.cbm?.toString() || '0') || 0), 0).toFixed(3)
+                        }
+                      </td>
+                      <td className="border border-gray-300 px-4 py-3 text-right text-green-600">
+                        GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Footer */}
+              <div className="mt-8 text-center text-sm text-gray-500">
+                Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
