@@ -331,47 +331,48 @@ export default function SeaCargo() {
   }, [isCustomer]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       {/* Cargo Type Navigation Tabs */}
-      <div className="flex gap-2 border-b border-border pb-2">
+      <div className="flex gap-1 sm:gap-2 border-b border-border pb-2 overflow-x-auto">
         <button
           onClick={() => navigate(isCustomer ? '/customer/cargo/sea' : '/cargos/sea')}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground"
+          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md bg-primary text-primary-foreground shrink-0"
         >
-          <Ship className="h-4 w-4" />
+          <Ship className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           Sea Goods
         </button>
         <button
           onClick={() => navigate(isCustomer ? '/customer/cargo/air' : '/cargos/air')}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
         >
-          <Plane className="h-4 w-4" />
+          <Plane className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           Air Goods
         </button>
       </div>
 
       {/* Page Header */}
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+      <div className="flex flex-col space-y-3 sm:space-y-4">
         <div>
-          <h1 className="text-xl lg:text-2xl font-semibold text-foreground flex items-center">
-            <Ship className="h-5 w-5 lg:h-6 lg:w-6 mr-3 text-primary" />
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-foreground flex items-center">
+            <Ship className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 mr-2 sm:mr-3 text-primary" />
             {isCustomer ? "My Sea Cargo" : "Sea Cargo"}
           </h1>
-          <p className="text-muted-foreground text-sm lg:text-base mt-1">
+          <p className="text-muted-foreground text-xs sm:text-sm lg:text-base mt-1">
             {isCustomer
               ? "View containers where your goods are located"
               : "Track and manage all sea freight shipments • All times shown in your local time zone"}
           </p>
         </div>
         {!isCustomer && (
-          <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
-            <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0">
-              <Plus className="h-4 w-4 mr-2" />
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+            <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0 h-9 sm:h-10 text-xs sm:text-sm">
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
               Add Cargo
             </Button>
             <ExcelUploadButton
               uploadType="sea_cargo"
               variant="outline"
+              className="h-9 sm:h-10 text-xs sm:text-sm"
               onUploadComplete={(response) => {
                 toast({
                   title: "Excel upload completed",
@@ -387,72 +388,73 @@ export default function SeaCargo() {
 
       {/* Summary Cards - Admin Only */}
       {!isCustomer && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="logistics-card p-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+          <div className="logistics-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">
                   Total Containers
                 </div>
-                <div className="text-2xl font-semibold mt-1">
+                <div className="text-lg sm:text-xl md:text-2xl font-semibold mt-0.5 sm:mt-1">
                   {dashboard?.total_containers ?? 0}
                 </div>
               </div>
-              <Package className="h-8 w-8 text-primary/60" />
+              <Package className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-primary/60" />
             </div>
           </div>
-          <div className="logistics-card p-4">
+          <div className="logistics-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-muted-foreground">In Transit</div>
-                <div className="text-2xl font-semibold mt-1">
+                <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">In Transit</div>
+                <div className="text-lg sm:text-xl md:text-2xl font-semibold mt-0.5 sm:mt-1">
                   {dashboard?.containers_in_transit ?? 0}
                 </div>
               </div>
-              <Ship className="h-8 w-8 text-secondary/60" />
+              <Ship className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-secondary/60" />
             </div>
           </div>
-          <div className="logistics-card p-4">
+          <div className="logistics-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-muted-foreground">Total CBM</div>
-                <div className="text-2xl font-semibold mt-1">
+                <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Total CBM</div>
+                <div className="text-lg sm:text-xl md:text-2xl font-semibold mt-0.5 sm:mt-1">
                   {filteredCargo
                     .reduce((sum, c) => sum + (c.cbm || 0), 0)
                     .toFixed(1)}
                 </div>
               </div>
-              <Package className="h-8 w-8 text-accent/60" />
+              <Package className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-accent/60" />
             </div>
           </div>
-          <div className="logistics-card p-4">
+          <div className="logistics-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-muted-foreground">This Month</div>
-                <div className="text-2xl font-semibold mt-1">12</div>
+                <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">This Month</div>
+                <div className="text-lg sm:text-xl md:text-2xl font-semibold mt-0.5 sm:mt-1">12</div>
               </div>
-              <Calendar className="h-8 w-8 text-warning/60" />
+              <Calendar className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-warning/60" />
             </div>
           </div>
         </div>
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:gap-3 md:gap-4">
+        <div className="relative flex-1 max-w-full sm:max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           <Input
             placeholder="Search by container, client, or tracking ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-9 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm"
           />
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
           <Button
             variant={statusFilter === "all" ? "default" : "outline"}
             size="sm"
             onClick={() => setStatusFilter("all")}
+            className="h-8 sm:h-9 text-[11px] sm:text-xs px-2 sm:px-3 shrink-0"
           >
             All
           </Button>
@@ -460,6 +462,7 @@ export default function SeaCargo() {
             variant={statusFilter === "in-transit" ? "default" : "outline"}
             size="sm"
             onClick={() => setStatusFilter("in-transit")}
+            className="h-8 sm:h-9 text-[11px] sm:text-xs px-2 sm:px-3 shrink-0"
           >
             In Transit
           </Button>
@@ -467,6 +470,7 @@ export default function SeaCargo() {
             variant={statusFilter === "pending" ? "default" : "outline"}
             size="sm"
             onClick={() => setStatusFilter("pending")}
+            className="h-8 sm:h-9 text-[11px] sm:text-xs px-2 sm:px-3 shrink-0"
           >
             Pending
           </Button>
@@ -474,6 +478,7 @@ export default function SeaCargo() {
             variant={statusFilter === "delivered" ? "default" : "outline"}
             size="sm"
             onClick={() => setStatusFilter("delivered")}
+            className="h-8 sm:h-9 text-[11px] sm:text-xs px-2 sm:px-3 shrink-0"
           >
             Delivered
           </Button>
@@ -484,14 +489,15 @@ export default function SeaCargo() {
               setSearchTerm("");
               setStatusFilter("all");
             }}
+            className="h-8 sm:h-9 text-[11px] sm:text-xs px-2 sm:px-3 shrink-0"
           >
-            <RefreshCcw className="h-4 w-4 mr-1" /> Reset filters
+            <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Reset
           </Button>
         </div>
       </div>
 
       {/* Cargo Table */}
-      <div className="logistics-card p-4">
+      <div className="logistics-card p-2 sm:p-3 md:p-4 overflow-x-auto">
         <DataTable
           id="sea-cargo"
           rows={filteredCargo}
@@ -499,7 +505,7 @@ export default function SeaCargo() {
           loading={loading}
           defaultSort={{ column: "container", direction: "desc" }}
           empty={
-            <div className="text-muted-foreground">
+            <div className="text-muted-foreground text-xs sm:text-sm">
               {isCustomer
                 ? "No containers found with your goods."
                 : "No sea cargo yet. Add Cargo or Import from Excel."}

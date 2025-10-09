@@ -304,47 +304,48 @@ export default function AirCargo() {
   }, [isCustomer]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       {/* Cargo Type Navigation Tabs */}
-      <div className="flex gap-2 border-b border-border pb-2">
+      <div className="flex gap-1 sm:gap-2 border-b border-border pb-2 overflow-x-auto">
         <button
           onClick={() => navigate(isCustomer ? '/customer/cargo/sea' : '/cargos/sea')}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
         >
-          <Ship className="h-4 w-4" />
+          <Ship className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           Sea Goods
         </button>
         <button
           onClick={() => navigate(isCustomer ? '/customer/cargo/air' : '/cargos/air')}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground"
+          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md bg-primary text-primary-foreground shrink-0"
         >
-          <Plane className="h-4 w-4" />
+          <Plane className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           Air Goods
         </button>
       </div>
 
       {/* Header */}
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+      <div className="flex flex-col space-y-3 sm:space-y-4">
         <div>
-          <h1 className="text-xl lg:text-2xl font-semibold text-foreground flex items-center">
-            <Plane className="h-5 w-5 lg:h-6 lg:w-6 mr-3 text-primary" />
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-foreground flex items-center">
+            <Plane className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 mr-2 sm:mr-3 text-primary" />
             {isCustomer ? "My Air Cargo" : "Air Cargo"}
           </h1>
-          <p className="text-muted-foreground text-sm lg:text-base mt-1">
+          <p className="text-muted-foreground text-xs sm:text-sm lg:text-base mt-1">
             {isCustomer
               ? "View containers where your goods are located"
               : "Manage air freight shipments • All times shown in your local time zone"}
           </p>
         </div>
         {!isCustomer && (
-          <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
-            <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0">
-              <Plus className="h-4 w-4 mr-2" />
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+            <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0 h-9 sm:h-10 text-xs sm:text-sm">
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
               Add Air Container
             </Button>
             <ExcelUploadButton
               uploadType="air_cargo"
               variant="outline"
+              className="h-9 sm:h-10 text-xs sm:text-sm"
               onUploadComplete={(response) => {
                 toast({
                   title: "Excel upload completed",
@@ -359,43 +360,43 @@ export default function AirCargo() {
 
       {/* Summary Cards - Admin Only */}
       {!isCustomer && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="logistics-card p-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+          <div className="logistics-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">
                   Total Shipments
                 </div>
-                <div className="text-2xl font-semibold mt-1">
+                <div className="text-lg sm:text-xl md:text-2xl font-semibold mt-0.5 sm:mt-1">
                   {dashboard?.total_containers ?? 0}
                 </div>
               </div>
-              <Package className="h-8 w-8 text-primary/60" />
+              <Package className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-primary/60" />
             </div>
           </div>
-          <div className="logistics-card p-4">
+          <div className="logistics-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-muted-foreground">In Transit</div>
-                <div className="text-2xl font-semibold mt-1">
+                <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">In Transit</div>
+                <div className="text-lg sm:text-xl md:text-2xl font-semibold mt-0.5 sm:mt-1">
                   {dashboard?.containers_in_transit ?? 0}
                 </div>
               </div>
-              <Plane className="h-8 w-8 text-secondary/60" />
+              <Plane className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-secondary/60" />
             </div>
           </div>
-          <div className="logistics-card p-4">
+          <div className="logistics-card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-muted-foreground">Total Weight</div>
-                <div className="text-2xl font-semibold mt-1">
+                <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Total Weight</div>
+                <div className="text-base sm:text-lg md:text-2xl font-semibold mt-0.5 sm:mt-1">
                   {filteredCargo
                     .reduce(
                       (sum, c) => sum + (c.total_weight || c.weight || 0),
                       0
                     )
                     .toFixed(1)}{" "}
-                  kg
+                  <span className="text-xs sm:text-sm md:text-base">kg</span>
                 </div>
               </div>
               <Package className="h-8 w-8 text-accent/60" />

@@ -575,7 +575,7 @@ class GoodsReceivedContainerSerializer(serializers.ModelSerializer):
     
     def get_goods_items(self, obj):
         """Get goods items, filtered by search query if present in context."""
-        items = obj.goods_items.all()
+        items = obj.goods_items.select_related('customer').all()
         
         # If search query is present in context, filter items
         search_query = self.context.get('search_query', None)
@@ -585,14 +585,16 @@ class GoodsReceivedContainerSerializer(serializers.ModelSerializer):
                 Q(shipping_mark__icontains=search_query) |
                 Q(supply_tracking__icontains=search_query) |
                 Q(description__icontains=search_query) |
-                Q(customer_name__icontains=search_query)
+                Q(customer__company_name__icontains=search_query) |
+                Q(customer__first_name__icontains=search_query) |
+                Q(customer__last_name__icontains=search_query)
             )
         
         return GoodsReceivedItemSerializer(items, many=True).data
     
     def get_items_by_shipping_mark(self, obj):
         """Group items by shipping mark for organized display."""
-        items = obj.goods_items.all()
+        items = obj.goods_items.select_related('customer').all()
         
         # If search query is present in context, filter items
         search_query = self.context.get('search_query', None)
@@ -602,7 +604,9 @@ class GoodsReceivedContainerSerializer(serializers.ModelSerializer):
                 Q(shipping_mark__icontains=search_query) |
                 Q(supply_tracking__icontains=search_query) |
                 Q(description__icontains=search_query) |
-                Q(customer_name__icontains=search_query)
+                Q(customer__company_name__icontains=search_query) |
+                Q(customer__first_name__icontains=search_query) |
+                Q(customer__last_name__icontains=search_query)
             )
         
         grouped = {}

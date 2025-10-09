@@ -120,11 +120,14 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
       className={cn(
         "fixed left-0 top-0 h-full bg-gray-200 border-r border-border transition-all duration-300",
         isMobile
-          ? mobileMenuOpen ? "w-sidebar z-50" : "-translate-x-full z-30"
-          : isCollapsed ? "w-16 sm:w-20 md:w-sidebar-collapsed z-30" : "w-sidebar z-30",
+          ? mobileMenuOpen 
+            ? "w-sidebar z-50" 
+            : "hidden" // Completely hide on mobile when closed
+          : isCollapsed 
+            ? "w-16 sm:w-20 md:w-sidebar-collapsed z-30" 
+            : "w-sidebar z-30",
         "md:z-30"
       )}
-      style={isMobile && !mobileMenuOpen ? { display: 'none' } : {}}
     >
       {/* Header */}
       <div className="flex h-16 items-center justify-between px-4 border-b border-border">

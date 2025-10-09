@@ -491,18 +491,18 @@ export default function GoodsReceivedChinaSea() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-foreground">
             China Warehouse - Sea Cargo
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Manage sea cargo goods received in China warehouse
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <ExcelUploadButton
             uploadType="goods_received"
             warehouse="China"
@@ -516,16 +516,17 @@ export default function GoodsReceivedChinaSea() {
           />
           <Button
             onClick={() => setShowNewGoodsDialog(true)}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
           >
-            <Plus className="h-4 w-4" />
-            Add Goods Received
+            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="hidden xs:inline">Add Goods</span>
+            <span className="xs:hidden">Add</span>
           </Button>
         </div>
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <MetricCard
           title="Total Items"
           value={stats?.total_count || 0}

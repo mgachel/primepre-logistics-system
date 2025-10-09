@@ -64,13 +64,16 @@ export function AppLayout({ children }: AppLayoutProps) {
         className={cn(
           "pt-16 min-h-screen transition-all duration-300",
           isMobile 
-            ? "ml-0" 
+            ? "ml-0 w-full" // Full width on mobile
             : sidebarCollapsed 
               ? "ml-sidebar-collapsed" 
               : "ml-sidebar"
         )}
       >
-        <div className="p-4 md:p-6">
+        <div className={cn(
+          "p-3 sm:p-4 md:p-6",
+          isMobile ? "max-w-full overflow-x-hidden" : ""
+        )}>
           {children}
         </div>
       </main>
