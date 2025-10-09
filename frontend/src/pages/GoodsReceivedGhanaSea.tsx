@@ -196,17 +196,13 @@ export default function GoodsReceivedGhanaSea() {
     }
   };
 
+  // Filter containers - search is handled by API, only filter by status locally
   const filteredContainers = useMemo(() => {
     return containers.filter(container => {
-      const matchesSearch = !searchTerm || 
-        container.container_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        container.created_at?.toLowerCase().includes(searchTerm.toLowerCase());
-      
       const matchesStatus = statusFilter === 'all' || container.status === statusFilter;
-      
-      return matchesSearch && matchesStatus;
+      return matchesStatus;
     });
-  }, [containers, searchTerm, statusFilter]);
+  }, [containers, statusFilter]);
 
   // Table columns - different for customers vs admins
   const columns: Column<GoodsReceivedContainer>[] = isCustomer ? [

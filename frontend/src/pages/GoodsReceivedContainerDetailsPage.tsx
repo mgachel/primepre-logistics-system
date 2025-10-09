@@ -192,8 +192,16 @@ export default function GoodsReceivedContainerDetailsPage() {
   };
 
   const generateInvoiceHTML = (shippingMark: string, items: GoodsReceivedItem[], totalAmount: number) => {
-    // Get client information from the first item (all items in a shipping mark should have the same client)
-    const clientName = items[0]?.customer_name || 'N/A';
+    // Calculate totals
+    const totalQty = items.reduce((sum, item) => sum + (parseInt(item.quantity?.toString() || '0') || 0), 0);
+    const totalCBM = items.reduce((sum, item) => sum + (parseFloat(item.cbm?.toString() || '0') || 0), 0);
+    const totalWeight = items.reduce((sum, item) => sum + (parseFloat(item.weight?.toString() || '0') || 0), 0);
+    
+    // Generate invoice number: PM + date + random number
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const invoiceNumber = `PM${dateStr}${randomNum}`;
     
     // Generate invoice HTML for goods received
     const invoiceHTML = `
@@ -320,14 +328,12 @@ export default function GoodsReceivedContainerDetailsPage() {
             <div class="info-section">
               <div class="info-row"><strong>Container ID:</strong> <span>${container?.container_id}</span></div>
               <div class="info-row"><strong>Shipping Mark:</strong> <span>${shippingMark}</span></div>
-              <div class="info-row"><strong>Client:</strong> <span>${clientName}</span></div>
               <div class="info-row"><strong>Container Type:</strong> <span>${container?.container_type?.toUpperCase()}</span></div>
               <div class="info-row"><strong>Offloading Date:</strong> <span>${container?.arrival_date ? new Date(container.arrival_date).toLocaleDateString() : 'N/A'}</span></div>
-              ${container?.dollar_rate ? `<div class="info-row"><strong>Rate:</strong> <span>₵${parseFloat(container.dollar_rate.toString()).toFixed(2)} per ${container.container_type === 'air' ? 'kg' : 'CBM'}</span></div>` : ''}
             </div>
             
             <div class="invoice-number">
-              <h2>Invoice #${container?.container_id}-${shippingMark}</h2>
+              <h2>Invoice #${invoiceNumber}</h2>
               <div><strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
               <div><strong>Total Amount:</strong> ₵${totalAmount.toFixed(2)}</div>
             </div>
@@ -364,14 +370,16 @@ export default function GoodsReceivedContainerDetailsPage() {
                 return `
                   <tr>
                     <td>${item.supply_tracking}</td>
-                    <td>${item.quantity}</td>
-                    <td>${measurementValue.toFixed(container?.container_type === 'air' ? 1 : 3)}</td>
+                    <td class="amount-cell">${item.quantity}</td>
+                    <td class="amount-cell">${measurementValue.toFixed(container?.container_type === 'air' ? 1 : 3)}</td>
                     <td class="amount-cell">₵${amount.toFixed(2)}</td>
                   </tr>
                 `;
               }).join('')}
               <tr class="total-row">
-                <td colspan="3"><strong>TOTAL AMOUNT</strong></td>
+                <td><strong>TOTAL</strong></td>
+                <td class="amount-cell"><strong>${totalQty}</strong></td>
+                <td class="amount-cell"><strong>${container?.container_type === 'air' ? totalWeight.toFixed(1) : totalCBM.toFixed(3)}</strong></td>
                 <td class="amount-cell"><strong>₵${totalAmount.toFixed(2)}</strong></td>
               </tr>
             </tbody>
@@ -390,12 +398,18 @@ export default function GoodsReceivedContainerDetailsPage() {
     
     const invoiceHTML = generateInvoiceHTML(invoiceData.shippingMark, invoiceData.items, invoiceData.totalAmount);
     
+    // Generate invoice number for filename
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const invoiceNumber = `PM${dateStr}${randomNum}`;
+    
     // Create and trigger download
     const blob = new Blob([invoiceHTML], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `goods-received-invoice-${invoiceData.shippingMark}-${new Date().toISOString().split('T')[0]}.html`;
+    a.download = `invoice-${invoiceNumber}-${invoiceData.shippingMark}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -533,31 +547,31 @@ export default function GoodsReceivedContainerDetailsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       {/* Back Button */}
       <div className="mb-2">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3">
+          <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Back
         </Button>
       </div>
 
       {/* Header */}
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+      <div className="flex flex-col space-y-3 sm:space-y-4">
         <div>
-          <h1 className="text-xl lg:text-2xl font-semibold">{container.container_id}</h1>
-          <p className="text-muted-foreground text-sm lg:text-base">
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">{container.container_id}</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm lg:text-base">
             {container.container_type === "sea" ? "Sea" : "Air"} Goods Received •{" "}
             {goodsItems.length} items • {container.location === "china" ? "China" : "Ghana"}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={refreshData}>
-            <RefreshCcw className="h-4 w-4" /> Refresh
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={refreshData} className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3">
+            <RefreshCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Refresh
           </Button>
           {!isCustomer && (
             <>
-              <Button variant="outline" size="sm" onClick={() => setShowEditContainerDialog(true)}>
-                <Edit className="h-4 w-4" /> Edit Container
+              <Button variant="outline" size="sm" onClick={() => setShowEditContainerDialog(true)} className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3">
+                <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Edit
               </Button>
               <ExcelUploadButton
                 uploadType="goods_received"
@@ -567,12 +581,13 @@ export default function GoodsReceivedContainerDetailsPage() {
                   refreshData();
                 }}
                 size="sm"
+                className="h-8 sm:h-9 text-xs sm:text-sm"
               />
-              <Button size="sm" onClick={() => setShowAddShippingMarkGroupDialog(true)} className="bg-primary">
-                <Plus className="h-4 w-4" /> Add Shipping Mark Group
+              <Button size="sm" onClick={() => setShowAddShippingMarkGroupDialog(true)} className="bg-primary h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3">
+                <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Add Group
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowAddItemDialog(true)}>
-                <Plus className="h-4 w-4" /> Add Single Item
+              <Button variant="outline" size="sm" onClick={() => setShowAddItemDialog(true)} className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3">
+                <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Add Item
               </Button>
             </>
           )}
@@ -580,47 +595,47 @@ export default function GoodsReceivedContainerDetailsPage() {
       </div>
 
       {/* Container Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="logistics-card p-4">
-          <div className="text-sm text-muted-foreground">Rate</div>
-          <div className="font-medium">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+        <div className="logistics-card p-3 sm:p-4">
+          <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Rate</div>
+          <div className="font-medium text-sm sm:text-base">
             {container.rates ? `₵${container.rates}` : "Not set"}
           </div>
         </div>
-        <div className="logistics-card p-4">
-          <div className="text-sm text-muted-foreground">Offloading Date</div>
-          <div className="font-medium">
+        <div className="logistics-card p-3 sm:p-4">
+          <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Offloading Date</div>
+          <div className="font-medium text-sm sm:text-base">
             {container.arrival_date ? formatDate(container.arrival_date) : "Not set"}
           </div>
         </div>
-        <div className="logistics-card p-4">
-          <div className="text-sm text-muted-foreground">Total Items</div>
-          <div className="font-medium">{container.total_items_count || 0}</div>
+        <div className="logistics-card p-3 sm:p-4">
+          <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Total Items</div>
+          <div className="font-medium text-sm sm:text-base">{container.total_items_count || 0}</div>
         </div>
-        <div className="logistics-card p-4">
-          <div className="text-sm text-muted-foreground">Dollar Rate</div>
-          <div className="font-medium">
+        <div className="logistics-card p-3 sm:p-4">
+          <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">Dollar Rate</div>
+          <div className="font-medium text-sm sm:text-base">
             {container.dollar_rate ? `$${container.dollar_rate}` : "Not set"}
           </div>
         </div>
       </div>
 
       {/* Search Field */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-3.5 w-3.5 sm:h-4 sm:w-4" />
           <Input
             type="text"
             placeholder="Search by shipping mark, description, or supply tracking..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-9 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm"
           />
         </div>
       </div>
 
       {/* Grouped by Shipping Mark */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {Object.entries(groupedByShippingMark).map(([mark, items]) => {
           const totalCBM = items.reduce((sum, i) => sum + (parseFloat(i.cbm?.toString() || '0') || 0), 0);
           const totalWeight = items.reduce((sum, i) => sum + (parseFloat(i.weight?.toString() || '0') || 0), 0);
@@ -647,29 +662,29 @@ export default function GoodsReceivedContainerDetailsPage() {
             : 0;
 
           return (
-            <div key={mark} className="logistics-card p-4">
+            <div key={mark} className="logistics-card p-3 sm:p-4">
               {/* Group Row */}
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div
                   className="flex-1 cursor-pointer"
                   onClick={() =>
                     setExpandedMark(expandedMark === mark ? null : mark)
                   }
                 >
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                     <div>
-                      <h3 className="font-semibold">{mark}</h3>
-                      <p className="text-sm text-muted-foreground">
+                      <h3 className="font-semibold text-sm sm:text-base">{mark}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         {items.length} item{items.length > 1 ? "s" : ""}
                       </p>
                     </div>
-                    <div className="flex gap-8">
+                    <div className="flex flex-wrap gap-3 sm:gap-6 text-xs sm:text-sm">
                       {container?.container_type === "sea" ? (
-                        <span>CBM: {totalCBM.toFixed(5)}</span>
+                        <span>CBM: <span className="font-medium">{totalCBM.toFixed(5)}</span></span>
                       ) : (
-                        <span>Weight: {totalWeight.toFixed(1)} kg</span>
+                        <span>Weight: <span className="font-medium">{totalWeight.toFixed(1)} kg</span></span>
                       )}
-                      <span>Qty: {totalQty}</span>
+                      <span>Qty: <span className="font-medium">{totalQty}</span></span>
                       {/* Show total amount if dollar rate is set */}
                       {container?.dollar_rate && (
                         <span className="font-semibold text-green-600">
@@ -681,7 +696,7 @@ export default function GoodsReceivedContainerDetailsPage() {
                 </div>
                 
                 {/* Action Buttons */}
-                <div className="flex gap-2 ml-4">
+                <div className="flex gap-2 flex-wrap sm:flex-nowrap ml-0 sm:ml-4">
                   {/* View Group Button - Available to all users */}
                   <Button
                     variant="outline"
@@ -690,9 +705,10 @@ export default function GoodsReceivedContainerDetailsPage() {
                       e.stopPropagation();
                       handleViewGroup(mark, items);
                     }}
+                    className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
                   >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Items
+                    <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    View
                   </Button>
                   
                   {/* Download Invoice Button - Only when dollar rate is set */}
@@ -704,8 +720,9 @@ export default function GoodsReceivedContainerDetailsPage() {
                         e.stopPropagation();
                         handlePreviewInvoice(mark, items, totalAmount);
                       }}
+                      className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
                     >
-                      Preview Invoice
+                      Invoice
                     </Button>
                   )}
                 </div>
@@ -713,7 +730,7 @@ export default function GoodsReceivedContainerDetailsPage() {
 
               {/* Expanded Items Table */}
               {expandedMark === mark && (
-                <div className="mt-4 pt-4 border-t">
+                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t overflow-x-auto">
                   <DataTable
                     id="goods-received-items"
                     columns={columns}
@@ -740,7 +757,7 @@ export default function GoodsReceivedContainerDetailsPage() {
 
       {/* No items message */}
       {Object.keys(groupedByShippingMark).length === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
+        <div className="text-center py-6 sm:py-8 text-muted-foreground text-xs sm:text-sm">
           {searchQuery ? "No items match your search criteria" : "No goods received items in this container yet"}
         </div>
       )}
@@ -816,8 +833,16 @@ export default function GoodsReceivedContainerDetailsPage() {
       {/* Invoice Preview Dialog */}
       <Dialog open={showInvoicePreview} onOpenChange={setShowInvoicePreview}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+          <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>Invoice Preview</DialogTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadFromPreview}
+              className="ml-auto"
+            >
+              Download Invoice
+            </Button>
           </DialogHeader>
           
           <div className="invoice-preview">

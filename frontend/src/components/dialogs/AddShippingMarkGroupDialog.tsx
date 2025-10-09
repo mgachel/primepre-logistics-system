@@ -687,21 +687,21 @@ export function AddShippingMarkGroupDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[95vw] sm:max-w-[600px] md:max-w-[750px] lg:max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0">
-        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 shrink-0">
-          <DialogTitle className="text-base sm:text-lg md:text-xl">
+      <DialogContent className="w-[98vw] max-w-[95vw] sm:max-w-[600px] md:max-w-[750px] lg:max-w-[900px] h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0">
+        <DialogHeader className="px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-2 shrink-0 space-y-1 sm:space-y-2">
+          <DialogTitle className="text-sm sm:text-base md:text-lg lg:text-xl leading-tight">
             {step === 'select-client' ? 'Add Shipping Mark Group' : (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <span className="text-sm sm:text-base">Add Items for {selectedClient?.shippingMark}</span>
                 {savedItemsCount > 0 && (
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 py-0.5">
                     {savedItemsCount} saved
                   </Badge>
                 )}
               </div>
             )}
           </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">
+          <DialogDescription className="text-[11px] sm:text-xs md:text-sm leading-tight">
             {step === 'select-client' 
               ? 'Select a shipping mark/client, then add multiple items under that group'
               : savedItemsCount > 0
@@ -712,100 +712,103 @@ export function AddShippingMarkGroupDialog({
         </DialogHeader>
 
         {step === 'select-client' && (
-          <div className="space-y-4 py-4 px-4 sm:px-6 overflow-y-auto flex-1">
-            <div className="space-y-2">
-              <Label className="text-xs sm:text-sm">Select Shipping Mark / Client *</Label>
-              <Popover
-                open={clientPopoverOpen}
-                onOpenChange={setClientPopoverOpen}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={clientPopoverOpen}
-                    className="w-full justify-between h-auto min-h-[40px] py-2 text-sm"
-                  >
-                    {selectedClient
-                      ? (
-                        <div className="flex flex-col items-start gap-1">
-                          <span className="font-semibold text-sm">{selectedClient.shippingMark || "No Shipping Mark"}</span>
-                          <span className="text-xs text-muted-foreground">{selectedClient.displayName}</span>
-                        </div>
-                      )
-                      : "Select shipping mark / client..."}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start">
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Search by shipping mark or name..."
-                      value={clientQuery}
-                      onValueChange={setClientQuery}
-                      className="text-sm"
-                    />
-                    <CommandList>
-                      <CommandEmpty>
-                        {clientsLoading
-                          ? "Loading clients..."
-                          : clientsError
-                            ? `No clients found. ${clientsError}`
-                            : "No clients found."}
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {clients.map((c) => (
-                          <CommandItem
-                            key={c.id}
-                            className="flex flex-col items-start gap-1"
-                            onSelect={() => handleClientSelected(c)}
-                          >
-                            <span className="font-semibold tracking-tight">
-                              {c.shippingMark || "No Shipping Mark"}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {c.displayName}
-                              {c.phone ? ` • ${c.phone}` : ""}
-                            </span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
+          <ScrollArea className="flex-1 px-3 sm:px-4 md:px-6">
+            <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label className="text-xs sm:text-sm font-medium">Select Shipping Mark / Client *</Label>
+                <Popover
+                  open={clientPopoverOpen}
+                  onOpenChange={setClientPopoverOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={clientPopoverOpen}
+                      className="w-full justify-between h-auto min-h-[44px] sm:min-h-[40px] py-2 px-3 text-xs sm:text-sm text-left"
+                    >
+                      {selectedClient
+                        ? (
+                          <div className="flex flex-col items-start gap-0.5 sm:gap-1">
+                            <span className="font-semibold text-xs sm:text-sm">{selectedClient.shippingMark || "No Shipping Mark"}</span>
+                            <span className="text-[10px] sm:text-xs text-muted-foreground line-clamp-1">{selectedClient.displayName}</span>
+                          </div>
+                        )
+                        : "Select shipping mark / client..."}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[calc(100vw-1.5rem)] sm:w-[500px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Search by shipping mark or name..."
+                        value={clientQuery}
+                        onValueChange={setClientQuery}
+                        className="text-xs sm:text-sm h-10 sm:h-9"
+                      />
+                      <CommandList className="max-h-[50vh] sm:max-h-[300px]">
+                        <CommandEmpty className="py-4 text-xs sm:text-sm">
+                          {clientsLoading
+                            ? "Loading clients..."
+                            : clientsError
+                              ? `No clients found. ${clientsError}`
+                              : "No clients found."}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {clients.map((c) => (
+                            <CommandItem
+                              key={c.id}
+                              className="flex flex-col items-start gap-0.5 sm:gap-1 py-2.5 sm:py-2"
+                              onSelect={() => handleClientSelected(c)}
+                            >
+                              <span className="font-semibold tracking-tight text-xs sm:text-sm">
+                                {c.shippingMark || "No Shipping Mark"}
+                              </span>
+                              <span className="text-[10px] sm:text-xs text-muted-foreground">
+                                {c.displayName}
+                                {c.phone ? ` • ${c.phone}` : ""}
+                              </span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-              >
-                Cancel
-              </Button>
+              <div className="flex justify-end gap-2 pt-2 sm:pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  className="h-9 sm:h-10 px-4 text-xs sm:text-sm"
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
-          </div>
+          </ScrollArea>
         )}
 
         {step === 'add-items' && (
-          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 py-2 px-4 sm:px-6 border-b shrink-0">
-              <div className="flex items-center gap-2">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 py-2 sm:py-2.5 px-3 sm:px-4 md:px-6 border-b shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={handleBackToClientSelection}
-                  className="h-8 text-xs sm:text-sm"
+                  className="h-7 sm:h-8 text-[11px] sm:text-xs px-2 sm:px-3"
                 >
                   ← Change Client
                 </Button>
-                <Badge variant="secondary" className="font-semibold text-xs">
+                <Badge variant="secondary" className="font-semibold text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5">
                   {selectedClient?.shippingMark}
                 </Badge>
               </div>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs">
                 <span className="text-muted-foreground">
                   {items.length} item{items.length !== 1 ? 's' : ''}
                 </span>
@@ -822,30 +825,30 @@ export function AddShippingMarkGroupDialog({
               </div>
             </div>
 
-            <ScrollArea className="flex-1 px-4 sm:px-6">
-              <div className="space-y-3 sm:space-y-4 py-4">
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="space-y-2.5 sm:space-y-3 md:space-y-4 py-3 sm:py-4 px-3 sm:px-4 md:px-6">
                 {items.map((item, index) => (
                   <Card key={item.id} className="relative">
-                    <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-6">
+                    <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6 pt-3 sm:pt-4">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm sm:text-base">Item {index + 1}</CardTitle>
+                        <CardTitle className="text-sm sm:text-base font-semibold">Item {index + 1}</CardTitle>
                         {items.length > 1 && (
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => removeItem(item.id)}
-                            className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive"
+                            className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                           >
-                            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </Button>
                         )}
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-2 sm:space-y-3 px-3 sm:px-6 pb-3 sm:pb-6">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                        <div>
-                          <Label htmlFor={`supply-tracking-${item.id}`} className="text-xs">
+                    <CardContent className="space-y-2 sm:space-y-2.5 px-3 sm:px-4 md:px-6 pb-3 sm:pb-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 md:gap-3">
+                        <div className="space-y-1 sm:space-y-1.5">
+                          <Label htmlFor={`supply-tracking-${item.id}`} className="text-[11px] sm:text-xs font-medium">
                             Supply Tracking *
                           </Label>
                           <Input
@@ -853,12 +856,12 @@ export function AddShippingMarkGroupDialog({
                             value={item.supplyTracking}
                             onChange={(e) => handleItemChange(item.id, 'supplyTracking', e.target.value)}
                             placeholder="e.g., SPT-001234"
-                            className="h-9"
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
                           />
                         </div>
-                        <div>
-                          <Label htmlFor={`quantity-${item.id}`} className="text-xs">
-                            Quantity *
+                        <div className="space-y-1 sm:space-y-1.5">
+                          <Label htmlFor={`quantity-${item.id}`} className="text-[11px] sm:text-xs font-medium">
+                            Quantity (CTNS) *
                           </Label>
                           <Input
                             id={`quantity-${item.id}`}
@@ -867,13 +870,13 @@ export function AddShippingMarkGroupDialog({
                             value={item.quantity}
                             onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value)}
                             placeholder="e.g., 10"
-                            className="h-9"
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
                           />
                         </div>
                       </div>
 
-                      <div>
-                        <Label htmlFor={`description-${item.id}`} className="text-xs">
+                      <div className="space-y-1 sm:space-y-1.5">
+                        <Label htmlFor={`description-${item.id}`} className="text-[11px] sm:text-xs font-medium">
                           Description
                         </Label>
                         <Input
@@ -881,21 +884,21 @@ export function AddShippingMarkGroupDialog({
                           value={item.description}
                           onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
                           placeholder="Brief description"
-                          className="h-9"
+                          className="h-9 sm:h-10 text-xs sm:text-sm"
                         />
                       </div>
 
                       {containerType === 'sea' && (
                         <>
                           {/* CBM Entry Mode Toggle */}
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-3 bg-muted/50 rounded-md">
-                            <Label className="text-xs font-medium shrink-0">CBM Entry Method:</Label>
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-2 p-2.5 sm:p-3 bg-muted/50 rounded-md">
+                            <Label className="text-[11px] sm:text-xs font-medium shrink-0">CBM Entry Method:</Label>
                             <div className="flex gap-1 flex-wrap">
                               <Button
                                 type="button"
                                 variant={item.cbmEntryMode === 'dimensions' ? 'default' : 'outline'}
                                 size="sm"
-                                className="h-8 text-xs px-3"
+                                className="h-7 sm:h-8 text-[10px] sm:text-xs px-2 sm:px-3"
                                 onClick={() => handleCbmEntryModeChange(item.id, 'dimensions')}
                               >
                                 Enter Dimensions
@@ -904,7 +907,7 @@ export function AddShippingMarkGroupDialog({
                                 type="button"
                                 variant={item.cbmEntryMode === 'direct' ? 'default' : 'outline'}
                                 size="sm"
-                                className="h-8 text-xs px-3"
+                                className="h-7 sm:h-8 text-[10px] sm:text-xs px-2 sm:px-3"
                                 onClick={() => handleCbmEntryModeChange(item.id, 'direct')}
                               >
                                 Enter CBM Directly
@@ -915,9 +918,9 @@ export function AddShippingMarkGroupDialog({
                           {/* Dimensions Entry Mode */}
                           {item.cbmEntryMode === 'dimensions' && (
                             <>
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                                <div>
-                                  <Label htmlFor={`length-${item.id}`} className="text-xs">
+                              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 md:gap-3">
+                                <div className="space-y-1 sm:space-y-1.5">
+                                  <Label htmlFor={`length-${item.id}`} className="text-[11px] sm:text-xs font-medium">
                                     Length (cm) *
                                   </Label>
                                   <Input
@@ -928,11 +931,11 @@ export function AddShippingMarkGroupDialog({
                                     value={item.length}
                                     onChange={(e) => handleItemChange(item.id, 'length', e.target.value)}
                                     placeholder="cm"
-                                    className="h-9 sm:h-10"
+                                    className="h-9 sm:h-10 text-xs sm:text-sm"
                                   />
                                 </div>
-                                <div>
-                                  <Label htmlFor={`breadth-${item.id}`} className="text-xs">
+                                <div className="space-y-1 sm:space-y-1.5">
+                                  <Label htmlFor={`breadth-${item.id}`} className="text-[11px] sm:text-xs font-medium">
                                     Breadth (cm) *
                                   </Label>
                                   <Input
@@ -943,11 +946,11 @@ export function AddShippingMarkGroupDialog({
                                     value={item.breadth}
                                     onChange={(e) => handleItemChange(item.id, 'breadth', e.target.value)}
                                     placeholder="cm"
-                                    className="h-9 sm:h-10"
+                                    className="h-9 sm:h-10 text-xs sm:text-sm"
                                   />
                                 </div>
-                                <div>
-                                  <Label htmlFor={`height-${item.id}`} className="text-xs">
+                                <div className="space-y-1 sm:space-y-1.5">
+                                  <Label htmlFor={`height-${item.id}`} className="text-[11px] sm:text-xs font-medium">
                                     Height (cm) *
                                   </Label>
                                   <Input
@@ -958,12 +961,12 @@ export function AddShippingMarkGroupDialog({
                                     value={item.height}
                                     onChange={(e) => handleItemChange(item.id, 'height', e.target.value)}
                                     placeholder="cm"
-                                    className="h-9 sm:h-10"
+                                    className="h-9 sm:h-10 text-xs sm:text-sm"
                                   />
                                 </div>
                               </div>
-                              <div>
-                                <Label htmlFor={`cbm-${item.id}`} className="text-xs">
+                              <div className="space-y-1 sm:space-y-1.5">
+                                <Label htmlFor={`cbm-${item.id}`} className="text-[11px] sm:text-xs font-medium">
                                   CBM (auto-calculated)
                                 </Label>
                                 <Input
@@ -971,7 +974,7 @@ export function AddShippingMarkGroupDialog({
                                   type="text"
                                   value={item.cbm}
                                   readOnly
-                                  className="bg-muted h-9 sm:h-10 font-medium"
+                                  className="bg-muted h-9 sm:h-10 font-medium text-xs sm:text-sm"
                                   placeholder="Calculated from dimensions"
                                 />
                               </div>
@@ -980,8 +983,8 @@ export function AddShippingMarkGroupDialog({
 
                           {/* Direct CBM Entry Mode */}
                           {item.cbmEntryMode === 'direct' && (
-                            <div>
-                              <Label htmlFor={`cbm-direct-${item.id}`} className="text-xs">
+                            <div className="space-y-1 sm:space-y-1.5">
+                              <Label htmlFor={`cbm-direct-${item.id}`} className="text-[11px] sm:text-xs font-medium">
                                 CBM *
                               </Label>
                               <Input
@@ -992,9 +995,9 @@ export function AddShippingMarkGroupDialog({
                                 value={item.cbm}
                                 onChange={(e) => handleItemChange(item.id, 'cbm', e.target.value)}
                                 placeholder="e.g., 1.25"
-                                className="h-9 sm:h-10"
+                                className="h-9 sm:h-10 text-xs sm:text-sm"
                               />
-                              <p className="text-xs text-muted-foreground mt-1">
+                              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                                 Enter the total CBM directly without dimensions
                               </p>
                             </div>
@@ -1003,8 +1006,8 @@ export function AddShippingMarkGroupDialog({
                       )}
 
                       {containerType === 'air' && (
-                        <div>
-                          <Label htmlFor={`weight-${item.id}`} className="text-xs">
+                        <div className="space-y-1 sm:space-y-1.5">
+                          <Label htmlFor={`weight-${item.id}`} className="text-[11px] sm:text-xs font-medium">
                             Weight (kg) *
                           </Label>
                           <Input
@@ -1015,13 +1018,13 @@ export function AddShippingMarkGroupDialog({
                             value={item.weight}
                             onChange={(e) => handleItemChange(item.id, 'weight', e.target.value)}
                             placeholder="e.g., 15.5"
-                            className="h-9 sm:h-10"
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
                           />
                         </div>
                       )}
 
-                      <div>
-                        <Label htmlFor={`notes-${item.id}`} className="text-xs">
+                      <div className="space-y-1 sm:space-y-1.5">
+                        <Label htmlFor={`notes-${item.id}`} className="text-[11px] sm:text-xs font-medium">
                           Notes
                         </Label>
                         <Textarea
@@ -1030,7 +1033,7 @@ export function AddShippingMarkGroupDialog({
                           onChange={(e) => handleItemChange(item.id, 'notes', e.target.value)}
                           placeholder="Additional information..."
                           rows={2}
-                          className="resize-none text-sm"
+                          className="resize-none text-xs sm:text-sm min-h-[60px]"
                         />
                       </div>
                     </CardContent>
@@ -1041,17 +1044,17 @@ export function AddShippingMarkGroupDialog({
                   type="button"
                   variant="outline"
                   onClick={addItem}
-                  className="w-full h-10 text-sm"
+                  className="w-full h-10 sm:h-11 text-xs sm:text-sm font-medium"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
                   Add Another Item
                 </Button>
               </div>
             </ScrollArea>
 
-            <DialogFooter className="pt-3 sm:pt-4 px-4 sm:px-6 border-t shrink-0">
-              <div className="flex flex-col sm:flex-row gap-3 w-full">
-                <div className="flex-1 text-left text-xs sm:text-sm">
+            <DialogFooter className="pt-3 sm:pt-4 px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 border-t shrink-0">
+              <div className="flex flex-col gap-2.5 sm:gap-3 w-full">
+                <div className="flex-1 text-left text-[11px] sm:text-xs">
                   {items.length > 0 && (
                     <div className="space-y-1">
                       <div className="text-muted-foreground">
@@ -1067,13 +1070,13 @@ export function AddShippingMarkGroupDialog({
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2 flex-wrap justify-end">
+                <div className="flex gap-1.5 sm:gap-2 flex-wrap">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleFinishAndClose}
                     disabled={loading}
-                    className="h-9 sm:h-10 text-xs sm:text-sm"
+                    className="h-9 sm:h-10 text-[11px] sm:text-xs px-3 sm:px-4 flex-1 sm:flex-initial min-w-[100px]"
                   >
                     {savedItemsCount > 0 ? 'Finish & Close' : 'Cancel'}
                   </Button>
@@ -1082,14 +1085,14 @@ export function AddShippingMarkGroupDialog({
                     variant="secondary"
                     disabled={loading || items.length === 0}
                     onClick={handleSaveAndViewInvoice}
-                    className="h-9 sm:h-10 text-xs sm:text-sm"
+                    className="h-9 sm:h-10 text-[11px] sm:text-xs px-3 sm:px-4 flex-1 sm:flex-initial min-w-[120px]"
                   >
                     {loading ? "Processing..." : "Save & View Invoice"}
                   </Button>
                   <Button 
                     type="submit" 
                     disabled={loading || items.length === 0}
-                    className="h-9 sm:h-10 text-xs sm:text-sm"
+                    className="h-9 sm:h-10 text-[11px] sm:text-xs px-3 sm:px-4 flex-1 sm:flex-initial min-w-[100px]"
                   >
                     {loading ? "Saving..." : `Save & Add More`}
                   </Button>

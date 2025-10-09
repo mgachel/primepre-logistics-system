@@ -992,7 +992,9 @@ class GoodsReceivedContainerViewSet(viewsets.ModelViewSet):
         'goods_items__shipping_mark',
         'goods_items__supply_tracking',
         'goods_items__description',
-        'goods_items__customer_name',
+        'goods_items__customer__company_name',
+        'goods_items__customer__first_name',
+        'goods_items__customer__last_name',
     ]
     ordering_fields = ['created_at', 'arrival_date', 'status']
     ordering = ['-created_at']
@@ -1001,7 +1003,7 @@ class GoodsReceivedContainerViewSet(viewsets.ModelViewSet):
         from .models import GoodsReceivedContainer
         from django.db.models import Q
         
-        queryset = GoodsReceivedContainer.objects.all().prefetch_related('goods_items')
+        queryset = GoodsReceivedContainer.objects.all().prefetch_related('goods_items', 'goods_items__customer')
         
         # Enhanced custom search functionality - search in both container fields and item fields
         search = self.request.query_params.get('search')
@@ -1012,7 +1014,9 @@ class GoodsReceivedContainerViewSet(viewsets.ModelViewSet):
                 Q(goods_items__shipping_mark__icontains=search) |
                 Q(goods_items__supply_tracking__icontains=search) |
                 Q(goods_items__description__icontains=search) |
-                Q(goods_items__customer_name__icontains=search)
+                Q(goods_items__customer__company_name__icontains=search) |
+                Q(goods_items__customer__first_name__icontains=search) |
+                Q(goods_items__customer__last_name__icontains=search)
             ).distinct()
         
         return queryset

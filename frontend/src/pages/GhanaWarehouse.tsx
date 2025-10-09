@@ -339,22 +339,23 @@ export default function GhanaWarehouse() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+      <div className="flex flex-col space-y-3 sm:space-y-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
+          <h1 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-foreground">
             Ghana Warehouse
           </h1>
-          <p className="text-muted-foreground text-sm lg:text-base">
+          <p className="text-muted-foreground text-xs sm:text-sm lg:text-base">
             Manage goods available in Ghana warehouses
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ExcelUploadButton
             uploadType="goods_received"
             warehouse="Ghana"
             variant="outline"
             size="sm"
+            className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
             onUploadComplete={(response) => {
               toast({
                 title: "Excel upload completed",
@@ -364,22 +365,22 @@ export default function GhanaWarehouse() {
               setSearch((s) => s); // Trigger reload
             }}
           >
-            <Upload className="h-4 w-4" />
-            Import Excel
+            <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden xs:inline">Import </span>Excel
           </ExcelUploadButton>
-          <Button variant="outline" size="sm" onClick={onExportTemplate}>
-            <Download className="h-4 w-4" />
+          <Button variant="outline" size="sm" onClick={onExportTemplate} className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3">
+            <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             Template
           </Button>
-          <Button size="sm" onClick={() => setShowNewGoodsDialog(true)}>
-            <Plus className="h-4 w-4" />
+          <Button size="sm" onClick={() => setShowNewGoodsDialog(true)} className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3">
+            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             Add Goods
           </Button>
         </div>
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
         <MetricCard
           title="Total Items"
           value={(stats?.total_count ?? 0).toString()}
@@ -404,22 +405,22 @@ export default function GhanaWarehouse() {
       </div>
 
       {/* Goods Management Section */}
-      <div className="logistics-card p-6">
-        <div className="space-y-4">
+      <div className="logistics-card p-3 sm:p-4 md:p-6">
+        <div className="space-y-3 sm:space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-foreground">
+            <h3 className="text-base sm:text-lg font-semibold text-foreground">
               Ghana Warehouse Inventory
             </h3>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-xs sm:text-sm">
               Track and manage all goods available in Ghana warehouses
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by shipping mark, tracking, supplier"
-                className="pl-10"
+                className="pl-9 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -428,7 +429,7 @@ export default function GhanaWarehouse() {
               value={status}
               onValueChange={(v) => setStatus(v as typeof status)}
             >
-              <SelectTrigger className="w-full sm:w-[220px]">
+              <SelectTrigger className="w-full sm:w-[200px] md:w-[220px] h-9 sm:h-10 text-xs sm:text-sm">
                 <SelectValue placeholder="Filter by status..." />
               </SelectTrigger>
               <SelectContent>
