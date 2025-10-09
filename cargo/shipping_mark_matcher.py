@@ -1,8 +1,9 @@
 """
 Shipping mark matching service for Excel upload processing.
-Handles matching imported shipping marks with existing CustomerUser records.
+Groups candidates by shipping mark (client) and prevents duplicate summaries.
 """
-from typing import List, Dict, Any, Optional, Tuple
+
+from typing import List, Dict, Any
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -10,174 +11,72 @@ from .excel_utils import normalize_shipping_mark
 import logging
 
 logger = logging.getLogger(__name__)
-
 CustomerUser = get_user_model()
 
 
 class ShippingMarkMatcher:
-    """Service for matching shipping marks from Excel with existing customers."""
-    
+    """Service for matching and grouping shipping marks from Excel uploads."""
+
     def __init__(self, container_id: str):
         self.container_id = container_id
         self.customer_cache = {}
         self._load_customers()
-    
+
     def _load_customers(self):
-        """Load and cache all customers with their normalized shipping marks."""
+        """Load all customers and cache by normalized shipping mark."""
         customers = CustomerUser.objects.all()
-        
         for customer in customers:
             if customer.shipping_mark:
-                normalized_mark = normalize_shipping_mark(customer.shipping_mark)
-                if normalized_mark:
-                    self.customer_cache[normalized_mark] = customer
-    
+                normalized = normalize_shipping_mark(customer.shipping_mark)
+                if normalized:
+                    self.customer_cache[normalized] = customer
+
     def match_candidates(self, candidates: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Match shipping mark candidates with existing customers.
-        
-        Args:
-            candidates: List of parsed Excel row candidates
-            
-        Returns:
-            Dictionary with matched items, unmatched items, and statistics
+        Match Excel candidates to customers.
+        Groups by shipping mark, allows duplicate tracking numbers.
         """
-        matched_items = []
+        matched_groups = {}
         unmatched_items = []
         duplicate_tracking_numbers = []
-        
-        # Track tracking numbers to detect duplicates
-        tracking_numbers_seen = set()
-        
+
         for candidate in candidates:
             shipping_mark = candidate['shipping_mark_normalized']
-            tracking_number = candidate['tracking_number']
-            
-            # Check for duplicate tracking numbers within this batch
-            if tracking_number and tracking_number in tracking_numbers_seen:
-                duplicate_tracking_numbers.append({
-                    'candidate': candidate,
-                    'reason': 'duplicate_tracking_number_in_batch'
-                })
-                continue
-            
-            if tracking_number:
-                tracking_numbers_seen.add(tracking_number)
-            
-            # Try to match with existing customer
+            tracking_number = candidate.get('tracking_number')
             customer = self.customer_cache.get(shipping_mark)
-            
+
             if customer:
-                # Check for duplicate tracking number in database
-                from .models import CargoItem
-                if tracking_number:
-                    existing_item = CargoItem.objects.filter(tracking_id=tracking_number).first()
-                    if existing_item:
-                        duplicate_tracking_numbers.append({
-                            'candidate': candidate,
-                            'reason': 'duplicate_tracking_number_in_db',
-                            'existing_item_id': str(existing_item.id),
-                            'existing_container': existing_item.container.container_id
-                        })
-                        continue
-                
-                matched_items.append({
-                    'candidate': candidate,
+                key = customer.id
+                matched_groups.setdefault(key, {
                     'customer': {
                         'id': customer.id,
                         'shipping_mark': customer.shipping_mark,
                         'name': customer.get_full_name() or customer.phone,
-                        'phone': customer.phone if hasattr(customer, 'phone') else '',
-                        'email': customer.email
-                    }
+                        'phone': getattr(customer, 'phone', ''),
+                        'email': customer.email,
+                    },
+                    'candidates': []
                 })
+                matched_groups[key]['candidates'].append(candidate)
             else:
                 unmatched_items.append(candidate)
-        
+
         return {
-            'matched_items': matched_items,
+            'matched_groups': matched_groups,
             'unmatched_items': unmatched_items,
-            'duplicate_tracking_numbers': duplicate_tracking_numbers,
             'statistics': {
                 'total_candidates': len(candidates),
-                'matched_count': len(matched_items),
+                'matched_groups_count': len(matched_groups),
                 'unmatched_count': len(unmatched_items),
-                'duplicate_count': len(duplicate_tracking_numbers)
             }
         }
-    
-    def suggest_similar_customers(self, shipping_mark: str, limit: int = 5) -> List[Dict[str, Any]]:
+
+    def create_cargo_items(self, matched_groups: Dict[int, Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Find customers with similar shipping marks using fuzzy matching.
-        
-        Args:
-            shipping_mark: The normalized shipping mark to find matches for
-            limit: Maximum number of suggestions to return
-            
-        Returns:
-            List of customer suggestions with similarity scores
-        """
-        if not shipping_mark:
-            return []
-        
-        suggestions = []
-        
-        # Exact substring matches
-        for normalized_mark, customer in self.customer_cache.items():
-            if shipping_mark in normalized_mark or normalized_mark in shipping_mark:
-                suggestions.append({
-                    'customer': {
-                        'id': customer.id,
-                        'shipping_mark': customer.shipping_mark,
-                        'name': customer.get_full_name() or customer.phone,
-                        'phone': customer.phone if hasattr(customer, 'phone') else '',
-                        'email': customer.email
-                    },
-                    'similarity_type': 'substring',
-                    'normalized_mark': normalized_mark
-                })
-        
-        # If no substring matches, try partial word matches
-        if not suggestions:
-            mark_words = set(shipping_mark.split())
-            for normalized_mark, customer in self.customer_cache.items():
-                other_words = set(normalized_mark.split())
-                common_words = mark_words.intersection(other_words)
-                
-                if common_words:
-                    similarity_score = len(common_words) / max(len(mark_words), len(other_words))
-                    if similarity_score >= 0.5:  # At least 50% word overlap
-                        suggestions.append({
-                            'customer': {
-                                'id': customer.id,
-                                'shipping_mark': customer.shipping_mark,
-                                'name': customer.get_full_name() or customer.phone,
-                                'phone': customer.phone if hasattr(customer, 'phone') else '',
-                                'email': customer.email
-                            },
-                            'similarity_type': 'partial_words',
-                            'similarity_score': similarity_score,
-                            'normalized_mark': normalized_mark,
-                            'common_words': list(common_words)
-                        })
-        
-        # Sort by similarity and return top results
-        suggestions.sort(key=lambda x: x.get('similarity_score', 1.0), reverse=True)
-        return suggestions[:limit]
-    
-    def create_cargo_items(self, matched_items: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Create CargoItem instances from matched items.
-        
-        Args:
-            matched_items: List of matched item dictionaries
-            
-        Returns:
-            Dictionary with created items and any errors
+        Create CargoItem and ClientShipmentSummary entries for grouped clients.
         """
         from .models import CargoItem, CargoContainer, ClientShipmentSummary
-        from django.db import transaction
-        
+
         created_items = []
         errors = []
 
@@ -189,118 +88,83 @@ class ShippingMarkMatcher:
                 'errors': [{'error': f'Container {self.container_id} not found'}]
             }
 
-        for item_data in matched_items:
-            candidate = (item_data or {}).get('candidate') or {}
-            customer_payload = (item_data or {}).get('customer') or {}
-            source_row = candidate.get('source_row_number')
-
-            customer_id = customer_payload.get('id')
-            if not customer_id:
-                logger.warning(
-                    "Skipping matched item for container %s due to missing customer data: %s",
-                    self.container_id,
-                    customer_payload,
-                )
-                errors.append({
-                    'source_row_number': source_row,
-                    'error': 'Missing customer information for matched item',
-                    'candidate': candidate,
-                })
-                continue
+        for group_data in matched_groups.values():
+            customer_info = group_data['customer']
+            candidates = group_data['candidates']
 
             try:
-                customer = CustomerUser.objects.get(id=customer_id)
+                customer = CustomerUser.objects.get(id=customer_info['id'])
             except CustomerUser.DoesNotExist:
-                logger.warning(
-                    "Customer %s referenced in matched items could not be found",
-                    customer_id,
-                )
                 errors.append({
-                    'source_row_number': source_row,
-                    'error': f'Customer with id {customer_id} not found',
-                    'candidate': candidate,
+                    'error': f"Customer with id {customer_info['id']} not found",
+                    'customer_info': customer_info
                 })
                 continue
 
-            cbm_value = candidate.get('cbm')
-            if cbm_value is not None:
+            # Ensure only one summary per (container, client)
+            summary, _ = ClientShipmentSummary.objects.get_or_create(
+                container=container,
+                client=customer
+            )
+
+            # Create all cargo items for this customer group
+            for candidate in candidates:
+                cbm_value = candidate.get('cbm')
                 try:
-                    cbm_value = float(cbm_value)
+                    cbm_value = float(cbm_value) if cbm_value else None
                 except (TypeError, ValueError):
                     cbm_value = None
 
-            try:
-                with transaction.atomic():
-                    cargo_item = CargoItem(
-                        container=container,
-                        client=customer,
-                        tracking_id=candidate.get('tracking_number') or '',
-                        item_description=candidate.get('description') or '',
-                        quantity=candidate.get('quantity') or 0,
-                        cbm=cbm_value
+                try:
+                    with transaction.atomic():
+                        cargo_item = CargoItem.objects.create(
+                            container=container,
+                            client=customer,
+                            tracking_id=candidate.get('tracking_number') or '',
+                            item_description=candidate.get('description') or '',
+                            quantity=candidate.get('quantity') or 0,
+                            cbm=cbm_value,
+                        )
+                        created_items.append({
+                            'cargo_item_id': str(cargo_item.id),
+                            'tracking_id': cargo_item.tracking_id,
+                            'source_row_number': candidate.get('source_row_number'),
+                            'customer_name': customer.get_full_name() or customer.phone,
+                        })
+                except IntegrityError as exc:
+                    logger.warning(
+                        "Integrity error while creating cargo item for container %s: %s",
+                        self.container_id, exc
                     )
-                    cargo_item.save()
-
-                    summary, _ = ClientShipmentSummary.objects.get_or_create(
-                        container=container,
-                        client=customer
+                    errors.append({
+                        'error': 'Integrity error while creating cargo item',
+                        'details': str(exc),
+                        'candidate': candidate,
+                    })
+                except Exception as exc:
+                    logger.error(
+                        "Unexpected error creating cargo item for container %s: %s",
+                        self.container_id, exc, exc_info=True
                     )
-                    summary.update_totals()
+                    errors.append({
+                        'error': str(exc),
+                        'candidate': candidate,
+                    })
 
-                created_items.append({
-                    'cargo_item_id': str(cargo_item.id),
-                    'tracking_id': cargo_item.tracking_id,
-                    'source_row_number': source_row,
-                    'customer_name': customer.get_full_name() or customer.phone
-                })
-            except IntegrityError as exc:
-                logger.warning(
-                    "Integrity error while creating cargo item for container %s row %s: %s",
-                    self.container_id,
-                    source_row,
-                    exc,
-                )
-                errors.append({
-                    'source_row_number': source_row,
-                    'error': 'Integrity error while creating cargo item',
-                    'details': str(exc),
-                    'candidate': candidate,
-                })
-            except Exception as exc:
-                logger.error(
-                    "Unexpected error creating cargo item for container %s row %s: %s",
-                    self.container_id,
-                    source_row,
-                    exc,
-                    exc_info=True,
-                )
-                errors.append({
-                    'source_row_number': source_row,
-                    'error': str(exc),
-                    'candidate': candidate,
-                })
+            # Update totals once per client
+            summary.update_totals()
 
-        return {
-            'created_items': created_items,
-            'errors': errors
-        }
+        return {'created_items': created_items, 'errors': errors}
 
 
 def process_excel_upload(container_id: str, candidates: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
-    Main function to process Excel upload candidates.
-    
-    Args:
-        container_id: The container ID to add items to
-        candidates: List of parsed Excel row candidates
-        
-    Returns:
-        Complete processing results with matches, suggestions, and statistics
+    Main entry for Excel upload processing.
+    Groups by client and creates all items + summaries.
     """
     matcher = ShippingMarkMatcher(container_id)
     match_results = matcher.match_candidates(candidates)
-    
-    # Add similarity suggestions for unmatched items
+
     unmatched_with_suggestions = []
     for unmatched_item in match_results['unmatched_items']:
         suggestions = matcher.suggest_similar_customers(
@@ -310,10 +174,12 @@ def process_excel_upload(container_id: str, candidates: List[Dict[str, Any]]) ->
             'candidate': unmatched_item,
             'suggestions': suggestions
         })
-    
+
+    created_data = matcher.create_cargo_items(match_results['matched_groups'])
+
     return {
-        'matched_items': match_results['matched_items'],
+        'created_items': created_data['created_items'],
+        'errors': created_data['errors'],
         'unmatched_items': unmatched_with_suggestions,
-        'duplicate_tracking_numbers': match_results['duplicate_tracking_numbers'],
-        'statistics': match_results['statistics']
+        'statistics': match_results['statistics'],
     }
