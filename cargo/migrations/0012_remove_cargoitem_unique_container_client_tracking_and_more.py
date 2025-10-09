@@ -21,8 +21,5 @@ class Migration(migrations.Migration):
             name='tracking_id',
             field=models.CharField(max_length=100),
         ),
-        migrations.AddConstraint(
-            model_name='cargoitem',
-            constraint=models.UniqueConstraint(fields=('container', 'client'), name='unique_container_client'),
-        ),
+        # NOTE: The unique constraint will be added in migration 0014 after duplicates are cleaned in 0013
     ]
