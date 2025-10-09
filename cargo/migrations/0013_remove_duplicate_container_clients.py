@@ -3,10 +3,56 @@
 from django.db import migrations, models
 
 
+def check_and_remove_old_constraint(apps, schema_editor):
+    """
+    Check if the old constraint exists and remove it.
+    This handles cases where previous migration attempts partially succeeded.
+    """
+    with schema_editor.connection.cursor() as cursor:
+        # Check if the old constraint exists
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'cargo_cargoitem' 
+            AND constraint_name = 'unique_container_client_tracking'
+        """)
+        if cursor.fetchone():
+            cursor.execute("""
+                ALTER TABLE cargo_cargoitem 
+                DROP CONSTRAINT IF EXISTS unique_container_client_tracking
+            """)
+            print("Removed old constraint: unique_container_client_tracking")
+
+
+def check_and_add_new_constraint(apps, schema_editor):
+    """
+    Check if the new constraint exists before adding it.
+    This handles cases where previous migration attempts partially succeeded.
+    """
+    with schema_editor.connection.cursor() as cursor:
+        # Check if the new constraint already exists
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'cargo_cargoitem' 
+            AND constraint_name = 'unique_container_client'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("""
+                ALTER TABLE cargo_cargoitem 
+                ADD CONSTRAINT unique_container_client 
+                UNIQUE (container_id, client_id)
+            """)
+            print("Added new constraint: unique_container_client")
+        else:
+            print("Constraint unique_container_client already exists, skipping")
+
+
 class Migration(migrations.Migration):
     """
     Apply the schema changes that were originally in 0012.
     This is separated to avoid "pending trigger events" error in PostgreSQL.
+    Uses custom SQL to handle cases where constraints already exist.
     """
 
     dependencies = [
@@ -14,18 +60,20 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Schema changes from original migration 0012
-        migrations.RemoveConstraint(
-            model_name='cargoitem',
-            name='unique_container_client_tracking',
+        # Remove old constraint if it exists
+        migrations.RunPython(
+            check_and_remove_old_constraint,
+            migrations.RunPython.noop
         ),
+        # Alter the tracking_id field
         migrations.AlterField(
             model_name='cargoitem',
             name='tracking_id',
             field=models.CharField(max_length=100),
         ),
-        migrations.AddConstraint(
-            model_name='cargoitem',
-            constraint=models.UniqueConstraint(fields=('container', 'client'), name='unique_container_client'),
+        # Add new constraint only if it doesn't exist
+        migrations.RunPython(
+            check_and_add_new_constraint,
+            migrations.RunPython.noop
         ),
     ]
