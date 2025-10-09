@@ -27,12 +27,12 @@ export function ViewShippingMarkGroupDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-[600px] md:max-w-[750px] lg:max-w-[900px] max-h-[90vh] flex flex-col gap-0 p-0">
+      <DialogContent className="w-[95vw] sm:max-w-[600px] md:max-w-[750px] lg:max-w-[900px] max-h-[85vh] flex flex-col gap-0 p-0">
         {/* Header */}
         <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b shrink-0">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <DialogTitle className="text-base sm:text-lg md:text-xl">
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-base sm:text-lg md:text-xl break-words">
                 Shipping Mark Group: {shippingMark}
               </DialogTitle>
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm text-muted-foreground">
@@ -51,10 +51,11 @@ export function ViewShippingMarkGroupDialog({
           </div>
         </DialogHeader>
 
-        {/* Content */}
-        <ScrollArea className="flex-1 px-4 sm:px-6">
-          <div className="space-y-3 sm:space-y-4 py-4">
-            {items.map((item, index) => (
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full px-4 sm:px-6">
+            <div className="space-y-3 sm:space-y-4 py-4">
+              {items.map((item, index) => (
               <Card key={item.id} className="overflow-hidden">
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between mb-3">
@@ -136,6 +137,7 @@ export function ViewShippingMarkGroupDialog({
             ))}
           </div>
         </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
