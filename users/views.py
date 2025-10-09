@@ -859,11 +859,12 @@ class GenerateShippingMarksView(APIView):
                 # Remove any double spaces first
                 base_mark = ' '.join(base_mark.split())
                 
-                # Ensure there's a space between PM+number and the name
+                # Ensure there's a space between PM+prefix and the name
+                # Handles both numeric (PM1, PM16) and alphabetic (PMGA, PMNR) prefixes
                 import re
-                if not re.match(r'^PM\d+\s', base_mark) and re.match(r'^PM\d+', base_mark):
-                    # Add space after PM+digits if missing
-                    base_mark = re.sub(r'^(PM\d+)([A-Z])', r'\1 \2', base_mark)
+                if not re.match(r'^PM\s*[A-Z0-9]+\s', base_mark) and re.match(r'^PM\s*[A-Z0-9]+', base_mark):
+                    # Add space after PM+prefix if missing
+                    base_mark = re.sub(r'^(PM\s*[A-Z0-9]+)([A-Z])', r'\1 \2', base_mark)
                 original_mark = base_mark
                 
                 # Ensure length constraints (10-20 characters)
@@ -974,10 +975,10 @@ class GenerateShippingMarksView(APIView):
                 # Remove double spaces and ensure proper spacing
                 base_mark = ' '.join(base_mark.split())
                 
-                # Ensure space between PM+number and name
+                # Ensure space between PM+prefix and name (handles both letters and numbers)
                 import re
-                if not re.match(r'^PM\d+\s', base_mark) and re.match(r'^PM\d+', base_mark):
-                    base_mark = re.sub(r'^(PM\d+)([A-Z])', r'\1 \2', base_mark)
+                if not re.match(r'^PM\s*[A-Z0-9]+\s', base_mark) and re.match(r'^PM\s*[A-Z0-9]+', base_mark):
+                    base_mark = re.sub(r'^(PM\s*[A-Z0-9]+)([A-Z])', r'\1 \2', base_mark)
                 
                 # Apply length constraints (10-20 characters)
                 current_len = len(base_mark)
@@ -1118,14 +1119,15 @@ class SignupWithShippingMarkView(APIView):
                         'valid_regions': valid_regions
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
-                # Validate shipping mark format (must start with PM followed by optional number/prefix)
-                # Accept formats: "PM ", "PM-", "PM1 ", "PM2 ", "PM16 ", etc.
+                # Validate shipping mark format (must start with PM followed by optional alphanumeric prefix)
+                # Accept formats: "PM ", "PM-", "PM 1 ", "PM GA ", "PM NR ", "PMX4E ", "PM16 ", etc.
                 import re
-                if not re.match(r'^PM\d*[\s-]', shipping_mark):
+                # Pattern: PM followed by optional alphanumeric prefix, then space and name
+                if not re.match(r'^PM\s*[A-Z0-9]*\s+[A-Z]', shipping_mark):
                     return Response({
                         'success': False,
                         'error': 'Invalid shipping mark format',
-                        'message': 'Shipping mark must start with "PM" optionally followed by digits, then a space or dash'
+                        'message': f'Shipping mark must start with "PM" optionally followed by a regional prefix (letters or numbers), then a space and name. Got: {shipping_mark}'
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
                 # Create user with selected shipping mark
