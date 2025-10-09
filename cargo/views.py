@@ -160,7 +160,13 @@ class CargoContainerViewSet(viewsets.ModelViewSet):
         if warehouse_type:
             qs = qs.filter(warehouse_type=warehouse_type)
         if search:
-            qs = qs.filter(Q(container_id__icontains=search) | Q(route__icontains=search))
+            # Search by container_id, route, client shipping mark, or tracking numbers in cargo items
+            qs = qs.filter(
+                Q(container_id__icontains=search) | 
+                Q(route__icontains=search) |
+                Q(cargo_items__tracking_id__icontains=search) |
+                Q(cargo_items__client__shipping_mark__icontains=search)
+            ).distinct()
         return qs
 
     def get_serializer_class(self):
@@ -476,7 +482,7 @@ class CustomerCargoContainerViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CargoContainerSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['cargo_type', 'status', 'location', 'warehouse_type']
-    search_fields = ['container_id', 'route']
+    search_fields = ['container_id', 'route', 'cargo_items__tracking_id', 'cargo_items__client__shipping_mark']
     ordering_fields = ['load_date', 'eta', 'created_at', 'stay_days', 'delay_days']
     ordering = ['-load_date', '-created_at']
 
