@@ -11,6 +11,11 @@ def remove_duplicate_container_clients(apps, schema_editor):
     """
     CargoItem = apps.get_model('cargo', 'CargoItem')
     
+    # Force close any open transaction to avoid pending trigger events
+    from django.db import connection
+    connection.close()
+    connection.ensure_connection()
+    
     # Get all container-client combinations
     from django.db.models import Count
     duplicates = CargoItem.objects.values('container', 'client').annotate(
@@ -35,6 +40,10 @@ def remove_duplicate_container_clients(apps, schema_editor):
     
     if deleted_count > 0:
         print(f"Removed {deleted_count} duplicate CargoItem entries")
+    
+    # Commit the transaction explicitly
+    from django.db import transaction
+    transaction.commit()
 
 
 class Migration(migrations.Migration):
@@ -45,8 +54,12 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # First, remove duplicates
-        migrations.RunPython(remove_duplicate_container_clients, migrations.RunPython.noop),
+        # First, remove duplicates with atomic=False to avoid pending trigger events
+        migrations.RunPython(
+            remove_duplicate_container_clients, 
+            migrations.RunPython.noop,
+            atomic=False  # This is the key - run outside of transaction
+        ),
         # Then proceed with constraint changes
         migrations.RemoveConstraint(
             model_name='cargoitem',
