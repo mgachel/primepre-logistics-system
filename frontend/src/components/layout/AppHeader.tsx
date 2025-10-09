@@ -56,12 +56,27 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
           Start
         </button>
 
-        {/* Search (hidden for customers and on very small screens) */}
-        {(user?.user_role && user.user_role.toUpperCase() !== "CUSTOMER") && (
-          <div className={cn(
-            "flex-1 hidden sm:block", 
-            isMobile ? "ml-2 mr-2" : "mx-4 max-w-2xl"
-          )}> 
+        {/* Search or Logo */}
+        {user?.user_role?.toUpperCase() === "CUSTOMER" ? (
+          <div
+            className={cn(
+              "flex-1 flex justify-center",
+              isMobile ? "ml-2 mr-2" : "mx-4 max-w-2xl"
+            )}
+          >
+            <img
+              src="/client search logo.png"
+              alt="Client Search Logo"
+              className="h-10"
+            />
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "flex-1 flex",
+              isMobile ? "ml-2 mr-2" : "mx-4 max-w-2xl"
+            )}
+          >
             <GlobalSearch variant="inline" />
           </div>
         )}

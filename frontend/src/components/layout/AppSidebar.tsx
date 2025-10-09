@@ -133,7 +133,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
       <div className="flex h-16 items-center justify-between px-4 border-b border-border">
         <div className="flex items-center space-x-2">
           {(!isCollapsed || isMobile) && (
-            <img src="/primepre-logo-1.png" alt="PRIMEPRE" className="h-8" />
+            <img src="/sidebar.png" alt="PRIMEPRE" className="h-10" />
           )}
         </div>
         {/* Replace collapsed sidebar expand button with Start button */}
