@@ -9,10 +9,7 @@ def remove_duplicate_container_clients(apps, schema_editor):
     Remove duplicate CargoItem entries with the same container and client.
     Keep the most recent one (latest created_at).
     """
-    CargoItem = apps.get_model('cargo', 'CargoItem')
-    
     # Use raw SQL to avoid trigger issues with ORM deletes
-    # First, identify duplicates and keep only the most recent one
     with schema_editor.connection.cursor() as cursor:
         # Delete duplicates, keeping only the row with the latest created_at for each (container, client) pair
         cursor.execute("""
@@ -44,23 +41,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # First, remove duplicates using raw SQL to avoid trigger events
+        # Only remove duplicates in this migration
+        # Schema changes moved to next migration to avoid pending trigger events
         migrations.RunPython(
             remove_duplicate_container_clients, 
             migrations.RunPython.noop
-        ),
-        # Then proceed with constraint changes
-        migrations.RemoveConstraint(
-            model_name='cargoitem',
-            name='unique_container_client_tracking',
-        ),
-        migrations.AlterField(
-            model_name='cargoitem',
-            name='tracking_id',
-            field=models.CharField(max_length=100),
-        ),
-        migrations.AddConstraint(
-            model_name='cargoitem',
-            constraint=models.UniqueConstraint(fields=('container', 'client'), name='unique_container_client'),
         ),
     ]
