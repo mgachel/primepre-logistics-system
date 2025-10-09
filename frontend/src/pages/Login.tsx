@@ -155,24 +155,19 @@ export default function Login() {
       {/* Right Side - Login Form */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md space-y-8">
-          {/* Mobile Logo */}
-          <div className="lg:hidden text-center mb-6">
+          {/* Logo for both mobile and normal view */}
+          <div className="text-center mb-6">
             <img
-              src="/primepre-logo-1.png"
+              src="/prime_new_BLACK.png"
               alt="Prime Pre Logo"
               className="w-40 h-auto mx-auto mb-4"
             />
           </div>
 
-          <div className="text-center">
-            <h2 className="text-3xl font-bold tracking-tight">Welcome</h2>
-            <p className="text-muted-foreground mt-2">Sign in to your account</p>
-          </div>
-
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                {error && (
+                {error && (  
                   <Alert variant="destructive">
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
@@ -248,42 +243,6 @@ export default function Login() {
               </div>
             </div>
           </div>
-
-          {/* Demo Credentials
-          <Card className="border-dashed">
-            < className="pb-3">
-              < className="text-sm">Demo Credentials</>
-              < className="text-xs">
-                Use these credentials to test different user roles
-              </>
-            </>
-            <CardContent className="space-y-3">
-              {demoCredentials.map((cred, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-3 h-3 rounded-full ${cred.color}`}></div>
-                    <div>
-                      <div className="text-sm font-medium">{cred.role}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {cred.username} / {cred.password}
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setUsername(cred.username);
-                      setPassword(cred.password);
-                    }}
-                    className="h-8 px-3"
-                  >
-                    <ArrowRight className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card> */}
 
           <div className="text-center text-xs text-muted-foreground">
             <p>Protected by enterprise-grade security</p>
