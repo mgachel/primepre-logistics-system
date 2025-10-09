@@ -4,6 +4,39 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def remove_duplicate_container_clients(apps, schema_editor):
+    """
+    Remove duplicate CargoItem entries with the same container and client.
+    Keep the most recent one (latest created_at).
+    """
+    CargoItem = apps.get_model('cargo', 'CargoItem')
+    
+    # Get all container-client combinations
+    from django.db.models import Count
+    duplicates = CargoItem.objects.values('container', 'client').annotate(
+        count=Count('id')
+    ).filter(count__gt=1)
+    
+    deleted_count = 0
+    for dup in duplicates:
+        # Get all items with this container-client combo
+        items = CargoItem.objects.filter(
+            container_id=dup['container'],
+            client_id=dup['client']
+        ).order_by('-created_at')
+        
+        # Keep the first (most recent), delete the rest
+        items_to_delete = list(items[1:])
+        count = len(items_to_delete)
+        for item in items_to_delete:
+            item.delete()
+        
+        deleted_count += count
+    
+    if deleted_count > 0:
+        print(f"Removed {deleted_count} duplicate CargoItem entries")
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -12,6 +45,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # First, remove duplicates
+        migrations.RunPython(remove_duplicate_container_clients, migrations.RunPython.noop),
+        # Then proceed with constraint changes
         migrations.RemoveConstraint(
             model_name='cargoitem',
             name='unique_container_client_tracking',
@@ -21,5 +57,8 @@ class Migration(migrations.Migration):
             name='tracking_id',
             field=models.CharField(max_length=100),
         ),
-        # NOTE: The unique constraint will be added in migration 0014 after duplicates are cleaned in 0013
+        migrations.AddConstraint(
+            model_name='cargoitem',
+            constraint=models.UniqueConstraint(fields=('container', 'client'), name='unique_container_client'),
+        ),
     ]
