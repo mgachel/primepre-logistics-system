@@ -93,6 +93,9 @@ export default function AirCargo() {
   const [editContainer, setEditContainer] =
     useState<BackendCargoContainer | null>(null);
 
+  // Define primary color based on user role
+  const primaryColor = user?.user_role === "CUSTOMER" ? "#4FC3F7" : "#00703D"; // Light blue for customers, green for others
+
   // ✅ Load air containers and dashboard
   useEffect(() => {
     let ignore = false;
@@ -310,15 +313,17 @@ export default function AirCargo() {
         <button
           onClick={() => navigate(isCustomer ? '/customer/cargo/sea' : '/cargos/sea')}
           className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+          style={{ color: primaryColor }}
         >
-          <Ship className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <Ship className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: primaryColor }} />
           Sea Goods
         </button>
         <button
           onClick={() => navigate(isCustomer ? '/customer/cargo/air' : '/cargos/air')}
           className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md bg-primary text-primary-foreground shrink-0"
+          style={{ backgroundColor: primaryColor, color: "#FFFFFF" }}
         >
-          <Plane className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <Plane className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: "#FFFFFF" }} />
           Air Goods
         </button>
       </div>
@@ -327,7 +332,7 @@ export default function AirCargo() {
       <div className="flex flex-col space-y-3 sm:space-y-4">
         <div>
           <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-foreground flex items-center">
-            <Plane className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 mr-2 sm:mr-3 text-primary" />
+            <Plane className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 mr-2 sm:mr-3" style={{ color: primaryColor }} />
             {isCustomer ? "My Air Cargo" : "Air Cargo"}
           </h1>
           <p className="text-muted-foreground text-xs sm:text-sm lg:text-base mt-1">
@@ -338,12 +343,12 @@ export default function AirCargo() {
         </div>
         {!isCustomer && (
           <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-            <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0 h-9 sm:h-10 text-xs sm:text-sm">
-              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
+            <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0 h-9 sm:h-10 text-xs sm:text-sm" style={{ backgroundColor: primaryColor, color: "#FFFFFF" }}>
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" style={{ color: "#FFFFFF" }} />
               Add Air Container
             </Button>
             <ExcelUploadButton
-              uploadType="air_cargo"
+              uploadType="sea_cargo"
               variant="outline"
               className="h-9 sm:h-10 text-xs sm:text-sm"
               onUploadComplete={(response) => {
@@ -371,7 +376,7 @@ export default function AirCargo() {
                   {dashboard?.total_containers ?? 0}
                 </div>
               </div>
-              <Package className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-primary/60" />
+              <Package className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8" style={{ color: primaryColor }} />
             </div>
           </div>
           <div className="logistics-card p-3 sm:p-4">
@@ -382,7 +387,7 @@ export default function AirCargo() {
                   {dashboard?.containers_in_transit ?? 0}
                 </div>
               </div>
-              <Plane className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-secondary/60" />
+              <Plane className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8" style={{ color: primaryColor }} />
             </div>
           </div>
           <div className="logistics-card p-3 sm:p-4">
@@ -399,7 +404,7 @@ export default function AirCargo() {
                   <span className="text-xs sm:text-sm md:text-base">kg</span>
                 </div>
               </div>
-              <Package className="h-8 w-8 text-accent/60" />
+              <Package className="h-8 w-8" style={{ color: primaryColor }} />
             </div>
           </div>
           <div className="logistics-card p-4">
@@ -408,7 +413,7 @@ export default function AirCargo() {
                 <div className="text-sm text-muted-foreground">This Month</div>
                 <div className="text-2xl font-semibold mt-1">8</div>
               </div>
-              <Calendar className="h-8 w-8 text-warning/60" />
+              <Calendar className="h-8 w-8" style={{ color: primaryColor }} />
             </div>
           </div>
         </div>
@@ -432,6 +437,7 @@ export default function AirCargo() {
               variant={statusFilter === s ? "default" : "outline"}
               size="sm"
               onClick={() => setStatusFilter(s as "all" | "in-transit" | "pending" | "delivered")}
+              style={statusFilter === s ? { backgroundColor: primaryColor, color: "#FFFFFF" } : { borderColor: primaryColor, color: primaryColor }}
             >
               {s === "all"
                 ? "All"
@@ -445,8 +451,9 @@ export default function AirCargo() {
               setSearchTerm("");
               setStatusFilter("all");
             }}
+            style={{ borderColor: primaryColor, color: primaryColor }}
           >
-            <RefreshCcw className="h-4 w-4 mr-1" /> Reset filters
+            <RefreshCcw className="h-4 w-4 mr-1" style={{ color: primaryColor }} /> Reset filters
           </Button>
         </div>
       </div>
@@ -566,7 +573,7 @@ export default function AirCargo() {
             </Select>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowStatusDialog(false)}>
+            <Button variant="outline" onClick={() => setShowStatusDialog(false)} style={{ borderColor: primaryColor, color: primaryColor }}>
               Cancel
             </Button>
             <Button
@@ -574,6 +581,7 @@ export default function AirCargo() {
               disabled={
                 !newStatus || newStatus === selectedStatusContainer?.status
               }
+              style={{ backgroundColor: primaryColor, color: "#FFFFFF" }}
             >
               Update Status
             </Button>

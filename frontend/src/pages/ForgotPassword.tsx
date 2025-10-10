@@ -158,12 +158,6 @@ export default function ForgotPassword() {
                 Sign in
               </Link>
             </div>
-            <div className="text-xs">
-              New to Prime Pre?{' '}
-              <Link className="text-primary hover:underline font-medium" to="/simplified-signup">
-                Create an account
-              </Link>
-            </div>
           </div>
         </div>
       </div>

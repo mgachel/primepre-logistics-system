@@ -82,7 +82,10 @@ export default function SeaCargo() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const isCustomer = user?.user_role === "CUSTOMER";
-  
+
+  // Define primary color based on user role
+  const primaryColor = isCustomer ? "#4FC3F7" : "#00703D"; // Light blue for customers, green for others
+
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
   const [selectedContainer, _setSelectedContainer] =
@@ -336,16 +339,18 @@ export default function SeaCargo() {
       <div className="flex gap-1 sm:gap-2 border-b border-border pb-2 overflow-x-auto">
         <button
           onClick={() => navigate(isCustomer ? '/customer/cargo/sea' : '/cargos/sea')}
-          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md bg-primary text-primary-foreground shrink-0"
+          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md"
+          style={{ backgroundColor: primaryColor, color: "#FFFFFF" }}
         >
-          <Ship className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <Ship className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: "#FFFFFF" }} />
           Sea Goods
         </button>
         <button
           onClick={() => navigate(isCustomer ? '/customer/cargo/air' : '/cargos/air')}
           className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+          style={{ color: primaryColor }}
         >
-          <Plane className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <Plane className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: primaryColor }} />
           Air Goods
         </button>
       </div>
@@ -354,7 +359,10 @@ export default function SeaCargo() {
       <div className="flex flex-col space-y-3 sm:space-y-4">
         <div>
           <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-foreground flex items-center">
-            <Ship className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 mr-2 sm:mr-3 text-primary" />
+            <Ship
+              className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 mr-2 sm:mr-3"
+              style={{ color: primaryColor }}
+            />
             {isCustomer ? "My Sea Cargo" : "Sea Cargo"}
           </h1>
           <p className="text-muted-foreground text-xs sm:text-sm lg:text-base mt-1">
@@ -365,9 +373,12 @@ export default function SeaCargo() {
         </div>
         {!isCustomer && (
           <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-            <Button onClick={() => setShowNewCargoDialog(true)} className="flex-shrink-0 h-9 sm:h-10 text-xs sm:text-sm">
-              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
-              Add Cargo
+            <Button
+              onClick={() => setShowNewCargoDialog(true)}
+              className="flex-shrink-0 h-9 sm:h-10 text-xs sm:text-sm"
+              style={{ backgroundColor: primaryColor, color: "#FFFFFF" }}
+            >
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" style={{ color: "#FFFFFF" }} /> Add Cargo
             </Button>
             <ExcelUploadButton
               uploadType="sea_cargo"
@@ -381,6 +392,7 @@ export default function SeaCargo() {
                 // Refresh the data
                 window.location.reload();
               }}
+              style={{ borderColor: primaryColor, color: primaryColor }}
             />
           </div>
         )}
@@ -399,7 +411,10 @@ export default function SeaCargo() {
                   {dashboard?.total_containers ?? 0}
                 </div>
               </div>
-              <Package className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-primary/60" />
+              <Package
+                className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8"
+                style={{ color: `${primaryColor}99` }} // Adjusted for transparency
+              />
             </div>
           </div>
           <div className="logistics-card p-3 sm:p-4">
@@ -410,7 +425,7 @@ export default function SeaCargo() {
                   {dashboard?.containers_in_transit ?? 0}
                 </div>
               </div>
-              <Ship className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-secondary/60" />
+              <Ship className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8" style={{ color: primaryColor }} />
             </div>
           </div>
           <div className="logistics-card p-3 sm:p-4">
@@ -423,7 +438,7 @@ export default function SeaCargo() {
                     .toFixed(1)}
                 </div>
               </div>
-              <Package className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-accent/60" />
+              <Package className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8" style={{ color: primaryColor }} />
             </div>
           </div>
           <div className="logistics-card p-3 sm:p-4">
@@ -432,7 +447,7 @@ export default function SeaCargo() {
                 <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">This Month</div>
                 <div className="text-lg sm:text-xl md:text-2xl font-semibold mt-0.5 sm:mt-1">12</div>
               </div>
-              <Calendar className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-warning/60" />
+              <Calendar className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8" style={{ color: primaryColor }} />
             </div>
           </div>
         </div>
@@ -441,7 +456,7 @@ export default function SeaCargo() {
       {/* Filters */}
       <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:gap-3 md:gap-4">
         <div className="relative flex-1 max-w-full sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: primaryColor }} />
           <Input
             placeholder="Search by container, client, or tracking ID..."
             value={searchTerm}
@@ -455,6 +470,7 @@ export default function SeaCargo() {
             size="sm"
             onClick={() => setStatusFilter("all")}
             className="h-8 sm:h-9 text-[11px] sm:text-xs px-2 sm:px-3 shrink-0"
+            style={{ borderColor: primaryColor, color: primaryColor }}
           >
             All
           </Button>
@@ -463,6 +479,7 @@ export default function SeaCargo() {
             size="sm"
             onClick={() => setStatusFilter("in-transit")}
             className="h-8 sm:h-9 text-[11px] sm:text-xs px-2 sm:px-3 shrink-0"
+            style={{ borderColor: primaryColor, color: primaryColor }}
           >
             In Transit
           </Button>
@@ -471,6 +488,7 @@ export default function SeaCargo() {
             size="sm"
             onClick={() => setStatusFilter("pending")}
             className="h-8 sm:h-9 text-[11px] sm:text-xs px-2 sm:px-3 shrink-0"
+            style={{ borderColor: primaryColor, color: primaryColor }}
           >
             Pending
           </Button>
@@ -479,6 +497,7 @@ export default function SeaCargo() {
             size="sm"
             onClick={() => setStatusFilter("delivered")}
             className="h-8 sm:h-9 text-[11px] sm:text-xs px-2 sm:px-3 shrink-0"
+            style={{ borderColor: primaryColor, color: primaryColor }}
           >
             Delivered
           </Button>
@@ -490,8 +509,9 @@ export default function SeaCargo() {
               setStatusFilter("all");
             }}
             className="h-8 sm:h-9 text-[11px] sm:text-xs px-2 sm:px-3 shrink-0"
+            style={{ borderColor: primaryColor, color: primaryColor }}
           >
-            <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Reset
+            <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1" style={{ color: primaryColor }} /> Reset
           </Button>
         </div>
       </div>
@@ -648,6 +668,7 @@ export default function SeaCargo() {
             <Button
               variant="outline"
               onClick={() => setShowStatusDialog(false)}
+              style={{ borderColor: primaryColor, color: primaryColor }}
             >
               Cancel
             </Button>
@@ -656,6 +677,7 @@ export default function SeaCargo() {
               disabled={
                 !newStatus || newStatus === selectedStatusContainer?.status
               }
+              style={{ backgroundColor: primaryColor, color: "#FFFFFF" }}
             >
               Update Status
             </Button>

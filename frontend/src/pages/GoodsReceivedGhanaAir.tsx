@@ -74,6 +74,13 @@ export default function GoodsReceivedGhanaAir() {
   // Check if user is customer (user_role is CUSTOMER and not an admin)
   const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
 
+  // Color classes: keep blue for customers, use green (#00703D) for admins on this page
+  // To change the admin green, update the hex below. Customers remain on the app's blue theme.
+  const ADMIN_GREEN = "#00703D";
+  const iconClass = isCustomer ? "text-[color:var(--pp-primary)]" : `text-[${ADMIN_GREEN}]`;
+  const typeBadgeClass = isCustomer ? "text-[color:var(--pp-primary)] bg-[color:var(--pp-primary-foreground)]/10" : `text-white bg-[${ADMIN_GREEN}]`;
+  const primaryBtnClass = isCustomer ? "bg-[color:var(--pp-primary)] text-[color:var(--pp-primary-foreground)]" : `bg-[${ADMIN_GREEN}] text-white`;
+
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewContainerDialog, setShowNewContainerDialog] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
@@ -83,7 +90,7 @@ export default function GoodsReceivedGhanaAir() {
   const [error, setError] = useState<string | null>(null);
   const [containers, setContainers] = useState<GoodsReceivedContainer[]>([]);
   const [dashboard, setDashboard] = useState<GoodsReceivedContainerStats | null>(null);
-
+      const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false; // Check if user is customer
 
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [selectedStatusContainer, setSelectedStatusContainer] = useState<GoodsReceivedContainer | null>(null);
@@ -170,23 +177,25 @@ export default function GoodsReceivedGhanaAir() {
       await goodsReceivedContainerService.updateContainer(
         selectedStatusContainer.container_id,
         { status: newStatus as "pending" | "in_transit" | "arrived" | "cleared" }
-      );
-      toast({
-        title: "Status updated",
-        description: `${selectedStatusContainer.container_id} → ${newStatus.replace("_", " ")}`,
-      });
-      setShowStatusDialog(false);
-      setSelectedStatusContainer(null);
-      setNewStatus("");
-      await reloadData();
-    } catch (e: unknown) {
-      toast({
-        title: "Update failed",
-        description: e instanceof Error ? e.message : "Unable to update",
-        variant: "destructive",
-      });
-    }
-  };
+         {/* Navigation Tabs (admins only) */}
+         {!isCustomer && (
+           <div className="flex gap-2 border-b border-border pb-2 mb-6">
+             <button
+               onClick={() => navigate('/goods/ghana/sea')}
+               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+             >
+               <Ship className={`h-4 w-4 ${iconClass}`} />
+               Sea Goods
+             </button>
+             <button
+               onClick={() => navigate('/goods/ghana/air')}
+               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md ${primaryBtnClass}`}
+             >
+               <Plane className={`h-4 w-4 ${iconClass}`} />
+               Air Goods
+             </button>
+           </div>
+         )}
 
   // Filter containers - search is handled by API, only filter by status locally
   const filteredContainers = useMemo(() => {
@@ -238,7 +247,7 @@ export default function GoodsReceivedGhanaAir() {
       id: "type",
       header: "Shipment Type",
       accessor: (row) => (
-        <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium uppercase">
+        <div className={`text-xs px-2 py-1 rounded font-medium uppercase ${typeBadgeClass}`}>
           {row.container_type === 'sea' ? 'Sea Cargo' : 'Air Cargo'}
         </div>
       ),
@@ -347,14 +356,14 @@ export default function GoodsReceivedGhanaAir() {
           onClick={() => navigate('/goods/ghana/sea')}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
         >
-          <Ship className="h-4 w-4" />
+          <Ship className={`h-4 w-4 ${iconClass}`} />
           Sea Goods
         </button>
         <button
           onClick={() => navigate('/goods/ghana/air')}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground"
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md ${primaryBtnClass}`}
         >
-          <Plane className="h-4 w-4" />
+          <Plane className={`h-4 w-4 ${iconClass}`} />
           Air Goods
         </button>
       </div>
@@ -362,8 +371,8 @@ export default function GoodsReceivedGhanaAir() {
       {/* Header matching cargo structure */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Plane className="h-8 w-8 text-blue-600" />
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Plane className={`h-8 w-8 ${iconClass}`} />
             Ghana Air - Goods Received
           </h1>
           <p className="text-muted-foreground">
@@ -373,11 +382,12 @@ export default function GoodsReceivedGhanaAir() {
         <div className="flex items-center gap-2">
           {!isCustomer && (
             <>
-              <ExcelUploadButton 
-                onUploadSuccess={reloadData}
-                uploadType="goods-received-air"
+              <ExcelUploadButton
+                onUploadComplete={reloadData}
+                uploadType={"goods_received"}
+                className={isCustomer ? undefined : 'bg-[#00703D] text-white'}
               />
-              <Button onClick={() => setShowNewContainerDialog(true)}>
+              <Button onClick={() => setShowNewContainerDialog(true)} className={primaryBtnClass}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Container
               </Button>

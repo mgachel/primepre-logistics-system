@@ -78,6 +78,13 @@ export default function GoodsReceivedGhanaSea() {
   
   // Debug: Check if customer detection works
   console.log('🔍 GoodsReceivedGhanaSea - user:', user, 'isCustomer:', isCustomer);
+  // Color classes: keep blue for customers, use green (#00703D) for admins on this page
+  // Color classes: keep blue for customers, use green (#00703D) for admins on this page
+  // To change the admin green, update the hex below. Customers remain on the app's blue theme.
+  const ADMIN_GREEN = "#00703D";
+  const iconClass = isCustomer ? "text-[color:var(--pp-primary)]" : `text-[${ADMIN_GREEN}]`;
+  const typeBadgeClass = isCustomer ? "text-[color:var(--pp-primary)] bg-[color:var(--pp-primary-foreground)]/10" : `text-white bg-[${ADMIN_GREEN}]`;
+  const primaryBtnClass = isCustomer ? "bg-[color:var(--pp-primary)] text-[color:var(--pp-primary-foreground)]" : `bg-[${ADMIN_GREEN}] text-white`;
   
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewContainerDialog, setShowNewContainerDialog] = useState(false);
@@ -246,7 +253,7 @@ export default function GoodsReceivedGhanaSea() {
       id: "type",
       header: "Shipment Type",
       accessor: (row) => (
-        <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium uppercase">
+        <div className={`text-xs px-2 py-1 rounded font-medium uppercase ${typeBadgeClass}`}>
           {row.container_type === 'sea' ? 'Sea Cargo' : 'Air Cargo'}
         </div>
       ),
@@ -353,7 +360,7 @@ export default function GoodsReceivedGhanaSea() {
       <div className="flex gap-2 border-b border-border pb-2 mb-6">
         <button
           onClick={() => navigate('/goods/ghana/sea')}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground"
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md ${primaryBtnClass}`}
         >
           <Ship className="h-4 w-4" />
           Sea Goods
@@ -371,7 +378,7 @@ export default function GoodsReceivedGhanaSea() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Ship className="h-8 w-8 text-blue-600" />
+              <Ship className={`h-8 w-8 ${iconClass}`} />
             Ghana Sea - Goods Received
           </h1>
           <p className="text-muted-foreground">
@@ -381,11 +388,12 @@ export default function GoodsReceivedGhanaSea() {
         <div className="flex items-center gap-2">
           {!isCustomer && (
             <>
-              <ExcelUploadButton 
-                onUploadSuccess={reloadData}
-                uploadType="goods-received-sea"
+              <ExcelUploadButton
+                onUploadComplete={reloadData}
+                uploadType={"goods_received"}
+                className={isCustomer ? undefined : 'bg-[#00703D] text-white'}
               />
-              <Button onClick={() => setShowNewContainerDialog(true)}>
+              <Button onClick={() => setShowNewContainerDialog(true)} className={primaryBtnClass}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Container
               </Button>
@@ -399,7 +407,7 @@ export default function GoodsReceivedGhanaSea() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="logistics-card p-6">
             <div className="flex items-center">
-              <Package className="h-8 w-8 text-blue-600" />
+              <Package className={`h-8 w-8 ${iconClass}`} />
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Total Containers</p>
                 <p className="text-2xl font-bold">{dashboard?.total_containers || 0}</p>

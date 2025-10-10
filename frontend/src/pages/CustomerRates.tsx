@@ -20,6 +20,7 @@ import {
   Loader2,
   Calculator,
 } from "lucide-react";
+import { useAuthStore } from "@/stores/authStore";
 import {
   ratesService,
   Rate,
@@ -36,6 +37,11 @@ const CustomerRates: React.FC = () => {
   const [rates, setRates] = useState<Rate[]>([]);
   const [stats, setStats] = useState<RateStats | null>(null);
   const { toast } = useToast();
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
+
+  // Admin green used on admin-only accents for this page. Change ADMIN_GREEN to adjust color.
+  const ADMIN_GREEN = "#00703D";
 
   // Fetch rates data
   const fetchRates = useCallback(async () => {
@@ -82,7 +88,7 @@ const CustomerRates: React.FC = () => {
   const getCategoryColor = (category: string) => {
     switch (category) {
       case "NORMAL_GOODS":
-        return "bg-blue-100 text-blue-800";
+        return isCustomer ? "bg-blue-100 text-blue-800" : `bg-[${ADMIN_GREEN}] text-white`;
       case "SPECIAL_GOODS":
         return "bg-purple-100 text-purple-800";
       case "SMALL_GOODS":
@@ -94,7 +100,7 @@ const CustomerRates: React.FC = () => {
 
   const getTypeIcon = (rateType: string) => {
     return rateType === "SEA_RATES" ? (
-      <Ship className="h-4 w-4 text-blue-600" />
+      <Ship className={`h-4 w-4 ${isCustomer ? 'text-blue-600' : `text-[${ADMIN_GREEN}]`}`} />
     ) : (
       <Plane className="h-4 w-4 text-green-600" />
     );
@@ -118,8 +124,8 @@ const CustomerRates: React.FC = () => {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-full">
-                  <DollarSign className="h-5 w-5 text-blue-600" />
+                <div className={isCustomer ? "p-2 bg-blue-100 rounded-full" : `p-2 bg-[${ADMIN_GREEN}] rounded-full`}>
+                  <DollarSign className={`h-5 w-5 ${isCustomer ? 'text-blue-600' : `text-[${ADMIN_GREEN}]`}`} />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Rates</p>
@@ -218,7 +224,7 @@ const CustomerRates: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {selectedCategory === "SEA_RATES" ? (
-              <Ship className="h-5 w-5 text-blue-600" />
+              <Ship className={`h-5 w-5 ${isCustomer ? 'text-blue-600' : `text-[${ADMIN_GREEN}]`}`} />
             ) : selectedCategory === "AIR_RATES" ? (
               <Plane className="h-5 w-5 text-green-600" />
             ) : (
@@ -322,7 +328,7 @@ const CustomerRates: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 border rounded-lg">
               <div className="flex items-center gap-2 mb-2">
-                <Badge className="bg-blue-100 text-blue-800">Normal Goods</Badge>
+                <Badge className={isCustomer ? "bg-blue-100 text-blue-800" : `bg-[${ADMIN_GREEN}] text-white`}>Normal Goods</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
                 Standard shipping rates for regular cargo items

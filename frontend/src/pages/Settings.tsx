@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { settingsService, WarehouseAddress, CreateWarehouseRequest, UpdateWarehouseRequest, ShippingMarkRule, CreateShippingMarkRuleRequest, UpdateShippingMarkRuleRequest } from "@/services/settingsService";
+import { useAuthStore } from "@/stores/authStore";
 
 // Helper function to convert database region names to display names
 const getDisplayRegionName = (region: string): string => {
@@ -58,7 +59,7 @@ interface Office {
   country: string;
   phone: string;
   address: string;
-}
+} 
 
 // Use the WarehouseAddress from settingsService as the main interface
 // Simplified Warehouse interface for the editing form
@@ -75,6 +76,11 @@ interface WarehouseFormData {
 
 export default function Settings() {
   const { toast } = useToast();
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
+
+  // Admin green used for admin-only accents on this page
+  const ADMIN_GREEN = "#00703D";
   const [activeTab, setActiveTab] = useState("general");
   
   // Helper function to format region display names
@@ -647,7 +653,7 @@ export default function Settings() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5 text-primary" />
+                <User className={`h-5 w-5 ${isCustomer ? 'text-primary' : `text-[${ADMIN_GREEN}]`}`} />
                 Profile Information
               </CardTitle>
               <CardDescription>
@@ -727,14 +733,14 @@ export default function Settings() {
                   <Label htmlFor="role">User Role</Label>
                   <div className="flex items-center gap-2">
                     <Input id="role" value={generalSettings.role} readOnly />
-                    <Badge variant="default">{generalSettings.role}</Badge>
+                    <Badge variant="default" className={isCustomer ? undefined : `bg-[${ADMIN_GREEN}] text-white`}>{generalSettings.role}</Badge>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="warehouseAccess">Warehouse Access</Label>
                   <div className="flex items-center gap-2">
                     {generalSettings.warehouseAccess.map((warehouse, index) => (
-                      <Badge key={index} variant="secondary">{warehouse}</Badge>
+                      <Badge key={index} variant="secondary" className={isCustomer ? undefined : `bg-[${ADMIN_GREEN}] text-white`}>{warehouse}</Badge>
                     ))}
                   </div>
                 </div>
@@ -773,7 +779,7 @@ export default function Settings() {
               </div>
 
               <div className="pt-4">
-                <Button onClick={handleSaveGeneral} className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                <Button onClick={handleSaveGeneral} className={`flex items-center justify-center gap-2 w-full sm:w-auto ${isCustomer ? '' : `bg-[${ADMIN_GREEN}] text-white hover:bg-[${ADMIN_GREEN}]/90`} `}>
                   <Save className="h-4 w-4" />
                   Update Profile
                 </Button>
@@ -786,7 +792,7 @@ export default function Settings() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
+                <FileText className={`h-5 w-5 ${isCustomer ? 'text-primary' : `text-[${ADMIN_GREEN}]`}`} />
                 Invoice Configuration
               </CardTitle>
               <CardDescription>
@@ -800,7 +806,7 @@ export default function Settings() {
                   <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 lg:p-6 text-center">
                     <Upload className="h-6 w-6 lg:h-8 lg:w-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-xs lg:text-sm text-muted-foreground">Drag & drop logo here or click to browse</p>
-                    <Button variant="outline" size="sm" className="mt-2 w-full sm:w-auto">Browse Files</Button>
+                    <Button variant="outline" size="sm" className={`${isCustomer ? 'mt-2 w-full sm:w-auto' : `mt-2 w-full sm:w-auto bg-[${ADMIN_GREEN}] text-white hover:bg-[${ADMIN_GREEN}]/90`}`}>Browse Files</Button>
                   </div>
                 </div>
                 <div className="space-y-4">
@@ -854,7 +860,7 @@ export default function Settings() {
                 <h4 className="font-medium mb-3">Template Preview</h4>
                 <div className="border rounded-lg p-4 bg-muted/50">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="w-24 h-12 bg-primary/20 rounded flex items-center justify-center">
+                    <div className={`w-24 h-12 ${isCustomer ? 'bg-primary/20' : `bg-[${ADMIN_GREEN}]/20`} rounded flex items-center justify-center`}>
                       <span className="text-xs">LOGO</span>
                     </div>
                     <div className="text-right">
@@ -871,7 +877,7 @@ export default function Settings() {
               </div>
 
               <div className="pt-4">
-                <Button onClick={handleSaveInvoice} className="flex items-center gap-2">
+                <Button onClick={handleSaveInvoice} className={`flex items-center gap-2 ${isCustomer ? '' : `bg-[${ADMIN_GREEN}] text-white hover:bg-[${ADMIN_GREEN}]/90`}`}>
                   <Save className="h-4 w-4" />
                   Save Invoice Settings
                 </Button>
@@ -888,7 +894,7 @@ export default function Settings() {
                 Manage your company office locations and contact information
               </p>
             </div>
-            <Button onClick={handleAddOffice} className="flex items-center gap-2">
+            <Button onClick={handleAddOffice} className={`flex items-center gap-2 ${isCustomer ? '' : `bg-[${ADMIN_GREEN}] text-white hover:bg-[${ADMIN_GREEN}]/90`}`}>
               <Plus className="h-4 w-4" />
               Add Office
             </Button>
@@ -900,8 +906,8 @@ export default function Settings() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                        <Building className="h-6 w-6 text-primary" />
+                      <div className={`w-12 h-12 ${isCustomer ? 'bg-primary/10' : `bg-[${ADMIN_GREEN}]/10`} rounded-lg flex items-center justify-center`}>
+                        <Building className={`h-6 w-6 ${isCustomer ? 'text-primary' : `text-[${ADMIN_GREEN}]`}`} />
                       </div>
                       <div>
                         <CardTitle className="text-lg">{office.name}</CardTitle>
@@ -954,7 +960,7 @@ export default function Settings() {
                 Configure warehouse locations and shipping routes
               </p>
             </div>
-            <Button onClick={handleAddWarehouse} className="flex items-center gap-2">
+            <Button onClick={handleAddWarehouse} className={`flex items-center gap-2 ${isCustomer ? '' : `bg-[${ADMIN_GREEN}] text-white hover:bg-[${ADMIN_GREEN}]/90`}`}>
               <Plus className="h-4 w-4" />
               Add Warehouse
             </Button>
@@ -963,7 +969,7 @@ export default function Settings() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             {warehousesLoading ? (
               <div className="col-span-1 lg:col-span-2 text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${isCustomer ? 'border-primary' : `border-[${ADMIN_GREEN}]`} mx-auto`}></div>
                 <p className="text-muted-foreground text-sm lg:text-base mt-2">Loading warehouses...</p>
               </div>
             ) : !Array.isArray(warehouses) || warehouses.length === 0 ? (
@@ -1028,7 +1034,7 @@ export default function Settings() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings2 className="h-5 w-5 text-primary" />
+                <Settings2 className={`h-5 w-5 ${isCustomer ? 'text-primary' : `text-[${ADMIN_GREEN}]`}`} />
                 Shipping Mark Rules
               </CardTitle>
               <CardDescription>
@@ -1036,14 +1042,14 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className={`${isCustomer ? 'bg-blue-50 border border-blue-200' : `bg-[${ADMIN_GREEN}]/10 border border-[${ADMIN_GREEN}]/20`} rounded-lg p-4`}>
                 <h4 className="font-medium mb-2">Default Format</h4>
                 <p className="text-sm text-muted-foreground mb-3">
                   Shipping Mark = <strong>Prefix</strong> + <strong>Space</strong> + <strong>Random Name Combination</strong>
                 </p>
                 <div className="bg-white rounded border p-3">
                   <code className="text-sm">
-                    Example: <span className="text-blue-600">{shippingMarkRules.defaultPrefix}</span><span className="text-gray-400"> </span><span className="text-green-600">JODO</span> = <strong>{shippingMarkRules.defaultPrefix} JODO</strong>
+                    Example: <span className={`${isCustomer ? 'text-blue-600' : `text-[${ADMIN_GREEN}]`}`}>{shippingMarkRules.defaultPrefix}</span><span className="text-gray-400"> </span><span className="text-green-600">JODO</span> = <strong>{shippingMarkRules.defaultPrefix} JODO</strong>
                   </code>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
@@ -1065,7 +1071,7 @@ export default function Settings() {
 
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">Regional Rules</h4>
-                <Button size="sm" className="flex items-center gap-2" onClick={handleAddRegionalRule}>
+                <Button size="sm" className={`flex items-center gap-2 ${isCustomer ? '' : `bg-[${ADMIN_GREEN}] text-white hover:bg-[${ADMIN_GREEN}]/90`}`} onClick={handleAddRegionalRule}>
                   <Plus className="h-3 w-3" />
                   Add Rule
                 </Button>
@@ -1149,7 +1155,7 @@ export default function Settings() {
               )}
 
               <div className="pt-4">
-                <Button className="flex items-center gap-2">
+                <Button className={`flex items-center gap-2 ${isCustomer ? '' : `bg-[${ADMIN_GREEN}] text-white hover:bg-[${ADMIN_GREEN}]/90`}`}>
                   <Save className="h-4 w-4" />
                   Save Formatting Rules
                 </Button>
@@ -1278,7 +1284,7 @@ export default function Settings() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="text-xs h-7 px-2 bg-blue-500 text-white hover:bg-blue-600 flex-shrink-0"
+                      className={`text-xs h-7 px-2 ${isCustomer ? 'bg-blue-500 text-white hover:bg-blue-600' : `bg-[${ADMIN_GREEN}] text-white hover:bg-[${ADMIN_GREEN}]/90`} flex-shrink-0`}
                       onClick={() => {
                         const textarea = document.getElementById('warehouseAddress') as HTMLTextAreaElement;
                         const cursorPos = textarea.selectionStart;
@@ -1294,7 +1300,7 @@ export default function Settings() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="text-xs h-7 px-2 bg-blue-500 text-white hover:bg-blue-600"
+                      className={`text-xs h-7 px-2 ${isCustomer ? 'bg-blue-500 text-white hover:bg-blue-600' : `bg-[${ADMIN_GREEN}] text-white hover:bg-[${ADMIN_GREEN}]/90`}`}
                       onClick={() => {
                         const textarea = document.getElementById('warehouseAddress') as HTMLTextAreaElement;
                         const cursorPos = textarea.selectionStart;
@@ -1310,7 +1316,7 @@ export default function Settings() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="text-xs h-7 px-2 bg-blue-500 text-white hover:bg-blue-600"
+                      className={`text-xs h-7 px-2 ${isCustomer ? 'bg-blue-500 text-white hover:bg-blue-600' : `bg-[${ADMIN_GREEN}] text-white hover:bg-[${ADMIN_GREEN}]/90`}`}
                       onClick={() => {
                         const textarea = document.getElementById('warehouseAddress') as HTMLTextAreaElement;
                         const cursorPos = textarea.selectionStart;
@@ -1332,8 +1338,8 @@ export default function Settings() {
                     className="font-mono"
                   />
                   {(editingWarehouse.address?.includes('{{') || editingWarehouse.address?.includes('}}')) && (
-                    <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-                      <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                    <div className={`text-xs ${isCustomer ? 'text-blue-600' : `text-[${ADMIN_GREEN}]`} mt-1 flex items-center gap-1`}>
+                      <div className={`h-2 w-2 rounded-full ${isCustomer ? 'bg-blue-500' : `bg-[${ADMIN_GREEN}]`}`}></div>
                       Placeholders detected - clients will see personalized addresses
                     </div>
                   )}

@@ -1,10 +1,9 @@
+// GoodsReceivedChinaAir.tsx
 import { useEffect, useState } from "react";
 import {
   Package,
   Search,
-  Upload,
   Plus,
-  Download,
   CheckCircle2,
   Flag,
   Plane,
@@ -32,32 +31,47 @@ import {
   warehouseService,
   WarehouseItem,
   AdminWarehouseStatistics,
+  UpdateWarehouseItemRequest,
 } from "@/services/warehouseService";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthStore } from "@/stores/authStore";
 
+// role-aware colors are computed inside the component using auth state
+
+// =====================================================
+// Component
+// =====================================================
 export default function GoodsReceivedChinaAir() {
   const { toast } = useToast();
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
+  const ADMIN_GREEN = "#00703D";
+
+  const primaryColor = isCustomer ? "#2563eb" : ADMIN_GREEN;
+
+  // Common style helpers
+  const buttonStyle = { backgroundColor: primaryColor, color: "#FFFFFF" };
+  const outlineButtonStyle = { borderColor: primaryColor, color: primaryColor };
+  const iconStyle = { color: primaryColor };
   const PAGE_SIZE = 20;
+
   const [showNewGoodsDialog, setShowNewGoodsDialog] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<
-    | "all"
-    | "PENDING"
-    | "READY_FOR_SHIPPING"
-    | "FLAGGED"
-    | "SHIPPED"
-    | "CANCELLED"
+    "all" | "PENDING" | "READY_FOR_SHIPPING" | "FLAGGED" | "SHIPPED" | "CANCELLED"
   >("all");
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<WarehouseItem[]>([]);
-  const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [editingData, setEditingData] = useState<Partial<WarehouseItem>>({});
+  const [editingItem, setEditingItem] = useState<number | null>(null);
+  const [editingData, setEditingData] = useState<Partial<UpdateWarehouseItemRequest>>({});
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [stats, setStats] = useState<AdminWarehouseStatistics | null>(null);
 
-  // Fetch data
+  // =====================================================
+  // Data Fetching
+  // =====================================================
   const fetchData = async (currentPage = 1, isNewSearch = false) => {
     setLoading(true);
     try {
@@ -67,22 +81,23 @@ export default function GoodsReceivedChinaAir() {
         search: search || undefined,
         status: status === "all" ? undefined : status,
       };
-
-      // Use AIR cargo specific endpoint
       const response = await warehouseService.getChinaAirGoods(params);
       const newItems = response.data?.results || [];
 
       if (isNewSearch || currentPage === 1) {
         setItems(Array.isArray(newItems) ? newItems : []);
       } else {
-        setItems((prev) => [...(Array.isArray(prev) ? prev : []), ...(Array.isArray(newItems) ? newItems : [])]);
+        setItems((prev) => [
+          ...(Array.isArray(prev) ? prev : []),
+          ...(Array.isArray(newItems) ? newItems : []),
+        ]);
       }
 
       setHasMore(!!response.data?.next);
       setPage(currentPage);
     } catch (error) {
       console.error("Failed to fetch China air goods:", error);
-      setItems([]); // Ensure we always have an array on error
+      setItems([]);
       toast({
         title: "Error",
         description: "Failed to load goods. Please try again.",
@@ -93,7 +108,6 @@ export default function GoodsReceivedChinaAir() {
     }
   };
 
-  // Fetch statistics
   const fetchStats = async () => {
     try {
       const response = await warehouseService.getChinaAirStatistics();
@@ -103,15 +117,17 @@ export default function GoodsReceivedChinaAir() {
     }
   };
 
-  // Edit functions
+  // =====================================================
+  // Edit / Update Handlers
+  // =====================================================
   const handleEditStart = (item: WarehouseItem) => {
     setEditingItem(item.id);
     setEditingData({
-      shipping_mark: item.shipping_mark,
-      supply_tracking: item.supply_tracking,
-      description: item.description,
+      shipping_mark: item.shipping_mark || undefined,
+      supply_tracking: item.supply_tracking || undefined,
+      description: item.description ?? undefined,
       quantity: item.quantity,
-      weight: item.weight,
+      weight: item.weight ?? undefined,
       status: item.status,
     });
   };
@@ -123,7 +139,6 @@ export default function GoodsReceivedChinaAir() {
 
   const handleEditSave = async () => {
     if (!editingItem || !editingData) return;
-
     try {
       setSaving(true);
       await warehouseService.updateChinaWarehouseItem(editingItem, editingData);
@@ -136,7 +151,7 @@ export default function GoodsReceivedChinaAir() {
         description: "Item updated successfully",
       });
     } catch (error) {
-      console.error('Failed to update item:', error);
+      console.error("Failed to update item:", error);
       toast({
         title: "Error",
         description: "Failed to update item",
@@ -148,7 +163,7 @@ export default function GoodsReceivedChinaAir() {
   };
 
   const handleFieldChange = (field: keyof WarehouseItem, value: any) => {
-    setEditingData(prev => ({
+    setEditingData((prev) => ({
       ...prev,
       [field]: value,
     }));
@@ -203,11 +218,14 @@ export default function GoodsReceivedChinaAir() {
     }
   };
 
+  // =====================================================
+  // Table Columns
+  // =====================================================
   const columns: Column<WarehouseItem>[] = [
     {
       id: "shipping_mark",
       header: "Shipping Mark",
-      accessor: (item) => 
+      accessor: (item) =>
         editingItem === item.id ? (
           <Input
             value={editingData.shipping_mark || ""}
@@ -231,7 +249,10 @@ export default function GoodsReceivedChinaAir() {
             className="w-full"
           />
         ) : (
-          <code className="text-xs bg-muted px-2 py-1 rounded">
+          <code
+            className="text-xs bg-muted px-2 py-1 rounded"
+            style={{ color: primaryColor }}
+          >
             {item.supply_tracking}
           </code>
         ),
@@ -313,11 +334,9 @@ export default function GoodsReceivedChinaAir() {
     {
       id: "date_received",
       header: "Date Received",
-      accessor: (item) =>
-        new Date(item.date_received).toLocaleDateString(),
+      accessor: (item) => new Date(item.date_received).toLocaleDateString(),
       sort: (a, b) =>
-        new Date(a.date_received).getTime() -
-        new Date(b.date_received).getTime(),
+        new Date(a.date_received).getTime() - new Date(b.date_received).getTime(),
     },
     {
       id: "actions",
@@ -325,21 +344,11 @@ export default function GoodsReceivedChinaAir() {
       accessor: (item) =>
         editingItem === item.id ? (
           <div className="flex gap-2">
-            <Button
-              size="sm"
-              onClick={handleEditSave}
-              disabled={saving}
-              className="h-8 w-8 p-0"
-            >
+            <Button size="sm" onClick={handleEditSave} disabled={saving} className="h-8 w-8 p-0" style={buttonStyle}>
               <Save className="h-4 w-4" />
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleEditCancel}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
+            <Button size="sm" variant="outline" onClick={handleEditCancel} className="h-8 w-8 p-0" style={outlineButtonStyle}>
+              <X className="h-4 w-4" style={iconStyle} />
             </Button>
           </div>
         ) : (
@@ -348,13 +357,17 @@ export default function GoodsReceivedChinaAir() {
             variant="outline"
             onClick={() => handleEditStart(item)}
             className="h-8 w-8 p-0"
+            style={outlineButtonStyle}
           >
-            <Edit className="h-4 w-4" />
+            <Edit className="h-4 w-4" style={iconStyle} />
           </Button>
         ),
     },
   ];
 
+  // =====================================================
+  // Render
+  // =====================================================
   return (
     <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       {/* Header */}
@@ -369,9 +382,10 @@ export default function GoodsReceivedChinaAir() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ExcelUploadButton
-            uploadUrl="/api/goods/china/upload_excel/"
-            templateUrl="/api/goods/china/download_template/"
-            onUploadSuccess={() => {
+            uploadType="goods_received"
+            warehouse="China"
+            style={buttonStyle}
+            onUploadComplete={() => {
               fetchData(1, true);
               fetchStats();
             }}
@@ -379,8 +393,9 @@ export default function GoodsReceivedChinaAir() {
           <Button
             onClick={() => setShowNewGoodsDialog(true)}
             className="flex items-center gap-2 h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
+            style={buttonStyle}
           >
-            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: "#FFFFFF" }} />
             <span className="hidden xs:inline">Add Goods</span>
             <span className="xs:hidden">Add</span>
           </Button>
@@ -393,25 +408,29 @@ export default function GoodsReceivedChinaAir() {
           title="Total Items"
           value={stats?.total_count || 0}
           icon={Package}
-          trend="neutral"
+          iconColor={primaryColor}
+          bgColor={isCustomer ? undefined : ADMIN_GREEN + "22"}
         />
         <MetricCard
           title="Pending"
           value={stats?.pending_count || 0}
           icon={Package}
-          trend="neutral"
+          iconColor={primaryColor}
+          bgColor={isCustomer ? undefined : ADMIN_GREEN + "22"}
         />
         <MetricCard
           title="Ready for Shipping"
           value={stats?.ready_for_shipping_count || 0}
           icon={CheckCircle2}
-          trend="positive"
+          iconColor={primaryColor}
+          bgColor={isCustomer ? undefined : ADMIN_GREEN + "22"}
         />
         <MetricCard
           title="Flagged"
           value={stats?.flagged_count || 0}
           icon={Flag}
-          trend={stats?.flagged_count ? "negative" : "neutral"}
+          iconColor={primaryColor}
+          bgColor={isCustomer ? undefined : ADMIN_GREEN + "22"}
         />
       </div>
 
@@ -419,12 +438,7 @@ export default function GoodsReceivedChinaAir() {
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by tracking, mark, or description..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
+          <Input placeholder="Search by tracking, mark, or description..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
         </div>
         <Select value={status} onValueChange={(value: any) => setStatus(value)}>
           <SelectTrigger className="w-[180px]">
@@ -451,9 +465,7 @@ export default function GoodsReceivedChinaAir() {
         empty={
           <div className="text-center py-8">
             <Plane className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              No air cargo found
-            </h3>
+            <h3 className="text-lg font-semibold text-foreground mb-2">No air cargo found</h3>
             <p className="text-muted-foreground">
               Add air cargo goods or adjust your search filters
             </p>
@@ -465,20 +477,17 @@ export default function GoodsReceivedChinaAir() {
               onClick={() => handleStatusUpdate(item, "READY_FOR_SHIPPING")}
               disabled={item.status === "READY_FOR_SHIPPING"}
             >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
+              <CheckCircle2 className="h-4 w-4 mr-2" style={iconStyle} />
               Mark Ready
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => handleStatusUpdate(item, "FLAGGED")}
               disabled={item.status === "FLAGGED"}
             >
-              <Flag className="h-4 w-4 mr-2" />
+              <Flag className="h-4 w-4 mr-2" style={iconStyle} />
               Flag Item
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleDelete(item)}
-              className="text-destructive"
-            >
+            <DropdownMenuItem onClick={() => handleDelete(item)} className="text-destructive">
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </DropdownMenuItem>
@@ -489,7 +498,7 @@ export default function GoodsReceivedChinaAir() {
       {/* Load More */}
       {hasMore && (
         <div className="text-center">
-          <Button variant="outline" onClick={loadMore} disabled={loading}>
+          <Button variant="outline" onClick={loadMore} disabled={loading} style={outlineButtonStyle}>
             {loading ? "Loading..." : "Load More"}
           </Button>
         </div>
