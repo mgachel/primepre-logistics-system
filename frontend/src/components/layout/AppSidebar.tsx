@@ -9,7 +9,6 @@ import {
   Calculator, 
   Settings, 
   UserCog,
-  Menu,
   X,
   ChevronDown,
   FileText,
@@ -45,7 +44,6 @@ const adminNavigation = [
   {
     name: "Daily Updates",
     children: [
-      { name: "China (All)", href: "/goods/china", icon: Package },
       { name: "China Sea", href: "/goods/china/sea", icon: Ship },
       { name: "China Air", href: "/goods/china/air", icon: Plane },
     ],
@@ -86,18 +84,10 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
   const isAdmin = () => user && user.user_role && ['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(user.user_role);
   const isCustomer = () => user && user.user_role === 'CUSTOMER';
 
-  // Get navigation based on user role
-  const getNavigation = () => {
-    if (isAdmin()) {
-      return adminNavigation;
-    } else if (isCustomer()) {
-      return customerNavigation;
-    }
-    // Default to admin navigation for fallback
-    return adminNavigation;
-  };
+  // Define primary color based on user role
+  const primaryColor = isCustomer() ? "#4FC3F7" : "#00703D"; // Light blue for customers, green for others
 
-  const navigation = getNavigation();
+  const navigation = isAdmin() ? adminNavigation : customerNavigation;
 
   const isActive = (href: string) => {
     if (href === "/") return location.pathname === "/";
@@ -133,14 +123,19 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
       <div className="flex h-16 items-center justify-between px-4 border-b border-border">
         <div className="flex items-center space-x-2">
           {(!isCollapsed || isMobile) && (
-            <img src="/sidebar.png" alt="PRIMEPRE" className="h-10" />
+            <img
+              src={isCustomer() ? "/sidebar.png" : "/wavemova 0.png"}
+              alt="PRIMEPRE"
+              className={isCustomer() ? "h-10" : "h-10"}
+            />
           )}
         </div>
         {/* Replace collapsed sidebar expand button with Start button */}
         {!isMobile ? (
           <button
             onClick={onToggle}
-            className="p-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/80 transition-colors"
+            style={{ backgroundColor: primaryColor }}
+            className="p-2 rounded-md text-primary-foreground hover:opacity-80 transition-colors"
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
@@ -171,8 +166,9 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
                   <button
                     className={cn(
                       "flex w-full items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors hover:bg-muted",
-                      groupActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                      groupActive ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                     )}
+                    style={groupActive ? { color: primaryColor } : undefined}
                     aria-label={`Toggle ${item.name} section`}
                     title={`Toggle ${item.name} section`}
                   >
@@ -198,9 +194,10 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
                       className={cn(
                         "flex items-center px-3 py-2 ml-6 text-sm font-medium rounded-md transition-colors",
                         isActive(child.href)
-                          ? "bg-primary text-primary-foreground"
+                          ? "text-primary-foreground"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted"
                       )}
+                      style={isActive(child.href) ? { backgroundColor: primaryColor, color: "#FFFFFF" } : undefined}
                     >
                       <child.icon className="h-4 w-4 shrink-0" />
                       {(!isCollapsed || isMobile) && <span className="ml-3">{child.name}</span>}
@@ -219,9 +216,10 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
               className={cn(
                 "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
                 isActive(item.href)
-                  ? "bg-primary text-primary-foreground"
+                  ? "text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
               )}
+              style={isActive(item.href) ? { backgroundColor: primaryColor, color: "#FFFFFF" } : undefined}
             >
               <item.icon className="h-4 w-4 shrink-0" />
               {(!isCollapsed || isMobile) && <span className="ml-3">{item.name}</span>}

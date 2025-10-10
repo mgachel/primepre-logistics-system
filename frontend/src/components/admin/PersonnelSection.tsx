@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Users,
   Plus,
@@ -27,8 +27,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthStore } from '@/stores/authStore';
 import { NewAdminDialog } from "@/components/dialogs/NewAdminDialog";
-import { adminService, AdminUser } from "@/services/adminService";
+import { adminService } from "@/services/adminService";
 import { User } from "@/services/authService";
 
 export function PersonnelSection() {
@@ -37,6 +38,10 @@ export function PersonnelSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false || !user;
+  const ADMIN_GREEN = '#00703D';
+  const primaryColor = isCustomer ? '#1EA6D6' : ADMIN_GREEN;
 
   // Fetch personnel data from backend
   const fetchPersonnel = useCallback(async () => {
@@ -199,9 +204,9 @@ export function PersonnelSection() {
             </CardDescription>
           </div>
           <Button
-            className="bg-primary hover:bg-primary/90"
             onClick={() => setShowNewAdminDialog(true)}
             disabled={loading}
+            style={{ backgroundColor: primaryColor === '#1EA6D6' ? undefined : primaryColor, color: primaryColor === '#1EA6D6' ? undefined : '#FFFFFF' }}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Personnel
@@ -223,7 +228,7 @@ export function PersonnelSection() {
               <p className="text-muted-foreground mb-4">
                 No admin or staff users have been created yet.
               </p>
-              <Button onClick={() => setShowNewAdminDialog(true)}>
+              <Button onClick={() => setShowNewAdminDialog(true)} style={{ backgroundColor: primaryColor === '#1EA6D6' ? undefined : primaryColor, color: primaryColor === '#1EA6D6' ? undefined : '#FFFFFF' }}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add First Personnel
               </Button>

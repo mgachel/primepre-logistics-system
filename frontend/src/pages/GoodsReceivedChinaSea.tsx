@@ -17,6 +17,7 @@ import { NewGoodsDialog } from '@/components/dialogs/NewGoodsDialog';
 import { DataTable, Column } from '@/components/data-table/DataTable';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { warehouseService, WarehouseItem } from '@/services/warehouseService';
+import { useAuthStore } from '@/stores/authStore';
 import { formatDate } from '@/lib/date';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,8 +37,8 @@ export default function GoodsReceivedChinaSea() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [stats, setStats] = useState<SeaCargoStats | null>(null);
   const [showNewGoodsDialog, setShowNewGoodsDialog] = useState(false);
-  const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [editingData, setEditingData] = useState<Partial<WarehouseItem>>({});
+  const [editingItem, setEditingItem] = useState<number | null>(null);
+  const [editingData, setEditingData] = useState<Partial<import('@/services/warehouseService').UpdateWarehouseItemRequest>>({});
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -99,11 +100,11 @@ export default function GoodsReceivedChinaSea() {
   const handleEditStart = (item: WarehouseItem) => {
     setEditingItem(item.id);
     setEditingData({
-      shipping_mark: item.shipping_mark,
-      supply_tracking: item.supply_tracking,
-      description: item.description,
+      shipping_mark: item.shipping_mark || undefined,
+      supply_tracking: item.supply_tracking || undefined,
+      description: item.description ?? undefined,
       quantity: item.quantity,
-      cbm: item.cbm,
+      cbm: item.cbm ?? undefined,
       status: item.status,
     });
   };
@@ -228,6 +229,16 @@ export default function GoodsReceivedChinaSea() {
       return matchesSearch && matchesStatus;
     });
   }, [items, searchTerm, statusFilter]);
+
+  // Role-aware coloring using auth store
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
+  const ADMIN_GREEN = "#00703D";
+  const primaryColor = isCustomer ? "#2563eb" : ADMIN_GREEN;
+  // Apply conditional coloring to all relevant elements
+  const buttonStyle = { backgroundColor: primaryColor, color: "#FFFFFF" };
+  const outlineButtonStyle = { borderColor: primaryColor, color: primaryColor };
+  const iconStyle = { color: primaryColor };
 
   // Table configuration
   type Row = {
@@ -364,7 +375,7 @@ export default function GoodsReceivedChinaSea() {
         return isEditing ? (
           <Select
             value={editingData.status || r.status}
-            onValueChange={(value) => handleFieldChange('status', value)}
+            onValueChange={(value) => handleFieldChange('status', value as WarehouseItem['status'])}
           >
             <SelectTrigger className="h-8 text-sm w-32">
               <SelectValue />
@@ -513,12 +524,14 @@ export default function GoodsReceivedChinaSea() {
               };
               refreshData();
             }}
+            style={buttonStyle}
           />
           <Button
             onClick={() => setShowNewGoodsDialog(true)}
             className="flex items-center gap-2 h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
+            style={buttonStyle}
           >
-            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: "#FFFFFF" }} />
             <span className="hidden xs:inline">Add Goods</span>
             <span className="xs:hidden">Add</span>
           </Button>
@@ -531,21 +544,29 @@ export default function GoodsReceivedChinaSea() {
           title="Total Items"
           value={stats?.total_count || 0}
           icon={Package}
+          iconColor={primaryColor}
+          bgColor={isCustomer ? undefined : ADMIN_GREEN + '22'}
         />
         <MetricCard
           title="Pending"
           value={stats?.pending_count || 0}
           icon={Package}
+          iconColor={primaryColor}
+          bgColor={isCustomer ? undefined : ADMIN_GREEN + '22'}
         />
         <MetricCard
           title="Ready for Shipping"
           value={stats?.ready_for_shipping_count || 0}
           icon={CheckCircle2}
+          iconColor={primaryColor}
+          bgColor={isCustomer ? undefined : ADMIN_GREEN + '22'}
         />
         <MetricCard
           title="Flagged"
           value={stats?.flagged_count || 0}
           icon={Flag}
+          iconColor={primaryColor}
+          bgColor={isCustomer ? undefined : ADMIN_GREEN + '22'}
         />
       </div>
 
@@ -567,26 +588,26 @@ export default function GoodsReceivedChinaSea() {
                 />
               </div>
             </div>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => {
-                setStatusFilter(value);
-                setPage(1);
-              }}
-            >
+                    <Select
+                      value={statusFilter}
+                      onValueChange={(value) => {
+                        setStatusFilter(value as string);
+                        setPage(1);
+                      }}
+                    >
               <SelectTrigger className="w-48">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="PENDING">Pending</SelectItem>
-                <SelectItem value="READY_FOR_SHIPPING">Ready for Shipping</SelectItem>
-                <SelectItem value="SHIPPED">Shipped</SelectItem>
-                <SelectItem value="READY_FOR_DELIVERY">Ready for Delivery</SelectItem>
-                <SelectItem value="DELIVERED">Delivered</SelectItem>
-                <SelectItem value="FLAGGED">Flagged</SelectItem>
-                <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="READY_FOR_SHIPPING">Ready for Shipping</SelectItem>
+                    <SelectItem value="SHIPPED">Shipped</SelectItem>
+                    <SelectItem value="READY_FOR_DELIVERY">Ready for Delivery</SelectItem>
+                    <SelectItem value="DELIVERED">Delivered</SelectItem>
+                    <SelectItem value="FLAGGED">Flagged</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelled</SelectItem>
               </SelectContent>
             </Select>
             <Button 
@@ -599,8 +620,9 @@ export default function GoodsReceivedChinaSea() {
               }} 
               variant="outline" 
               size="sm"
+              style={outlineButtonStyle}
             >
-              <RefreshCcw className="h-4 w-4 mr-2" />
+              <RefreshCcw className="h-4 w-4 mr-2" style={iconStyle} />
               Refresh
             </Button>
           </div>
@@ -629,6 +651,7 @@ export default function GoodsReceivedChinaSea() {
                   refreshData();
                 }} 
                 variant="outline"
+                style={outlineButtonStyle}
               >
                 <RefreshCcw className="h-4 w-4 mr-2" />
                 Retry
