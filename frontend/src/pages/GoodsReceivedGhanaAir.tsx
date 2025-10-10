@@ -90,7 +90,7 @@ export default function GoodsReceivedGhanaAir() {
   const [error, setError] = useState<string | null>(null);
   const [containers, setContainers] = useState<GoodsReceivedContainer[]>([]);
   const [dashboard, setDashboard] = useState<GoodsReceivedContainerStats | null>(null);
-      const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false; // Check if user is customer
+
 
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [selectedStatusContainer, setSelectedStatusContainer] = useState<GoodsReceivedContainer | null>(null);
@@ -176,26 +176,24 @@ export default function GoodsReceivedGhanaAir() {
     try {
       await goodsReceivedContainerService.updateContainer(
         selectedStatusContainer.container_id,
-        { status: newStatus as "pending" | "in_transit" | "arrived" | "cleared" }
-         {/* Navigation Tabs (admins only) */}
-         {!isCustomer && (
-           <div className="flex gap-2 border-b border-border pb-2 mb-6">
-             <button
-               onClick={() => navigate('/goods/ghana/sea')}
-               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-             >
-               <Ship className={`h-4 w-4 ${iconClass}`} />
-               Sea Goods
-             </button>
-             <button
-               onClick={() => navigate('/goods/ghana/air')}
-               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md ${primaryBtnClass}`}
-             >
-               <Plane className={`h-4 w-4 ${iconClass}`} />
-               Air Goods
-             </button>
-           </div>
-         )}
+        { status: newStatus as "pending" | "processing" | "ready_for_delivery" | "delivered" | "flagged" }
+      );
+      toast({
+        title: "Status updated",
+        description: `${selectedStatusContainer.container_id} → ${newStatus.replace("_", " ")}`,
+      });
+      setShowStatusDialog(false);
+      setSelectedStatusContainer(null);
+      setNewStatus("");
+      await reloadData();
+    } catch (e: unknown) {
+      toast({
+        title: "Update failed",
+        description: e instanceof Error ? e.message : "Unable to update",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Filter containers - search is handled by API, only filter by status locally
   const filteredContainers = useMemo(() => {
@@ -304,9 +302,10 @@ export default function GoodsReceivedGhanaAir() {
       id: "status",
       header: "Status",
       accessor: (row) => (
-        <StatusBadge status={mapStatus(row.status)}>
-          {row.status?.replace("_", " ").toUpperCase() || "PENDING"}
-        </StatusBadge>
+        <div className="flex items-center gap-2">
+          <StatusBadge status={mapStatus(row.status)} />
+          <span className="text-sm">{row.status?.replace("_", " ").toUpperCase() || "PENDING"}</span>
+        </div>
       ),
       sort: (a, b) => (a.status || "").localeCompare(b.status || ""),
       width: "120px",
@@ -434,7 +433,7 @@ export default function GoodsReceivedGhanaAir() {
               <Package className="h-8 w-8 text-purple-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold">{dashboard?.pending || 0}</p>
+                <p className="text-2xl font-bold">{dashboard?.pending_containers || 0}</p>
               </div>
             </div>
           </div>
