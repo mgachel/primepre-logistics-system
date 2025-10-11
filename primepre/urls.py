@@ -26,6 +26,11 @@ import traceback
 def api_test_view(request):
     return JsonResponse({"status": "API working", "endpoint": "test"})
 
+
+def health_view(request):
+    """Lightweight health check for load testing and readiness probes."""
+    return JsonResponse({"status": "ok", "service": "primepre-backend"})
+
 @csrf_exempt
 def debug_signup_view(request):
     """Debug endpoint to test signup without full logic"""
@@ -87,6 +92,7 @@ def create_superuser_view(request):
 urlpatterns = [
     path('', home_view, name='home'),  # Root URL now has a proper handler
     path('api/test/', api_test_view, name='api_test'),  # Test endpoint
+    path('api/health/', health_view, name='health'),  # Lightweight health check
     path('api/debug/signup/', debug_signup_view, name='debug_signup'),  # Debug signup
     path('api/create-superuser/', create_superuser_view, name='create_superuser'),  # Superuser creation
     path('api/auth/', include('users.urls')),
