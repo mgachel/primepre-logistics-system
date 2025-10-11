@@ -7,6 +7,7 @@ import {
   Calendar,
   Search,
 } from "lucide-react";
+import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -54,6 +55,11 @@ export default function Notes() {
     content: "",
   });
   const { toast } = useToast();
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
+
+  // Admin green used on admin-only accents for this page. Change ADMIN_GREEN to adjust color.
+  const ADMIN_GREEN = "#00703D";
 
   // Load notes from API
   useEffect(() => {
@@ -238,8 +244,8 @@ export default function Notes() {
             Manage your personal notes and reminders
           </p>
         </div>
-        <Button onClick={handleAddNote} className="flex items-center justify-center gap-2 w-full sm:w-auto">
-          <Plus className="h-4 w-4" />
+        <Button onClick={handleAddNote} className={`flex items-center justify-center gap-2 w-full sm:w-auto ${isCustomer ? '' : `bg-[${ADMIN_GREEN}] text-white`}`}>
+          <Plus className={`h-4 w-4 ${isCustomer ? '' : `text-[${ADMIN_GREEN}]`}`} />
           <span>Add Note</span>
         </Button>
       </div>
@@ -255,8 +261,8 @@ export default function Notes() {
             className="pl-10"
           />
         </div>
-        <Badge variant="secondary" className="flex items-center gap-2">
-          <StickyNote className="h-3 w-3" />
+        <Badge variant="secondary" className={`flex items-center gap-2 ${isCustomer ? '' : `bg-[${ADMIN_GREEN}] text-white`}`}>
+          <StickyNote className={`h-3 w-3 ${isCustomer ? '' : `text-[${ADMIN_GREEN}]`}`} />
           {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
         </Badge>
       </div>
@@ -264,7 +270,7 @@ export default function Notes() {
       {/* Notes Grid */}
       {filteredNotes.length === 0 ? (
         <Card className="p-8 text-center">
-          <StickyNote className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <StickyNote className={`h-12 w-12 mx-auto mb-4 ${isCustomer ? 'text-muted-foreground' : `text-[${ADMIN_GREEN}]`}`} />
           <h3 className="text-lg font-medium text-foreground mb-2">
             {searchTerm ? "No notes found" : "No notes yet"}
           </h3>

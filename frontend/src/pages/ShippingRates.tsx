@@ -26,6 +26,7 @@ import {
   Trash2,
   ArrowLeft,
 } from "lucide-react";
+import { useAuthStore } from "@/stores/authStore";
 import {
   ratesService,
   Rate,
@@ -48,6 +49,11 @@ const ShippingRates = () => {
   const [editingRate, setEditingRate] = useState<Rate | null>(null);
   const [updating, setUpdating] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
+
+  // Admin green used on admin-only accents for this page. Change ADMIN_GREEN to adjust color.
+  const ADMIN_GREEN = "#00703D";
 
   // Form state
   const [formData, setFormData] = useState<CreateRateRequest>({
@@ -300,7 +306,7 @@ const ShippingRates = () => {
   const getCategoryColor = (category: string) => {
     switch (category) {
       case "NORMAL_GOODS":
-        return "bg-blue-100 text-blue-800";
+        return isCustomer ? "bg-blue-100 text-blue-800" : `bg-[${ADMIN_GREEN}] text-white`;
       case "SPECIAL_GOODS":
         return "bg-purple-100 text-purple-800";
       case "SMALL_GOODS":
@@ -317,10 +323,10 @@ const ShippingRates = () => {
         {/* Shipping Rates Section */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Ship className="h-5 w-5 text-primary" />
+            <Ship className={`h-5 w-5 ${isCustomer ? 'text-primary' : `text-[${ADMIN_GREEN}]`}`} />
             <h3 className="font-semibold">Shipping Rates</h3>
             {stats && (
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className={`text-xs ${isCustomer ? '' : `bg-[${ADMIN_GREEN}] text-white`}`}>
                 {stats.total}
               </Badge>
             )}
@@ -337,14 +343,14 @@ const ShippingRates = () => {
           </div>
 
           <Button
-            className="w-full border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary"
+            className={`w-full border-2 border-dashed border-primary/30 ${isCustomer ? 'bg-primary/5 hover:bg-primary/10 text-primary' : `bg-[${ADMIN_GREEN}] text-white`} `}
             variant="outline"
             onClick={() => {
               resetForm();
               setShowAddForm(true);
             }}
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className={`h-4 w-4 mr-2 ${isCustomer ? '' : `text-[${ADMIN_GREEN}]`}`} />
             Add New Rate
           </Button>
         </div>
@@ -358,7 +364,7 @@ const ShippingRates = () => {
             <Button
               variant={selectedCategory === "SEA_RATES" ? "default" : "outline"}
               size="sm"
-              className="flex items-center justify-center gap-1 lg:gap-2"
+                className={`flex items-center justify-center gap-1 lg:gap-2 ${selectedCategory === 'SEA_RATES' && !isCustomer ? `bg-[${ADMIN_GREEN}] text-white` : ''}`}
               onClick={() => setSelectedCategory("SEA_RATES")}
             >
               <Ship className="h-4 w-4" />
@@ -367,7 +373,7 @@ const ShippingRates = () => {
             <Button
               variant={selectedCategory === "AIR_RATES" ? "default" : "outline"}
               size="sm"
-              className="flex items-center justify-center gap-1 lg:gap-2"
+                className={`flex items-center justify-center gap-1 lg:gap-2 ${selectedCategory === 'AIR_RATES' && !isCustomer ? `bg-[${ADMIN_GREEN}] text-white` : ''}`}
               onClick={() => setSelectedCategory("AIR_RATES")}
             >
               <Plane className="h-4 w-4" />
@@ -413,7 +419,7 @@ const ShippingRates = () => {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             {selectedCategory === "SEA_RATES" ? (
-              <Ship className="h-4 w-4 text-blue-600" />
+              <Ship className={`h-4 w-4 ${isCustomer ? 'text-blue-600' : `text-[${ADMIN_GREEN}]`}`} />
             ) : (
               <Plane className="h-4 w-4 text-green-600" />
             )}
@@ -440,7 +446,7 @@ const ShippingRates = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       {selectedCategory === "SEA_RATES" ? (
-                        <Ship className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                        <Ship className={`h-3 w-3 ${isCustomer ? 'text-blue-600' : `text-[${ADMIN_GREEN}]`} flex-shrink-0`} />
                       ) : (
                         <Plane className="h-3 w-3 text-green-600 flex-shrink-0" />
                       )}
@@ -771,7 +777,7 @@ const ShippingRates = () => {
                           <td className="p-4">
                             <div className="flex items-center gap-3">
                               {rate.rate_type === "SEA_RATES" ? (
-                                <Ship className="h-4 w-4 text-blue-600" />
+                                <Ship className={`h-4 w-4 ${isCustomer ? 'text-blue-600' : `text-[${ADMIN_GREEN}]`}`} />
                               ) : (
                                 <Plane className="h-4 w-4 text-green-600" />
                               )}
@@ -810,7 +816,7 @@ const ShippingRates = () => {
                                 onClick={() => handleEditRate(rate)}
                                 title="Edit rate"
                               >
-                                <Edit className="h-4 w-4 text-blue-600" />
+                                <Edit className={`h-4 w-4 ${isCustomer ? 'text-blue-600' : `text-[${ADMIN_GREEN}]`}`} />
                               </Button>
                               <Button
                                 variant="ghost"

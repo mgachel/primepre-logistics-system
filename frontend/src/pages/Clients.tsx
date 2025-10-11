@@ -6,7 +6,6 @@ import {
   Edit,
   Trash2,
   Mail,
-  History,
   Briefcase,
   RefreshCcw,
   ShieldX,
@@ -19,12 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { NewClientDialog } from "@/components/dialogs/NewClientDialog";
 import { EditClientDialog } from "@/components/dialogs/EditClientDialog";
 import { SendMessageDialog } from "@/components/dialogs/SendMessageDialog";
@@ -44,15 +38,24 @@ import { persistGet, persistSet } from "@/lib/persist";
 import { cargoService, BackendCargoItem } from "@/services/cargoService";
 import { useToast } from "@/hooks/use-toast";
 import { exportClientsToExcel } from "@/lib/excelExporter";
+import { useAuthStore } from "@/stores/authStore";
 
 export default function Clients() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
+  const ADMIN_GREEN = "#00703D";
+  const primaryColor = isCustomer ? "#2563eb" : ADMIN_GREEN;
+  const buttonStyle = { backgroundColor: primaryColor, color: "#FFFFFF" };
+  const outlineButtonStyle = { borderColor: primaryColor, color: primaryColor };
+  const iconStyle = { color: primaryColor };
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<
     "all" | "active" | "inactive"
-  >(persistGet("clients:filterStatus", "all"));
+  >( (persistGet("clients:filterStatus") as "all" | "active" | "inactive" ) ?? "all");
   const [showNewClientDialog, setShowNewClientDialog] = useState(false);
   const [showExcelUploadDialog, setShowExcelUploadDialog] = useState(false);
   const [showSendMessageDialog, setShowSendMessageDialog] = useState(false);
@@ -283,7 +286,7 @@ export default function Clients() {
           user_type: userType,
           status: u.is_active ? ("active" as const) : ("inactive" as const),
           lastActivity,
-          is_verified: u.is_verified ? "Verified" : "Unverified",
+    is_verified: (u as any).is_verified ? "Verified" : "Unverified",
           _raw: u,
         };
       }),
@@ -315,7 +318,10 @@ export default function Clients() {
       id: "shipping_mark",
       header: "Shipping Mark",
       accessor: (c) => (
-        <div className="font-mono text-sm font-medium bg-primary/10 px-2 py-1 rounded">
+        <div
+          className="font-mono text-sm font-medium px-2 py-1 rounded"
+          style={isCustomer ? undefined : { backgroundColor: ADMIN_GREEN + '22', color: ADMIN_GREEN }}
+        >
           {c.shipping_mark}
         </div>
       ),
@@ -398,26 +404,28 @@ export default function Clients() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => setShowNewClientDialog(true)}>
+          <Button onClick={() => setShowNewClientDialog(true)} style={buttonStyle}>
             <Plus className="h-4 w-4 mr-2" />
             Add Client
           </Button>
           <Button 
             variant="outline" 
             onClick={() => setShowExcelUploadDialog(true)}
+            style={outlineButtonStyle}
           >
-            <Upload className="h-4 w-4 mr-2" />
+            <Upload className="h-4 w-4 mr-2" style={iconStyle} />
             Upload Excel
           </Button>
           <Button 
             variant="outline" 
             onClick={handleExportToExcel}
+            style={outlineButtonStyle}
           >
-            <Download className="h-4 w-4 mr-2" />
+            <Download className="h-4 w-4 mr-2" style={iconStyle} />
             Download Excel
           </Button>
-          <Button variant="outline" onClick={handleRefresh}>
-            <RefreshCcw className="h-4 w-4 mr-2" />
+          <Button variant="outline" onClick={handleRefresh} style={outlineButtonStyle}>
+            <RefreshCcw className="h-4 w-4 mr-2" style={iconStyle} />
             Refresh
           </Button>
         </div>
@@ -450,6 +458,7 @@ export default function Clients() {
           <Button
             variant={filterStatus === "all" ? "default" : "outline"}
             size="sm"
+            style={filterStatus === "all" ? buttonStyle : outlineButtonStyle}
             onClick={() => {
               setFilterStatus("all");
               setPage(1);
@@ -461,6 +470,7 @@ export default function Clients() {
           <Button
             variant={filterStatus === "active" ? "default" : "outline"}
             size="sm"
+            style={filterStatus === "active" ? buttonStyle : outlineButtonStyle}
             onClick={() => {
               setFilterStatus("active");
               setPage(1);
@@ -472,6 +482,7 @@ export default function Clients() {
           <Button
             variant={filterStatus === "inactive" ? "default" : "outline"}
             size="sm"
+            style={filterStatus === "inactive" ? buttonStyle : outlineButtonStyle}
             onClick={() => {
               setFilterStatus("inactive");
               setPage(1);
