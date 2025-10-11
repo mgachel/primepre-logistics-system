@@ -48,6 +48,8 @@ export default function Dashboard() {
   // Helper functions for role checking
   const isCustomer = useMemo(() => user?.user_role === 'CUSTOMER', [user?.user_role]);
   const isAdmin = useMemo(() => user && user.user_role && ['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(user.user_role), [user]);
+  // Explicit manager check (was referenced later but not defined)
+  const isManager = useMemo(() => user?.user_role === 'MANAGER', [user?.user_role]);
 
   // Define primary color based on user role
   const primaryColor = isCustomer ? "#4FC3F7" : "#00703D"; // Light blue for customers, green for others
@@ -57,7 +59,11 @@ export default function Dashboard() {
     queryKey: ["dashboard-data", user?.user_role, user?.id], // Include user ID to prevent cross-user caching
     queryFn: () => {
       console.log('📊 Fetching dashboard data for role:', user?.user_role);
-      return dashboardService.getDashboard(user?.user_role || "CUSTOMER");
+      return dashboardService.getDashboard(user?.user_role || "CUSTOMER").catch((err) => {
+        console.error('Dashboard fetch failed:', err);
+        // Return a safe empty shape so the UI can render without throwing
+        return { data: { cargo_items_count: 0 }, success: false, message: String(err) };
+      });
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes

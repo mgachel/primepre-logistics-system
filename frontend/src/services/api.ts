@@ -70,6 +70,11 @@ class ApiClient {
   constructor(baseURL: string) {
     // Ensure no trailing slash
     this.baseURL = baseURL.replace(/\/+$/, "");
+    // Helpful debug in dev: show which base URL the client is using
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log(`ApiClient initialized with baseURL=${this.baseURL}`);
+    }
   }
 
   private buildUrl(endpoint: string): string {

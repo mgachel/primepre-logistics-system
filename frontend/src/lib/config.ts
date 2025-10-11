@@ -20,9 +20,21 @@ if (missingEnvVars.length > 0 && import.meta.env.PROD) {
 }
 
 // Environment configuration
+// Normalize the API base URL: remove trailing slashes and any trailing '/api'
+function normalizeBaseUrl(raw?: string) {
+  const fallback = 'https://primepre-logistics-system.onrender.com';
+  const value = (raw || fallback).replace(/\/+$/, '');
+  // If the user accidentally set the base url to include '/api', strip it so
+  // endpoints like '/api/cargo/...' don't become '/api/api/cargo/...'
+  if (value.toLowerCase().endsWith('/api')) {
+    return value.slice(0, -4).replace(/\/+$/, '');
+  }
+  return value;
+}
+
 export const config = {
   // API Configuration
-  apiBaseUrl: (import.meta.env.VITE_API_BASE_URL || 'https://primepre-logistics-system.onrender.com').replace(/\/+$/, ''),
+  apiBaseUrl: normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL),
   
   // App Configuration
   appName: import.meta.env.VITE_APP_NAME || 'PrimePre Logistics',
