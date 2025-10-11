@@ -42,3 +42,5 @@ twilio>=8.0.0
 
 # Development tools
 setuptools
+
+uvicorn[standard]
