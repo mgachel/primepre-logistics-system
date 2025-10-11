@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { FileSpreadsheet, Upload } from 'lucide-react';
+import { FileSpreadsheet } from 'lucide-react';
 import { ExcelUploadDialog } from '@/components/dialogs/ExcelUploadDialog';
 import { ExcelUploadResponse, WarehouseLocation } from '@/services/excelUploadService';
 
@@ -11,6 +11,7 @@ interface ExcelUploadButtonProps {
   variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive';
   size?: 'sm' | 'default' | 'lg';
   className?: string;
+  style?: React.CSSProperties;
   children?: React.ReactNode;
 }
 
@@ -21,6 +22,7 @@ export function ExcelUploadButton({
   variant = 'default',
   size = 'default',
   className,
+  style,
   children,
 }: ExcelUploadButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -36,6 +38,7 @@ export function ExcelUploadButton({
         variant={variant}
         size={size}
         className={className}
+        style={style}
         onClick={() => setDialogOpen(true)}
       >
         {children || (

@@ -10,9 +10,12 @@ interface MetricCardProps {
   };
   icon?: LucideIcon;
   className?: string;
+  // Optional overrides for icon and background color (CSS color string)
+  iconColor?: string;
+  bgColor?: string;
 }
 
-export function MetricCard({ title, value, change, icon: Icon, className }: MetricCardProps) {
+export function MetricCard({ title, value, change, icon: Icon, className, iconColor, bgColor }: MetricCardProps) {
   return (
     <div className={cn("logistics-card p-6", className)}>
       <div className="flex items-center justify-between">
@@ -31,8 +34,11 @@ export function MetricCard({ title, value, change, icon: Icon, className }: Metr
           )}
         </div>
         {Icon && (
-          <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-            <Icon className="h-6 w-6 text-primary" />
+          <div
+            className="w-12 h-12 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: bgColor }}
+          >
+            <Icon className="h-6 w-6" style={{ color: iconColor }} />
           </div>
         )}
       </div>

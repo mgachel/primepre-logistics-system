@@ -136,7 +136,7 @@ export default function GoodsReceivedContainerDetailsPage() {
       const description = item.description?.toLowerCase() || "";
       const supplyTracking = item.supply_tracking?.toLowerCase() || "";
       
-      return shippingMark.includes(query) || 
+      return shippingMark.includes(query)
              description.includes(query) || 
              supplyTracking.includes(query);
     });
@@ -291,7 +291,7 @@ export default function GoodsReceivedContainerDetailsPage() {
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
     pdf.text(`Invoice #${invoiceNumber}`, pageWidth - 14, yPos, { align: 'right' });
-    
+
     yPos += 8;
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'bold');
@@ -304,7 +304,26 @@ export default function GoodsReceivedContainerDetailsPage() {
     pdf.text('Total Amount:', pageWidth - 60, yPos);
     pdf.setFont('helvetica', 'normal');
     pdf.text(`GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' });
-    
+
+    // Add new text rows for MOMO and UBA details
+    yPos += 10;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('MOMO:', pageWidth - 60, yPos);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('MTN: 054 029 5187', pageWidth - 14, yPos, { align: 'right' });
+
+    yPos += 6;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('UBA:', pageWidth - 60, yPos);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('00115148103503', pageWidth - 14, yPos, { align: 'right' });
+
+    yPos += 6;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('CBO HEAD OFFICE', pageWidth - 60, yPos);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('', pageWidth - 14, yPos, { align: 'right' });
+
     // Prepare table data
       const tableData = items.map(item => {
         const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
@@ -340,9 +359,12 @@ export default function GoodsReceivedContainerDetailsPage() {
         `GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       ]);
       
+      const tableStartY = yPos + 18;
+
+
       // Generate table
       autoTable(pdf, {
-        startY: 95,
+        startY: tableStartY,
         head: [[
           'Supply Tracking',
           'Quantity',
@@ -899,6 +921,19 @@ export default function GoodsReceivedContainerDetailsPage() {
                     <span className="text-lg font-bold text-green-600">
                       GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
+                  </div>
+                  {/* Add new text rows for MOMO and UBA details */}
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold">MOMO:</span>
+                    <span>MTN: 054 029 5187</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold">UBA:</span>
+                    <span>00115148103503</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold">CBO HEAD OFFICE</span>
+                    <span></span>
                   </div>
                 </div>
               </div>

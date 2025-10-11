@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Calendar, Clock, AlertCircle, RefreshCw, Eye } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+// Separator not used in this file
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
@@ -26,8 +26,16 @@ import dailyUpdatesService from '@/services/dailyUpdatesService';
 import { DailyUpdateForm } from './DailyUpdateForm';
 import { DailyUpdateViewDialog } from './DailyUpdateViewDialog';
 import { DeleteConfirmDialog } from '../dialogs/DeleteConfirmDialog';
+import { useAuthStore } from '@/stores/authStore';
 
 export function DailyUpdatesAdmin() {
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
+  const ADMIN_GREEN = "#00703D";
+  const primaryColor = isCustomer ? "#2563eb" : ADMIN_GREEN;
+  const buttonStyle = { backgroundColor: primaryColor, color: "#FFFFFF" };
+  const outlineButtonStyle = { borderColor: primaryColor, color: primaryColor };
+  const iconStyle = { color: primaryColor };
   const [updates, setUpdates] = useState<DailyUpdate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -177,7 +185,7 @@ export function DailyUpdatesAdmin() {
         <div className="flex items-center space-x-2">
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">Client Announcements</h1>
           {totalCount > 0 && (
-            <Badge variant="secondary" className="ml-2">
+            <Badge className="ml-2" style={{ backgroundColor: primaryColor, color: '#FFFFFF' }}>
               {totalCount} total
             </Badge>
           )}
@@ -189,14 +197,15 @@ export function DailyUpdatesAdmin() {
             size="sm"
             disabled={loading}
             className="flex-1 sm:flex-none"
+            style={outlineButtonStyle}
           >
-            <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} style={iconStyle} />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="flex-1 sm:flex-none">
-                <Plus className="h-4 w-4 sm:mr-2" />
+              <Button className="flex-1 sm:flex-none" style={buttonStyle}>
+                <Plus className="h-4 w-4 sm:mr-2" style={{ color: '#FFFFFF' }} />
                 <span className="hidden sm:inline">Create Update</span>
                 <span className="sm:hidden">Create</span>
               </Button>
@@ -230,8 +239,8 @@ export function DailyUpdatesAdmin() {
             <p className="text-muted-foreground text-center mb-4">
               Get started by creating your first daily update.
             </p>
-            <Button onClick={() => setCreateDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={() => setCreateDialogOpen(true)} style={buttonStyle}>
+              <Plus className="h-4 w-4 mr-2" style={{ color: '#FFFFFF' }} />
               Create Update
             </Button>
           </CardContent>
@@ -292,6 +301,7 @@ export function DailyUpdatesAdmin() {
               disabled={!hasPreviousPage || loading}
               onClick={() => handlePageChange(currentPage - 1)}
               className="flex-1 sm:flex-none"
+              style={outlineButtonStyle}
             >
               Previous
             </Button>
@@ -300,6 +310,7 @@ export function DailyUpdatesAdmin() {
               disabled={!hasNextPage || loading}
               onClick={() => handlePageChange(currentPage + 1)}
               className="flex-1 sm:flex-none"
+              style={outlineButtonStyle}
             >
               Next
             </Button>
@@ -351,6 +362,10 @@ interface DailyUpdateRowProps {
 }
 
 function DailyUpdateRow({ update, onView, onEdit, onDelete, onExtendExpiry }: DailyUpdateRowProps) {
+  const { user } = useAuthStore();
+  const isCustomer = user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
+  const ADMIN_GREEN = "#00703D";
+  const primaryColor = isCustomer ? "#2563eb" : ADMIN_GREEN;
   const priorityColor = dailyUpdatesService.getPriorityColor(update.priority);
   const expiryText = dailyUpdatesService.formatDate(update.expires_at);
   const isExpiringSoon = dailyUpdatesService.isExpiringSoon(update);
@@ -393,7 +408,7 @@ function DailyUpdateRow({ update, onView, onEdit, onDelete, onExtendExpiry }: Da
             </Badge>
           )}
           {!update.is_expired && !isExpiringSoon && (
-            <Badge variant="outline" className="text-green-600 border-green-200">
+            <Badge variant="outline" style={{ color: primaryColor, borderColor: primaryColor }}>
               Active
             </Badge>
           )}

@@ -25,13 +25,8 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
 
-  // Debug: Log user info
-  console.log('AppHeader User Info:', {
-    user_role: user?.user_role,
-    shipping_mark: user?.shipping_mark,
-    full_name: user?.full_name,
-    is_customer: user?.user_role?.toUpperCase() === 'CUSTOMER'
-  });
+  // Define primary color based on user role
+  const primaryColor = user?.user_role?.toUpperCase() === "CUSTOMER" ? "#4FC3F7" : "#00703D"; // Light blue for customers, green for others
 
   const handleLogout = () => {
     logout();
@@ -49,7 +44,8 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
         {/* Sidebar toggle replaced with Start button */}
         <button
           onClick={onToggle}
-          className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/80 transition-colors text-sm sm:text-base font-semibold whitespace-nowrap"
+          style={{ backgroundColor: primaryColor }}
+          className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-md text-primary-foreground hover:opacity-80 transition-colors text-sm sm:text-base font-semibold whitespace-nowrap"
           aria-label="Toggle sidebar"
           title="Toggle sidebar"
         >
@@ -92,7 +88,10 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
                 aria-label="User menu"
                 title="Open user menu"
               >
-                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary rounded-full flex items-center justify-center">
+                <div
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: primaryColor }}
+                >
                   <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary-foreground" />
                 </div>
                 <div className="hidden md:block text-left">
