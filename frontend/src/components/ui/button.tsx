@@ -38,25 +38,28 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
+  forceBlue?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, forceBlue = false, ...props }, ref) => {
   const { user } = useAuthStore();
   // If there's no authenticated user (on login/signup pages), default to customer/blue theme
   const isCustomer = !user || user?.user_role === 'CUSTOMER' || user?.is_admin_user === false;
-    const ADMIN_GREEN = '#00703D';
-  const primary = isCustomer ? '#1EA6D6' : ADMIN_GREEN;
-    const Comp = asChild ? Slot : "button"
-    return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
-        style={{ ['--pp-primary' as any]: primary, ['--pp-primary-foreground' as any]: '#FFFFFF' }}
-        {...props}
-      />
-    )
-  }
+  const ADMIN_GREEN = '#00703D';
+  const BLUE = '#1EA6D6';
+  // forceBlue overrides user role and ensures the button uses the blue primary color
+  const primary = forceBlue || isCustomer ? BLUE : ADMIN_GREEN;
+  const Comp = asChild ? Slot : "button"
+  return (
+    <Comp
+      className={cn(buttonVariants({ variant, size, className }))}
+      ref={ref}
+      style={{ ['--pp-primary' as any]: primary, ['--pp-primary-foreground' as any]: '#FFFFFF' }}
+      {...props}
+    />
+  )
+}
 )
 Button.displayName = "Button"
 

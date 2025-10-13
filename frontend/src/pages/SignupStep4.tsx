@@ -201,7 +201,7 @@ export default function SignupStep4() {
                     Back
                   </Button>
                   
-                  <Button type="submit" className="w-full h-11">
+                  <Button type="submit" className="w-full h-11" forceBlue>
                     Create Account
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>

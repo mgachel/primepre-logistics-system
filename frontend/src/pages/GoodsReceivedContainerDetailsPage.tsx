@@ -284,10 +284,6 @@ export default function GoodsReceivedContainerDetailsPage() {
     pdf.setFont('helvetica', 'normal');
     pdf.text('WE DO NOT ACCEPT CASH. ONLY MOMO OR BANK TRANSFER', pageWidth / 2, startY + 12, { align: 'center' });
     
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('PrimePre Logistics', pageWidth / 2, startY + 7, { align: 'center' });
-    
     // Invoice details - Left side
     let yPos = startY + 20;
     pdf.setFontSize(9);
@@ -314,43 +310,53 @@ export default function GoodsReceivedContainerDetailsPage() {
     pdf.setFont('helvetica', 'normal');
     pdf.text(container?.arrival_date ? new Date(container.arrival_date).toLocaleDateString() : 'N/A', 50, yPos);
     
+
+    yPos += 6;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('LOCATION:', 14, yPos);
+    pdf.setFont('helvetica', 'normal'); 
+    pdf.text('Primemade (on Google Maps)', 50, yPos);
+
+
     // Invoice details - Right side
     yPos = startY + 20;
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
     pdf.text(`Invoice #${invoiceNumber}`, pageWidth - 14, yPos, { align: 'right' });
 
-    yPos += 8;
+  yPos += 8;
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Date:', pageWidth - 60, yPos);
+  const labelX = pageWidth - 70;
+  const valueRightX = pageWidth - 14;
+  pdf.text('Date:', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(new Date().toLocaleDateString(), pageWidth - 14, yPos, { align: 'right' });
+  pdf.text(new Date().toLocaleDateString(), valueRightX, yPos, { align: 'right' });
     
     yPos += 6;
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Total Amount:', pageWidth - 60, yPos);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Total Amount:', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' });
+  pdf.text(`GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueRightX, yPos, { align: 'right' });
 
     // Add new text rows for MOMO and UBA details
     yPos += 10;
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('MOMO:', pageWidth - 60, yPos);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('MOMO:', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('MTN: 054 029 5187', pageWidth - 14, yPos, { align: 'right' });
+  pdf.text('MTN: 054 029 5187', valueRightX, yPos, { align: 'right' });
 
     yPos += 6;
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('UBA:', pageWidth - 60, yPos);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('BANK - UBA:', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('00115148103503', pageWidth - 14, yPos, { align: 'right' });
+  pdf.text('00115148103503', valueRightX, yPos, { align: 'right' });
 
     yPos += 6;
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('CBO HEAD OFFICE', pageWidth - 60, yPos);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('CBO HEAD OFFICE', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('', pageWidth - 14, yPos, { align: 'right' });
+  pdf.text('', valueRightX, yPos, { align: 'right' });
 
     // Prepare table data
       const tableData = items.map(item => {
@@ -580,8 +586,7 @@ export default function GoodsReceivedContainerDetailsPage() {
         <div>
           <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold">{container.container_id}</h1>
           <p className="text-muted-foreground text-xs sm:text-sm lg:text-base">
-            {container.container_type === "sea" ? "Sea" : "Air"} Goods Received •{" "}
-            {goodsItems.length} items • {container.location === "china" ? "China" : "Ghana"}
+            {container.container_type === "sea" ? "Sea" : "Air"} Goods Received • {goodsItems.length} items • {container.location === "china" ? "China" : "Ghana"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -878,55 +883,44 @@ export default function GoodsReceivedContainerDetailsPage() {
 
               {/* Invoice Details Grid */}
               <div className="grid grid-cols-2 gap-8 mb-8">
-                {/* Left Side */}
+                {/* Left Side - compact two-column grid for label/value proximity */}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold">Container:</span>
-                    <span>{container?.container_id}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold">Shipping Mark:</span>
-                    <span>{previewInvoiceData.shippingMark}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold">Container Type:</span>
-                    <span>{container?.container_type?.toUpperCase()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold">Offloading Date:</span>
-                    <span>{container?.arrival_date ? new Date(container.arrival_date).toLocaleDateString() : 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold">LOCATION:</span>
-                    <span><h1>Primemade (on Google Maps)</h1></span>
+                  <div className="grid" style={{ gridTemplateColumns: 'max-content auto', columnGap: '2px', rowGap: '2px', alignItems: 'center', justifyItems: 'start' }}>
+                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Container:</div>
+                    <div className="text-sm">{container?.container_id}</div>
+
+                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Shipping Mark:</div>
+                    <div className="text-sm">{previewInvoiceData.shippingMark}</div>
+
+                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Container Type:</div>
+                    <div className="text-sm">{container?.container_type?.toUpperCase()}</div>
+
+                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Offloading Date:</div>
+                    <div className="text-sm">{container?.arrival_date ? new Date(container.arrival_date).toLocaleDateString() : 'N/A'}</div>
+
+                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>LOCATION:</div>
+                    <div className="text-sm">Primemade (on Google Maps)</div>
                   </div>
                 </div>
 
-                {/* Right Side */}
-                <div className="text-right space-y-2">
+                {/* Right Side - compact two-column grid for label/value proximity */}
+                <div className="space-y-2" style={{ justifySelf: 'end', textAlign: 'right' }}>
                   <h2 className="text-lg font-bold">Invoice #{previewInvoiceData.invoiceNumber}</h2>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold">Date:</span>
-                    <span>{new Date().toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold">Total Amount:</span>
-                    <span className="text-lg font-bold text-green-600">
-                      GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  {/* Add new text rows for MOMO and UBA details */}
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold">MOMO:</span>
-                    <span>MTN: 054 029 5187</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-bold">BANK - UBA:</span>
-                    <span>00115148103503</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold">CBO HEAD OFFICE</span>
-                    <span></span>
+                  <div className="grid" style={{ gridTemplateColumns: 'max-content auto', columnGap: '2px', rowGap: '2px', alignItems: 'center', justifyItems: 'start', justifySelf: 'end' }}>
+                    <div className="text-sm font-semibold">Date:</div>
+                    <div className="text-sm">{new Date().toLocaleDateString()}</div>
+
+                    <div className="text-sm font-semibold">Total Amount:</div>
+                    <div className="text-lg font-bold text-green-600">GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+
+                    <div className="text-sm font-semibold">MOMO:</div>
+                    <div className="text-sm">MTN: 054 029 5187</div>
+
+                    <div className="text-sm font-semibold">BANK - UBA:</div>
+                    <div className="text-sm">00115148103503</div>
+
+                    <div className="text-sm font-semibold">CBO HEAD OFFICE</div>
+                    <div className="text-sm">&nbsp;</div>
                   </div>
                 </div>
               </div>

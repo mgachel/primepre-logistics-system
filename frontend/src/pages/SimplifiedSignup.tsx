@@ -329,7 +329,7 @@ export default function SimplifiedSignup() {
 
                 {/* Submit Button */}
                 <Button 
-                  type="submit" 
+                  type="submit" forceBlue 
                   className="w-full" 
                   disabled={isLoading}
                 >

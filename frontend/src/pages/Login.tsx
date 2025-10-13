@@ -217,7 +217,7 @@ export default function Login() {
                   )}
                 </div>
 
-                <Button type="submit" className="w-full h-11" disabled={isLoading}>
+                <Button type="submit" className="w-full h-11" disabled={isLoading} forceBlue>
                   {isLoading ? (
                     <div className="flex items-center">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

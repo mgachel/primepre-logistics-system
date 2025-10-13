@@ -127,7 +127,7 @@ export default function SignupStep2() {
                     Back
                   </Button>
                   
-                  <Button type="submit" className="w-full h-11">
+                  <Button type="submit" className="w-full h-11" forceBlue>
                     Next
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
