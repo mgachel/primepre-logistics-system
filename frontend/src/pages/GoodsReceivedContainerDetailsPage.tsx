@@ -874,7 +874,6 @@ export default function GoodsReceivedContainerDetailsPage() {
               <div className="text-center mb-8">
                 <h1 className="text-2xl font-bold mb-2">GOODS IN GHANA INVOICE</h1>
                 <h2 className="text-gray-600">WE DO NOT ACCEPT CASH. ONLY MOMO OR BANK TRANSFER</h2>
-                <p className="text-gray-600">PrimePre Logistics</p>
               </div>
 
               {/* Invoice Details Grid */}
@@ -897,6 +896,10 @@ export default function GoodsReceivedContainerDetailsPage() {
                     <span className="font-semibold">Offloading Date:</span>
                     <span>{container?.arrival_date ? new Date(container.arrival_date).toLocaleDateString() : 'N/A'}</span>
                   </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold">LOCATION:</span>
+                    <span><h1>Primemade (on Google Maps)</h1></span>
+                  </div>
                 </div>
 
                 {/* Right Side */}
@@ -918,7 +921,7 @@ export default function GoodsReceivedContainerDetailsPage() {
                     <span>MTN: 054 029 5187</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="font-bold">LOCATION - UBA:</span>
+                    <span className="font-bold">BANK - UBA:</span>
                     <span>00115148103503</span>
                   </div>
                   <div className="flex justify-between text-sm">
