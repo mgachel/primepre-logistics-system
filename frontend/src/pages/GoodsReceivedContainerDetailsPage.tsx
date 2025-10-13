@@ -66,6 +66,30 @@ export default function GoodsReceivedContainerDetailsPage() {
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Helper to compute amount for an item taking Ghana small-measurement overrides into account
+  const computeAmount = (container: GoodsReceivedContainer | null, item: GoodsReceivedItem) => {
+    const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
+    const cbmRate = parseFloat(container?.rates?.toString() || '0');
+    let measurement = 0;
+
+    if (container?.container_type === 'air') {
+      measurement = parseFloat(item.weight?.toString() || '0') || 0;
+    } else {
+      measurement = parseFloat(item.cbm?.toString() || '0') || 0;
+    }
+
+    // Ghana warehouse special minimum charges for very small measurements
+    // If measurement is between 0.005 and 0.009 (inclusive) => flat ₵35
+    // If measurement is between 0 and 0.004 (inclusive) => flat ₵30
+    if (container?.location === 'ghana') {
+      if (measurement > 0 && measurement <= 0.004) return 30;
+      if (measurement >= 0.005 && measurement <= 0.009) return 35;
+    }
+
+    // Default calculation: measurement * dollarRate * cbmRate
+    return measurement * dollarRate * cbmRate;
+  };
+
   // Load container and goods items
   useEffect(() => {
     const loadData = async () => {
@@ -255,6 +279,10 @@ export default function GoodsReceivedContainerDetailsPage() {
     pdf.setFontSize(18);
     pdf.setFont('helvetica', 'bold');
     pdf.text('GOODS IN GHANA INVOICE', pageWidth / 2, startY, { align: 'center' });
+
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('WE DO NOT ACCEPT CASH. ONLY MOMO OR BANK TRANSFER', pageWidth / 2, startY + 12, { align: 'center' });
     
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
@@ -326,23 +354,11 @@ export default function GoodsReceivedContainerDetailsPage() {
 
     // Prepare table data
       const tableData = items.map(item => {
-        const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
-        const cbmRate = parseFloat(container?.rates?.toString() || '0');
-        let amount = 0;
-        let measurementValue = 0;
-        
-        if (container?.container_type === 'air') {
-          // Ghana Air: Weight * Dollar Rate * Rate
-          const weight = parseFloat(item.weight?.toString() || '0') || 0;
-          amount = weight * dollarRate * cbmRate;
-          measurementValue = weight;
-        } else {
-          // Ghana Sea: CBM * Dollar Rate * CBM Rate
-          const cbm = parseFloat(item.cbm?.toString() || '0') || 0;
-          amount = cbm * dollarRate * cbmRate;
-          measurementValue = cbm;
-        }
-        
+        const amount = computeAmount(container, item);
+        const measurementValue = container?.container_type === 'air'
+          ? (parseFloat(item.weight?.toString() || '0') || 0)
+          : (parseFloat(item.cbm?.toString() || '0') || 0);
+
         return [
           item.supply_tracking,
           item.quantity?.toString() || '0',
@@ -511,20 +527,8 @@ export default function GoodsReceivedContainerDetailsPage() {
       id: "amount",
       header: "Amount (₵)",
       accessor: (item: GoodsReceivedItem) => {
-        const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
-        const cbmRate = parseFloat(container?.rates?.toString() || '0');
-        let amount = 0;
-        
-        if (container?.container_type === 'air') {
-          // Ghana Air: Weight * Dollar Rate * Rate
-          const weight = parseFloat(item.weight?.toString() || '0') || 0;
-          amount = weight * dollarRate * cbmRate;
-        } else {
-          // Ghana Sea: CBM * Dollar Rate * CBM Rate
-          const cbm = parseFloat(item.cbm?.toString() || '0') || 0;
-          amount = cbm * dollarRate * cbmRate;
-        }
-        
+        const amount = computeAmount(container, item);
+
         return (
           <div className="text-right font-medium text-green-600">
             ₵{amount.toFixed(2)}
@@ -659,22 +663,7 @@ export default function GoodsReceivedContainerDetailsPage() {
           
           // Calculate total amount
           const totalAmount = container?.dollar_rate && container?.rates
-            ? items.reduce((sum, i) => {
-                const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
-                const cbmRate = parseFloat(container?.rates?.toString() || '0');
-                
-                if (container?.container_type === 'sea') {
-                  // Ghana Sea: CBM * Dollar Rate * CBM Rate
-                  const cbm = parseFloat(i.cbm?.toString() || '0') || 0;
-                  return sum + (cbm * dollarRate * cbmRate);
-                } else if (container?.container_type === 'air') {
-                  // Ghana Air: Weight * Dollar Rate * Rate
-                  const weight = parseFloat(i.weight?.toString() || '0') || 0;
-                  return sum + (weight * dollarRate * cbmRate);
-                }
-                
-                return sum;
-              }, 0)
+            ? items.reduce((sum, i) => sum + computeAmount(container, i), 0)
             : 0;
 
           return (
@@ -884,6 +873,7 @@ export default function GoodsReceivedContainerDetailsPage() {
               {/* Header */}
               <div className="text-center mb-8">
                 <h1 className="text-2xl font-bold mb-2">GOODS IN GHANA INVOICE</h1>
+                <h2 className="text-gray-600">WE DO NOT ACCEPT CASH. ONLY MOMO OR BANK TRANSFER</h2>
                 <p className="text-gray-600">PrimePre Logistics</p>
               </div>
 
@@ -928,7 +918,7 @@ export default function GoodsReceivedContainerDetailsPage() {
                     <span>MTN: 054 029 5187</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="font-semibold">UBA:</span>
+                    <span className="font-bold">LOCATION - UBA:</span>
                     <span>00115148103503</span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -953,20 +943,10 @@ export default function GoodsReceivedContainerDetailsPage() {
                   </thead>
                   <tbody>
                     {previewInvoiceData.items.map((item, index) => {
-                      const dollarRate = parseFloat(container?.dollar_rate?.toString() || '0');
-                      const cbmRate = parseFloat(container?.rates?.toString() || '0');
-                      let amount = 0;
-                      let measurementValue = 0;
-                      
-                      if (container?.container_type === 'air') {
-                        const weight = parseFloat(item.weight?.toString() || '0') || 0;
-                        amount = weight * dollarRate * cbmRate;
-                        measurementValue = weight;
-                      } else {
-                        const cbm = parseFloat(item.cbm?.toString() || '0') || 0;
-                        amount = cbm * dollarRate * cbmRate;
-                        measurementValue = cbm;
-                      }
+                      const amount = computeAmount(container, item);
+                      const measurementValue = container?.container_type === 'air'
+                        ? (parseFloat(item.weight?.toString() || '0') || 0)
+                        : (parseFloat(item.cbm?.toString() || '0') || 0);
 
                       return (
                         <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
