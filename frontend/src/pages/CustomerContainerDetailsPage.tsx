@@ -35,7 +35,7 @@ export default function CustomerContainerDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [container, setContainer] = useState<GoodsReceivedContainer | null>(null);
   const [goodsItems, setGoodsItems] = useState<GoodsReceivedItem[]>([]);
-  const [groupedItems, setGroupedItems] = useState<Record<string, GoodsReceivedItem[]>>({});
+  const [, setGroupedItems] = useState<Record<string, GoodsReceivedItem[]>>({});
 
   // Determine container type from current path
   const containerType: "sea" | "air" = window.location.pathname.includes("/air/") ? "air" : "sea";
@@ -261,7 +261,11 @@ export default function CustomerContainerDetailsPage() {
                 Total CBM
               </div>
               <div className="font-medium">
-                {goodsItems.reduce((sum, item) => sum + (item.cbm || 0), 0).toFixed(2)} m³
+                {goodsItems.reduce((sum, item) => {
+                  const perUnit = Number(item.cbm || 0) || 0;
+                  const qty = Number(item.quantity || 0) || 0;
+                  return sum + perUnit * Math.max(1, qty);
+                }, 0).toFixed(2)} m³
               </div>
             </div>
             <div>

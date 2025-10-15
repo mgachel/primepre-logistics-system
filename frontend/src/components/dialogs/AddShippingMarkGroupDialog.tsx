@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/useDebounce";
 import { goodsReceivedContainerService } from "@/services/goodsReceivedContainerService";
+import { getItemCBM } from '@/lib/measurements';
 import { containerExcelService } from "@/services/containerExcelService";
 import { CustomerOption, mapCustomerToOption, rankCustomerOptions } from "@/lib/customerSearch";
 import { Plus, Trash2 } from "lucide-react";
@@ -315,7 +316,7 @@ export function AddShippingMarkGroupDialog({
           ...(item.notes.trim() && { notes: item.notes.trim() }),
           ...(containerType === 'air' && item.weight && { weight: parseFloat(item.weight) }),
           ...(containerType === 'sea' && item.cbm && { 
-            cbm: parseFloat(item.cbm),
+            cbm: getItemCBM(item),
             ...(item.length && { length: parseFloat(item.length) }),
             ...(item.breadth && { breadth: parseFloat(item.breadth) }),
             ...(item.height && { height: parseFloat(item.height) })
@@ -399,8 +400,8 @@ export function AddShippingMarkGroupDialog({
           ...(item.description.trim() && { description: item.description.trim() }),
           ...(item.notes.trim() && { notes: item.notes.trim() }),
           ...(containerType === 'air' && item.weight && { weight: parseFloat(item.weight) }),
-          ...(containerType === 'sea' && item.cbm && { 
-            cbm: parseFloat(item.cbm),
+          ...(containerType === 'sea' && (item.cbm || (item.length && item.breadth && item.height)) && { 
+            cbm: getItemCBM(item),
             ...(item.length && { length: parseFloat(item.length) }),
             ...(item.breadth && { breadth: parseFloat(item.breadth) }),
             ...(item.height && { height: parseFloat(item.height) })

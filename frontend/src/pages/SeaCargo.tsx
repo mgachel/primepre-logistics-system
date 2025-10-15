@@ -300,10 +300,25 @@ export default function SeaCargo() {
         id: "total_cbm",
         header: "Total CBM",
         accessor: (c) => {
-          if (!c.cbm || c.cbm === null) {
-            return <span className="text-sm text-muted-foreground">-</span>;
+          // Prefer container item list to compute exact CBM after uploads
+          try {
+            // some container shapes include `items` or `goods_items`
+            // @ts-ignore
+            const items = (c as any).items || (c as any).goods_items || null;
+            if (Array.isArray(items) && items.length > 0) {
+              const total = items.reduce((sum: number, it: any) => {
+                const cbm = parseFloat(String(it.cbm || 0)) || 0;
+                const qty = parseFloat(String(it.quantity || it.qty || 0)) || 0;
+                return sum + cbm * (qty || 1);
+              }, 0);
+              return total > 0 ? <span className="text-sm">{total.toFixed(5)} m³</span> : <span className="text-sm text-muted-foreground">-</span>;
+            }
+          } catch (err) {
+            // ignore and fall back
           }
-          return <span className="text-sm">{c.cbm} m³</span>;
+
+          const cbmVal = Number(c.cbm || 0);
+          return cbmVal > 0 ? <span className="text-sm">{cbmVal.toFixed(5)} m³</span> : <span className="text-sm text-muted-foreground">-</span>;
         },
         sort: (a, b) => (a.cbm || 0) - (b.cbm || 0),
         align: "right",

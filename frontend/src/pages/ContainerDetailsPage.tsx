@@ -356,7 +356,12 @@ export default function ContainerDetailsPage() {
       {/* Grouped by Shipping Mark */}
       <div className="space-y-4">
         {Object.entries(groupedByShippingMark).map(([mark, items]) => {
-          const totalCBM = items.reduce((sum, i) => sum + (i.cbm || 0), 0);
+          // Total CBM should be the sum of each item's cbm * quantity
+          const totalCBM = items.reduce((sum, i) => {
+            const cbm = parseFloat(String(i.cbm || 0)) || 0;
+            const qty = parseFloat(String(i.quantity || 0)) || 0;
+            return sum + cbm * qty;
+          }, 0);
           const totalQty = items.reduce((sum, i) => sum + (i.quantity || 0), 0);
           
           // Amount calculations removed - only available for goods received containers

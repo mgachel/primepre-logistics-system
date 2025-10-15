@@ -74,8 +74,10 @@ export const generatePackingListPDF = (data: PackingListData) => {
       };
     }
     
-    groupedData[mark].quantity += item.quantity || 0;
-    groupedData[mark].cbm += item.cbm || 0;
+  groupedData[mark].quantity += item.quantity || 0;
+  // Treat CBM as per-item cbm multiplied by quantity when provided
+  const itemCbm = (item.cbm || 0) * (item.quantity || 1);
+  groupedData[mark].cbm += itemCbm;
     
     // Collect tracking numbers
     const trackingNums = item.tracking_numbers || (item.tracking_number ? [item.tracking_number] : []);

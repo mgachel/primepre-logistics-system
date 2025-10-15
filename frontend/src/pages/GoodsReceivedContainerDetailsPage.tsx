@@ -237,6 +237,7 @@ export default function GoodsReceivedContainerDetailsPage() {
     try {
       // Calculate totals
       const totalQty = items.reduce((sum, item) => sum + (parseInt(item.quantity?.toString() || '0') || 0), 0);
+      // Total CBM is simply the sum of the CBM values provided for each item
       const totalCBM = items.reduce((sum, item) => sum + (parseFloat(item.cbm?.toString() || '0') || 0), 0);
       const totalWeight = items.reduce((sum, item) => sum + (parseFloat(item.weight?.toString() || '0') || 0), 0);
       
