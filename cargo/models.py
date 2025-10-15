@@ -113,7 +113,7 @@ class CargoItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     container = models.ForeignKey(CargoContainer, on_delete=models.CASCADE, related_name='cargo_items')
     client = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cargo_items')
-    tracking_id = models.CharField(max_length=100, unique=True, editable=True)
+    tracking_id = models.CharField(max_length=100, editable=True)
     item_description = models.TextField(blank=True, null=True)
     quantity = models.IntegerField()
     weight = models.FloatField(null=True, blank=True)
@@ -132,7 +132,9 @@ class CargoItem(models.Model):
     class Meta:
         ordering = ['-created_at']
         constraints = [
-            models.UniqueConstraint(fields=['container', 'client', 'tracking_id'], name='unique_container_client_tracking')
+            # NOTE: tracking_id uniqueness was removed to allow duplicate
+            # tracking numbers across the system per product requirement.
+            # The previous constraint was: UniqueConstraint(fields=['container', 'client', 'tracking_id'], name='unique_container_client_tracking')
         ]
 
     def save(self, *args, **kwargs):

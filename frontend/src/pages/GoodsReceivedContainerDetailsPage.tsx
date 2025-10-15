@@ -358,41 +358,85 @@ export default function GoodsReceivedContainerDetailsPage() {
     pdf.setFont('helvetica', 'normal');
   pdf.text('', valueRightX, yPos, { align: 'right' });
 
-    // Prepare table data
-      const tableData = items.map(item => {
-        const amount = computeAmount(container, item);
-        const measurementValue = container?.container_type === 'air'
-          ? (parseFloat(item.weight?.toString() || '0') || 0)
-          : (parseFloat(item.cbm?.toString() || '0') || 0);
+      // Prepare table data and headers based on container type
+      let tableData: any[] = [];
+      let tableHead: string[] = [];
+      const isAir = container?.container_type === 'air';
 
-        return [
-          item.supply_tracking,
-          item.quantity?.toString() || '0',
-          measurementValue.toFixed(container?.container_type === 'air' ? 1 : 3),
-          `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-        ];
-      });
-      
-      // Add totals row
-      tableData.push([
-        'TOTAL',
-        totalQty.toString(),
-        (container?.container_type === 'air' ? totalWeight.toFixed(1) : totalCBM.toFixed(3)),
-        `GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      ]);
-      
+      if (isAir) {
+        tableHead = ['Supply Tracking', 'Quantity', 'Weight (kg)', 'Amount (GHS)'];
+        tableData = items.map(item => {
+          const amount = computeAmount(container, item);
+          const weight = (parseFloat(item.weight?.toString() || '0') || 0);
+
+          return [
+            item.supply_tracking,
+            item.quantity?.toString() || '0',
+            weight.toFixed(1),
+            `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          ];
+        });
+
+        // Totals row for air
+        tableData.push([
+          'TOTAL',
+          totalQty.toString(),
+          totalWeight.toFixed(1),
+          `GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        ]);
+      } else {
+        // Sea container - include length/breadth/height and CBM
+        tableHead = ['Supply Tracking', 'Quantity', 'Length (cm)', 'Breadth (cm)', 'Height (cm)', 'CBM', 'Amount (GHS)'];
+        tableData = items.map(item => {
+          const amount = computeAmount(container, item);
+          const length = item.length || '-';
+          const breadth = item.breadth || '-';
+          const height = item.height || '-';
+          const cbm = (parseFloat(item.cbm?.toString() || '0') || 0);
+
+          return [
+            item.supply_tracking,
+            item.quantity?.toString() || '0',
+            length,
+            breadth,
+            height,
+            cbm.toFixed(3),
+            `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          ];
+        });
+
+        // Totals row for sea - lengths/breadths/heights don't sum meaningfully, leave blanks
+        tableData.push([
+          'TOTAL',
+          totalQty.toString(),
+          '-',
+          '-',
+          '-',
+          totalCBM.toFixed(3),
+          `GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        ]);
+      }
+
       const tableStartY = yPos + 18;
 
+      // Configure column styles for PDF (ensure numeric columns right-aligned and amount bold)
+      const columnStyles: any = {};
+      // Quantity column always index 1
+      columnStyles[1] = { halign: 'right' };
+      if (isAir) {
+        // Weight at index 2, Amount at index 3
+        columnStyles[2] = { halign: 'right' };
+        columnStyles[3] = { halign: 'right', fontStyle: 'bold' };
+      } else {
+        // For sea: CBM at index 5, Amount at index 6
+        columnStyles[5] = { halign: 'right' };
+        columnStyles[6] = { halign: 'right', fontStyle: 'bold' };
+      }
 
       // Generate table
       autoTable(pdf, {
         startY: tableStartY,
-        head: [[
-          'Supply Tracking',
-          'Quantity',
-          container?.container_type === 'air' ? 'Weight (kg)' : 'CBM',
-          'Amount (GHS)'
-        ]],
+        head: [tableHead],
         body: tableData,
         theme: 'striped',
         headStyles: {
@@ -404,11 +448,7 @@ export default function GoodsReceivedContainerDetailsPage() {
         bodyStyles: {
           fontSize: 8
         },
-        columnStyles: {
-          1: { halign: 'right' },
-          2: { halign: 'right' },
-          3: { halign: 'right', fontStyle: 'bold' }
-        },
+        columnStyles,
         didParseCell: (data) => {
           // Style the last row (totals) differently
           if (data.row.index === tableData.length - 1) {
@@ -929,51 +969,78 @@ export default function GoodsReceivedContainerDetailsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-gray-300">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Supply Tracking</th>
-                      <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Quantity</th>
-                      <th className="border border-gray-300 px-4 py-2 text-right font-semibold">
-                        {container?.container_type === 'air' ? 'Weight (kg)' : 'CBM'}
-                      </th>
-                      <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Amount (GH₵)</th>
-                    </tr>
+                    {container?.container_type === 'air' ? (
+                      <tr className="bg-gray-100">
+                        <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Supply Tracking</th>
+                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Quantity</th>
+                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Weight (kg)</th>
+                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Amount (GH₵)</th>
+                      </tr>
+                    ) : (
+                      <tr className="bg-gray-100">
+                        <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Supply Tracking</th>
+                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Quantity</th>
+                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Length (cm)</th>
+                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Breadth (cm)</th>
+                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Height (cm)</th>
+                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold">CBM</th>
+                        <th className="border border-gray-300 px-4 py-2 text-right font-semibold">Amount (GH₵)</th>
+                      </tr>
+                    )}
                   </thead>
                   <tbody>
                     {previewInvoiceData.items.map((item, index) => {
                       const amount = computeAmount(container, item);
-                      const measurementValue = container?.container_type === 'air'
-                        ? (parseFloat(item.weight?.toString() || '0') || 0)
-                        : (parseFloat(item.cbm?.toString() || '0') || 0);
+                      if (container?.container_type === 'air') {
+                        const weight = (parseFloat(item.weight?.toString() || '0') || 0);
+                        return (
+                          <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                            <td className="border border-gray-300 px-4 py-2">{item.supply_tracking}</td>
+                            <td className="border border-gray-300 px-4 py-2 text-right">{item.quantity}</td>
+                            <td className="border border-gray-300 px-4 py-2 text-right">{weight.toFixed(1)}</td>
+                            <td className="border border-gray-300 px-4 py-2 text-right font-medium">GH₵ {amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          </tr>
+                        );
+                      }
+
+                      // Sea
+                      const length = item.length || '-';
+                      const breadth = item.breadth || '-';
+                      const height = item.height || '-';
+                      const cbm = (parseFloat(item.cbm?.toString() || '0') || 0);
 
                       return (
                         <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
                           <td className="border border-gray-300 px-4 py-2">{item.supply_tracking}</td>
                           <td className="border border-gray-300 px-4 py-2 text-right">{item.quantity}</td>
-                          <td className="border border-gray-300 px-4 py-2 text-right">
-                            {measurementValue.toFixed(container?.container_type === 'air' ? 1 : 3)}
-                          </td>
-                          <td className="border border-gray-300 px-4 py-2 text-right font-medium">
-                            GH₵ {amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
+                          <td className="border border-gray-300 px-4 py-2 text-right">{length}</td>
+                          <td className="border border-gray-300 px-4 py-2 text-right">{breadth}</td>
+                          <td className="border border-gray-300 px-4 py-2 text-right">{height}</td>
+                          <td className="border border-gray-300 px-4 py-2 text-right">{cbm.toFixed(3)}</td>
+                          <td className="border border-gray-300 px-4 py-2 text-right font-medium">GH₵ {amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
                       );
                     })}
+
                     {/* Total Row */}
-                    <tr className="bg-gray-100 font-bold">
-                      <td className="border border-gray-300 px-4 py-3">TOTAL</td>
-                      <td className="border border-gray-300 px-4 py-3 text-right">
-                        {previewInvoiceData.items.reduce((sum, item) => sum + (parseInt(item.quantity?.toString() || '0') || 0), 0)}
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-right">
-                        {container?.container_type === 'air'
-                          ? previewInvoiceData.items.reduce((sum, item) => sum + (parseFloat(item.weight?.toString() || '0') || 0), 0).toFixed(1)
-                          : previewInvoiceData.items.reduce((sum, item) => sum + (parseFloat(item.cbm?.toString() || '0') || 0), 0).toFixed(3)
-                        }
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-right text-green-600">
-                        GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    </tr>
+                    {container?.container_type === 'air' ? (
+                      <tr className="bg-gray-100 font-bold">
+                        <td className="border border-gray-300 px-4 py-3">TOTAL</td>
+                        <td className="border border-gray-300 px-4 py-3 text-right">{previewInvoiceData.items.reduce((sum, item) => sum + (parseInt(item.quantity?.toString() || '0') || 0), 0)}</td>
+                        <td className="border border-gray-300 px-4 py-3 text-right">{previewInvoiceData.items.reduce((sum, item) => sum + (parseFloat(item.weight?.toString() || '0') || 0), 0).toFixed(1)}</td>
+                        <td className="border border-gray-300 px-4 py-3 text-right text-green-600">GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    ) : (
+                      <tr className="bg-gray-100 font-bold">
+                        <td className="border border-gray-300 px-4 py-3">TOTAL</td>
+                        <td className="border border-gray-300 px-4 py-3 text-right">{previewInvoiceData.items.reduce((sum, item) => sum + (parseInt(item.quantity?.toString() || '0') || 0), 0)}</td>
+                        <td className="border border-gray-300 px-4 py-3 text-right">-</td>
+                        <td className="border border-gray-300 px-4 py-3 text-right">-</td>
+                        <td className="border border-gray-300 px-4 py-3 text-right">-</td>
+                        <td className="border border-gray-300 px-4 py-3 text-right">{previewInvoiceData.items.reduce((sum, item) => sum + (parseFloat(item.cbm?.toString() || '0') || 0), 0).toFixed(3)}</td>
+                        <td className="border border-gray-300 px-4 py-3 text-right text-green-600">GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

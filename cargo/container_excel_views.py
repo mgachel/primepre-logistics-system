@@ -444,14 +444,17 @@ class ContainerItemsCreateView(APIView):
                 try:
                     with transaction.atomic():
                         cargo_items_bulk = [item[0] for item in items_to_create]
+                        # Try bulk create first for performance. Do NOT modify
+                        # the supplied tracking_id values — preserve exactly what
+                        # was in the uploaded Excel sheet.
                         CargoItem.objects.bulk_create(cargo_items_bulk)
-                        
+
                         logger.info(
                             "Bulk created %d cargo items in %.2f seconds",
                             len(cargo_items_bulk),
                             time.time() - bulk_create_start
                         )
-                        
+
                         # Track created items for response
                         for cargo_item, customer, source_row, action in items_to_create:
                             created_items.append({
@@ -468,11 +471,34 @@ class ContainerItemsCreateView(APIView):
                         exc,
                         exc_info=True
                     )
-                    errors.append({
-                        'error': 'Integrity error while creating cargo items in bulk',
-                        'details': str(exc),
-                        'type': 'bulk_create_error'
-                    })
+                    # Bulk insert failed (likely due to DB constraint or bad
+                    # input). Do not mutate tracking IDs; instead record per-row
+                    # errors so the caller can inspect/fix the original Excel.
+                    for cargo_item, customer, source_row, action in items_to_create:
+                        try:
+                            with transaction.atomic():
+                                cargo_item.save()
+                                created_items.append({
+                                    'cargo_item_id': str(cargo_item.id),
+                                    'tracking_id': cargo_item.tracking_id,
+                                    'source_row_number': source_row,
+                                    'customer_name': customer.get_full_name() or customer.phone,
+                                    'action_taken': action
+                                })
+                        except IntegrityError as exc_item:
+                            logger.warning(
+                                "Per-item create failed for container %s row %s: %s",
+                                container_id,
+                                source_row,
+                                exc_item,
+                                exc_info=True
+                            )
+                            errors.append({
+                                'source_row_number': source_row,
+                                'error': 'Integrity error while creating cargo item',
+                                'details': str(exc_item),
+                                'candidate': {}
+                            })
                 except Exception as exc:
                     logger.error(
                         "Error during bulk cargo item creation for container %s: %s",
@@ -498,20 +524,25 @@ class ContainerItemsCreateView(APIView):
                         )
                     }
                     
-                    # Create missing summaries in bulk
-                    summaries_to_create = []
+                    # Create missing summaries one-by-one with get_or_create to
+                    # avoid UNIQUE constraint failures when multiple threads
+                    # or concurrent uploads race to create the same summary.
                     for customer_id in customers_to_update:
                         key = (container.container_id, customer_id)
                         if key not in existing_summaries:
-                            summaries_to_create.append(
-                                ClientShipmentSummary(
+                            try:
+                                ClientShipmentSummary.objects.get_or_create(
                                     container=container,
-                                    client_id=customer_id
+                                    client_id=customer_id,
                                 )
-                            )
-                    
-                    if summaries_to_create:
-                        ClientShipmentSummary.objects.bulk_create(summaries_to_create)
+                            except Exception as exc_summary:
+                                logger.warning(
+                                    "Failed to create summary for container %s customer %s: %s",
+                                    container.container_id,
+                                    customer_id,
+                                    exc_summary,
+                                    exc_info=True
+                                )
                     
                     # Update all summaries
                     all_summaries = ClientShipmentSummary.objects.filter(

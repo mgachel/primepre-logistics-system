@@ -35,13 +35,11 @@ def create_shipment_from_china(sender, instance, created, **kwargs):
     else:
         # If goods are marked as shipped, update Shipment
         if instance.status == "SHIPPED":
-            try:
-                shipment = Shipments.objects.get(goods_received_china=instance)
+            shipment = Shipments.objects.filter(goods_received_china=instance).first()
+            if shipment:
                 shipment.status = "in_transit"
                 shipment.date_shipped = timezone.now()
                 shipment.save(update_fields=["status", "date_shipped", "updated_at"])
-            except Shipments.DoesNotExist:
-                pass
 
 
 @receiver(post_save, sender=GoodsReceivedGhana)
@@ -50,14 +48,18 @@ def update_shipment_from_ghana(sender, instance, created, **kwargs):
     When goods are received/delivered in Ghana, update Shipment to 'delivered'.
     """
     if instance.status == "DELIVERED":
-        try:
-            shipment = Shipments.objects.get(
-                supply_tracking=instance.supply_tracking
-            )
+        shipment_qs = Shipments.objects.filter(supply_tracking=instance.supply_tracking)
+        shipment = shipment_qs.first()
+        if shipment:
+            # If there are multiple shipments matching this tracking id, log a warning
+            if shipment_qs.count() > 1:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Multiple shipments found for supply_tracking=%s; using first",
+                    instance.supply_tracking
+                )
             shipment.status = "delivered"
             shipment.save(update_fields=["status", "updated_at"])
-        except Shipments.DoesNotExist:
-            pass
 
 
 @receiver(post_save, sender=CargoItem)
@@ -65,10 +67,16 @@ def update_shipment_from_cargo_item(sender, instance, created, **kwargs):
     """
     When a CargoItem is created, link/update the Shipment.
     """
-    try:
-        shipment = Shipments.objects.get(supply_tracking=instance.tracking_id)
-    except Shipments.DoesNotExist:
+    shipment_qs = Shipments.objects.filter(supply_tracking=instance.tracking_id)
+    shipment = shipment_qs.first()
+    if not shipment:
         return
+    if shipment_qs.count() > 1:
+        import logging
+        logging.getLogger(__name__).warning(
+            "Multiple shipments found for tracking_id=%s; using first",
+            instance.tracking_id
+        )
 
     # If cargo item is moved to in_transit
     if instance.status == "in_transit":
@@ -90,9 +98,15 @@ def update_shipment_from_container(sender, instance, created, **kwargs):
     if instance.is_demurrage:
         cargo_items = instance.cargo_items.all()
         for item in cargo_items:
-            try:
-                shipment = Shipments.objects.get(supply_tracking=item.tracking_id)
+                shipment = Shipments.objects.filter(supply_tracking=item.tracking_id).first()
+                if not shipment:
+                    continue
+                # Log if multiple shipments exist
+                if Shipments.objects.filter(supply_tracking=item.tracking_id).count() > 1:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "Multiple shipments found for tracking_id=%s when marking demurrage; using first",
+                        item.tracking_id
+                    )
                 shipment.status = "demurrage"
                 shipment.save(update_fields=["status", "updated_at"])
-            except Shipments.DoesNotExist:
-                continue

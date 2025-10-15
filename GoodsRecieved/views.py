@@ -810,12 +810,20 @@ class CustomerBaseGoodsReceivedViewSet(viewsets.ReadOnlyModelViewSet):
         tracking_id = request.query_params.get('tracking_id')
         if not tracking_id:
             return Response({'detail': 'tracking_id parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            item = self.get_queryset().get(supply_tracking=tracking_id)
-            serializer = self.get_serializer(item)
-            return Response(serializer.data)
-        except self.model_class.DoesNotExist:
+        item_qs = self.get_queryset().filter(supply_tracking=tracking_id)
+        item = item_qs.first()
+        if not item:
             return Response({'detail': 'Item not found or not accessible'}, status=status.HTTP_404_NOT_FOUND)
+
+        if item_qs.count() > 1:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Multiple goods received entries found for supply_tracking=%s; returning first",
+                tracking_id
+            )
+
+        serializer = self.get_serializer(item)
+        return Response(serializer.data)
 
 
 class CustomerGoodsReceivedChinaViewSet(viewsets.ReadOnlyModelViewSet):

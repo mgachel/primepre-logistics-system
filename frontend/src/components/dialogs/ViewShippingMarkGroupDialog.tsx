@@ -1,7 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Package, Hash, Ruler, Weight, FileText, StickyNote } from "lucide-react";
 import { GoodsReceivedItem } from "@/services/goodsReceivedContainerService";
 
@@ -52,9 +51,9 @@ export function ViewShippingMarkGroupDialog({
         </DialogHeader>
 
         {/* Content - Scrollable */}
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full px-4 sm:px-6">
-            <div className="space-y-3 sm:space-y-4 py-4">
+        <div className="flex-1 min-h-0">
+          <div className="max-h-[65vh] px-4 sm:px-6 overflow-y-auto py-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="space-y-3 sm:space-y-4">
               {items.map((item, index) => (
               <Card key={item.id} className="overflow-hidden">
                 <CardContent className="p-3 sm:p-4">
@@ -135,8 +134,8 @@ export function ViewShippingMarkGroupDialog({
                 </CardContent>
               </Card>
             ))}
+            </div>
           </div>
-        </ScrollArea>
         </div>
       </DialogContent>
     </Dialog>

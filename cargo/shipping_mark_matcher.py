@@ -45,41 +45,22 @@ class ShippingMarkMatcher:
         matched_items = []
         unmatched_items = []
         duplicate_tracking_numbers = []
-        
-        # Track tracking numbers to detect duplicates
-        tracking_numbers_seen = set()
-        
+
         for candidate in candidates:
             shipping_mark = candidate['shipping_mark_normalized']
             tracking_number = candidate['tracking_number']
             
-            # Check for duplicate tracking numbers within this batch
-            if tracking_number and tracking_number in tracking_numbers_seen:
-                duplicate_tracking_numbers.append({
-                    'candidate': candidate,
-                    'reason': 'duplicate_tracking_number_in_batch'
-                })
-                continue
-            
-            if tracking_number:
-                tracking_numbers_seen.add(tracking_number)
-            
+            # NOTE: Duplicate tracking numbers are allowed. Previously we
+            # rejected candidates that had duplicate tracking numbers in the
+            # batch or already existed in the DB. The system now accepts
+            # duplicate tracking numbers, so we do not reject here.
             # Try to match with existing customer
             customer = self.customer_cache.get(shipping_mark)
             
             if customer:
-                # Check for duplicate tracking number in database
-                from .models import CargoItem
-                if tracking_number:
-                    existing_item = CargoItem.objects.filter(tracking_id=tracking_number).first()
-                    if existing_item:
-                        duplicate_tracking_numbers.append({
-                            'candidate': candidate,
-                            'reason': 'duplicate_tracking_number_in_db',
-                            'existing_item_id': str(existing_item.id),
-                            'existing_container': existing_item.container.container_id
-                        })
-                        continue
+                # Previously we checked the DB for existing tracking IDs and
+                # rejected matches when found. We now allow duplicate tracking
+                # IDs, so skip that check and proceed to match the customer.
                 
                 matched_items.append({
                     'candidate': candidate,
@@ -97,12 +78,11 @@ class ShippingMarkMatcher:
         return {
             'matched_items': matched_items,
             'unmatched_items': unmatched_items,
-            'duplicate_tracking_numbers': duplicate_tracking_numbers,
             'statistics': {
                 'total_candidates': len(candidates),
                 'matched_count': len(matched_items),
                 'unmatched_count': len(unmatched_items),
-                'duplicate_count': len(duplicate_tracking_numbers)
+                    'duplicate_count': len(duplicate_tracking_numbers)
             }
         }
     
@@ -239,6 +219,10 @@ class ShippingMarkMatcher:
                         quantity=candidate.get('quantity') or 0,
                         cbm=cbm_value
                     )
+
+                    # Preserve the tracking_id provided in the candidate — do
+                    # not overwrite or clear it. Uploads should exactly reflect
+                    # what's in the Excel sheet.
                     cargo_item.save()
 
                     summary, _ = ClientShipmentSummary.objects.get_or_create(
@@ -314,6 +298,8 @@ def process_excel_upload(container_id: str, candidates: List[Dict[str, Any]]) ->
     return {
         'matched_items': match_results['matched_items'],
         'unmatched_items': unmatched_with_suggestions,
-        'duplicate_tracking_numbers': match_results['duplicate_tracking_numbers'],
+        # Duplicate tracking numbers are permitted; return empty list for
+        # backward compatibility with callers that expect this key.
+        'duplicate_tracking_numbers': [],
         'statistics': match_results['statistics']
     }
