@@ -191,13 +191,16 @@ export default function GoodsReceivedContainerDetailsPage() {
     }
 
     try {
-      // TODO: Implement delete goods item service
+      // Call backend service to delete the item
+      await goodsReceivedContainerService.deleteItem(itemId);
+
       toast({
         title: "Item Deleted",
         description: "Goods item has been successfully deleted",
       });
-      // Reload after deletion
-      setGoodsItems((prev) => prev.filter((i) => i.id !== itemId));
+
+      // Refresh data from server to ensure UI is consistent
+      await refreshData();
     } catch (e: unknown) {
       toast({
         title: "Delete Failed",
