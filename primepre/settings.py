@@ -316,6 +316,8 @@ CORS_ALLOWED_ORIGINS = csv_list(config(
             'https://primepre-backend.onrender.com,'
             'https://primepre-frontend.onrender.com,'
             'https://primepre-logistics-system.onrender.com,'
+            "https://primemade.org,"
+            "https://www.primemade.org,"
             'http://localhost:3000,'
             'http://127.0.0.1:3000,'
             'http://localhost:5173,'
