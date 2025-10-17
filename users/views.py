@@ -855,16 +855,16 @@ class GenerateShippingMarksView(APIView):
                     # Default format
                     base_mark = f"PM {name_combo}"
                 
-                # Ensure proper spacing: normalize and ensure space after PM prefix
-                # Remove any double spaces first
-                base_mark = ' '.join(base_mark.split())
-                
-                # Ensure there's a space between PM+prefix and the name
-                # Handles both numeric (PM1, PM16) and alphabetic (PMGA, PMNR) prefixes
+                # Normalize whitespace and ensure a single space between the PM+prefix
+                # (e.g. PM, PM1, PMGA) and the rest of the shipping mark so we
+                # always produce strings like "PM1 ANGIE" or "PM ANGIE".
                 import re
-                if not re.match(r'^PM\s*[A-Z0-9]+\s', base_mark) and re.match(r'^PM\s*[A-Z0-9]+', base_mark):
-                    # Add space after PM+prefix if missing
-                    base_mark = re.sub(r'^(PM\s*[A-Z0-9]+)([A-Z])', r'\1 \2', base_mark)
+                base_mark = ' '.join(base_mark.split())
+                m = re.match(r'^(PM)([A-Z0-9]*)(?:\s*)(.*)$', base_mark, re.IGNORECASE)
+                if m:
+                    prefix = m.group(1) + (m.group(2) or '')
+                    rest = (m.group(3) or '').strip()
+                    base_mark = f"{prefix} {rest}" if rest else prefix
                 original_mark = base_mark
                 
                 # Ensure length constraints (10-20 characters)
@@ -972,13 +972,15 @@ class GenerateShippingMarksView(APIView):
                 else:
                     base_mark = f"PM {extended_combo}"
                 
-                # Remove double spaces and ensure proper spacing
-                base_mark = ' '.join(base_mark.split())
-                
-                # Ensure space between PM+prefix and name (handles both letters and numbers)
+                # Normalize whitespace and ensure a single space between the PM+prefix
+                # and the rest of the mark (keeps patterns like "PM1 ANGIE").
                 import re
-                if not re.match(r'^PM\s*[A-Z0-9]+\s', base_mark) and re.match(r'^PM\s*[A-Z0-9]+', base_mark):
-                    base_mark = re.sub(r'^(PM\s*[A-Z0-9]+)([A-Z])', r'\1 \2', base_mark)
+                base_mark = ' '.join(base_mark.split())
+                m = re.match(r'^(PM)([A-Z0-9]*)(?:\s*)(.*)$', base_mark, re.IGNORECASE)
+                if m:
+                    prefix = m.group(1) + (m.group(2) or '')
+                    rest = (m.group(3) or '').strip()
+                    base_mark = f"{prefix} {rest}" if rest else prefix
                 
                 # Apply length constraints (10-20 characters)
                 current_len = len(base_mark)
