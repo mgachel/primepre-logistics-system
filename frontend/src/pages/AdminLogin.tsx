@@ -20,7 +20,7 @@ export default function AdminLogin() {
   const { login, isLoading, error, clearError } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
 
-  const from = location.state?.from?.pathname || '/admin';
+  const from = location.state?.from?.pathname || '/';
 
   const {
     register,
