@@ -47,7 +47,7 @@ export default function AdminLogin() {
     <div className="min-h-screen flex">
   <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#00703D,#00703DCC)' }}>
         <div className="absolute inset-0 bg-black/20"></div>
-        <div className="relative z-10 flex flex-col justify-center px-12 text-white">
+  <div className="relative z-10 flex flex-col justify-center px-12" style={{ color: '#FFC300' }}>
           <div className="flex items-center mb-8">
             <div>
               <img src="/wavemova_0.png" alt="Prime Pre Logistics Platform" className="mb-8 w-64 h-auto" />
