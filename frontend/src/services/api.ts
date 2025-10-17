@@ -213,9 +213,34 @@ class ApiClient {
   private handleLogout() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    const storedUser = localStorage.getItem("user");
     localStorage.removeItem("user");
     localStorage.removeItem("admin_info");
-    window.location.href = "/login";
+
+    // Decide where to redirect after logout: admin login if user was admin or we're on admin host
+    let redirectTo = '/login';
+    try {
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser as string);
+        const role = (parsed.user_role || parsed.userRole || '').toString().toUpperCase();
+        if (['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(role)) {
+          redirectTo = '/admin/login';
+        }
+      }
+    } catch (e) {
+      // ignore parse errors
+    }
+
+    try {
+      const host = typeof window !== 'undefined' ? window.location.hostname : '';
+      if (host === 'admin.primemade.org' || host.endsWith('.admin.primemade.org')) {
+        redirectTo = '/admin/login';
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    window.location.href = redirectTo;
   }
 
   private extractErrorMessage(errorData: unknown, status: number): string {

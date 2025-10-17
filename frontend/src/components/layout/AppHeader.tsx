@@ -28,9 +28,26 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
   // Define primary color based on user role
   const primaryColor = user?.user_role?.toUpperCase() === "CUSTOMER" ? "#4FC3F7" : "#00703D"; // Light blue for customers, green for others
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    // Ensure logout completes before redirecting
+    await logout();
+
+    // If the user was an admin, send to admin login, otherwise regular login
+    const storedUser = localStorage.getItem('user');
+    let redirectTo = '/login';
+    try {
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        const role = (parsed.user_role || parsed.userRole || '').toString().toUpperCase();
+        if (['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(role)) {
+          redirectTo = '/admin/login';
+        }
+      }
+    } catch (e) {
+      // ignore parse errors and default to /login
+    }
+
+    navigate(redirectTo);
   };
 
   return (
