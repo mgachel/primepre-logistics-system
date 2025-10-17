@@ -50,7 +50,7 @@ export default function AdminLogin() {
         <div className="relative z-10 flex flex-col justify-center px-12 text-white">
           <div className="flex items-center mb-8">
             <div>
-              <img src="/primepre-logo.png" alt="Prime Pre Logistics Platform" className="mb-8 w-64 h-auto" />
+              <img src="/wavemova_0.png" alt="Prime Pre Logistics Platform" className="mb-8 w-64 h-auto" />
             </div>
           </div>
           <h2 className="text-4xl font-bold mb-4">Admin Portal</h2>
@@ -72,7 +72,7 @@ export default function AdminLogin() {
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center mb-6">
-            <img src="/prime_new_BLACK.png" alt="Prime Pre Logo" className="w-40 h-auto mx-auto mb-4" />
+            <img src="/wavemova_copy.png" alt="Prime Pre Logo" className="w-40 h-auto mx-auto mb-4" /> 
           </div>
 
           <Card className="border-0 shadow-lg">
