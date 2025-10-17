@@ -124,7 +124,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, mobileMenuOpen }: 
         <div className="flex items-center space-x-2">
           {(!isCollapsed || isMobile) && (
             <img
-              src={isCustomer() ? "/sidebar.png" : "/wavemova 0.png"}
+              src={isCustomer() ? "/sidebar.png" : "/wavemova_0.png"}
               alt="PRIMEPRE"
               className={isCustomer() ? "h-10" : "h-10"}
             />
