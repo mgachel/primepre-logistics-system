@@ -45,7 +45,7 @@ export default function AdminLogin() {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary to-primary/80 relative overflow-hidden">
+  <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#00703D,#00703DCC)' }}>
         <div className="absolute inset-0 bg-black/20"></div>
         <div className="relative z-10 flex flex-col justify-center px-12 text-white">
           <div className="flex items-center mb-8">
@@ -105,7 +105,7 @@ export default function AdminLogin() {
                   {errors.password && (<p className="text-sm text-red-600">{errors.password.message}</p>)}
                 </div>
 
-                <Button type="submit" className="w-full h-11" disabled={isLoading} forceBlue>
+                <Button type="submit" className="w-full h-11 bg-[#00703D] hover:opacity-90 text-white" disabled={isLoading}>
                   {isLoading ? (
                     <div className="flex items-center"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>Signing In...</div>
                   ) : (
