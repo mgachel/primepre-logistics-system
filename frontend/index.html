@@ -16,6 +16,20 @@
 
   <body>
     <div id="root"></div>
+    <script>
+      // If this site is served on the admin subdomain, redirect root to /admin
+      (function() {
+        try {
+          var host = window.location.hostname;
+          if (host === 'admin.primemade.org' && window.location.pathname === '/') {
+            window.location.replace('/admin' + window.location.search + window.location.hash);
+          }
+        } catch (e) {
+          // Fail silently - don't block app from loading
+          console.error('admin-redirect error', e);
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

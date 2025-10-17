@@ -83,6 +83,12 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
         default='CUSTOMER',
         help_text="User's role in the system"
     )
+    # New: allow multiple roles per user (keeps backward compatibility with `user_role`)
+    roles = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of roles assigned to this user (e.g., ['CUSTOMER','ADMIN'])"
+    )
     user_type = models.CharField(
         max_length=20, 
         choices=USER_TYPE_CHOICES, 
@@ -182,18 +188,52 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
     
     @property
     def is_admin_user(self):
-        """Check if user has admin privileges"""
+        """Check if user has admin privileges.
+
+        This consults the new `roles` field when available for multi-role users,
+        and falls back to the legacy `user_role` single-value field for older rows.
+        """
+        # Prefer `roles` list if populated (backwards-compatible)
+        if getattr(self, 'roles', None):
+            return any(r in ['ADMIN', 'MANAGER', 'SUPER_ADMIN'] for r in (self.roles or []))
         return self.user_role in ['ADMIN', 'MANAGER', 'SUPER_ADMIN']
     
     @property
     def is_super_admin(self):
-        """Check if user is super admin"""
+        """Check if user is super admin (supports multi-role `roles`)."""
+        if getattr(self, 'roles', None):
+            return 'SUPER_ADMIN' in (self.roles or [])
         return self.user_role == 'SUPER_ADMIN'
     
     @property
     def is_manager(self):
-        """Check if user is manager"""
+        """Check if user is manager (supports multi-role `roles`)."""
+        if getattr(self, 'roles', None):
+            return 'MANAGER' in (self.roles or [])
         return self.user_role == 'MANAGER'
+
+    # Convenience role helpers for new multi-role support
+    def has_role(self, role: str) -> bool:
+        """Return True if user has the given role (backwards-compatible)."""
+        if getattr(self, 'roles', None):
+            return role in (self.roles or [])
+        return self.user_role == role
+
+    def add_role(self, role: str):
+        """Add a role to the user's roles list and persist."""
+        if not getattr(self, 'roles', None):
+            self.roles = [self.user_role] if getattr(self, 'user_role', None) else []
+        if role not in self.roles:
+            self.roles.append(role)
+            self.save(update_fields=['roles'])
+
+    def remove_role(self, role: str):
+        """Remove a role from the user's roles list and persist."""
+        if not getattr(self, 'roles', None):
+            return
+        if role in self.roles:
+            self.roles.remove(role)
+            self.save(update_fields=['roles'])
     
     def can_create_admin_user(self):
         """Check if user can create other admin users"""
@@ -438,8 +478,9 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
                     counter += 1
                 self.shipping_mark = shipping_mark
         
-        # Set staff status based on role
-        if self.user_role in ['ADMIN', 'MANAGER', 'SUPER_ADMIN']:
+        # Set staff status based on role (supports multi-role `roles`)
+        effective_roles = (self.roles or [self.user_role]) if getattr(self, 'roles', None) else [self.user_role]
+        if any(r in ['ADMIN', 'MANAGER', 'SUPER_ADMIN'] for r in effective_roles):
             self.is_staff = True
             self.can_access_admin_panel = True
         
@@ -454,7 +495,7 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
             self.accessible_warehouses = ['accra', 'kumasi', 'tema', 'takoradi']  # Super admin has access to all
         
         # Auto-set permissions based on role
-        elif self.user_role == 'MANAGER':
+        elif 'MANAGER' in effective_roles:
             self.can_create_users = True
             self.can_manage_inventory = True
             self.can_manage_rates = True
@@ -462,12 +503,20 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
             if not self.accessible_warehouses:
                 self.accessible_warehouses = ['accra', 'kumasi', 'tema']
         
-        elif self.user_role == 'ADMIN':
+        elif 'ADMIN' in effective_roles:
             self.can_manage_inventory = True
             self.can_manage_rates = True
             self.can_view_analytics = True
             if not self.accessible_warehouses:
                 self.accessible_warehouses = ['accra']  # Default to main Accra warehouse
+
+        # Ensure the legacy single `user_role` is reflected in `roles` for new rows
+        if not getattr(self, 'roles', None) or len(self.roles) == 0:
+            # Initialize roles list from the legacy `user_role` when empty
+            try:
+                self.roles = [self.user_role]
+            except Exception:
+                self.roles = []
         
         super().save(*args, **kwargs)
     

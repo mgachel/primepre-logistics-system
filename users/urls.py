@@ -34,6 +34,7 @@ from .views import (
     # Development helpers
     DevelopmentPinsView
 )
+from .views import AdminLoginView
 
 # Import customer Excel upload views
 from .customer_excel_views import (
@@ -115,6 +116,7 @@ urlpatterns = [
     
     # Legacy authentication endpoints (keep for backward compatibility)
     path('register/', RegisterView.as_view(), name='register'),
+    path('admin-login/', AdminLoginView.as_view(), name='admin_login'),
     path('login/', LoginView.as_view(), name='login'),
     path('test/', TestView.as_view(), name='test'),
     

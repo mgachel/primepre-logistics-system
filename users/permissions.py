@@ -9,7 +9,7 @@ class IsAdminUser(BasePermission):
         return (
             request.user and 
             request.user.is_authenticated and 
-            request.user.is_admin_user
+            (getattr(request.user, 'is_admin_user', False) or getattr(request.user, 'is_staff', False))
         )
 
 
@@ -21,7 +21,7 @@ class IsCustomer(BasePermission):
         return (
             request.user and 
             request.user.is_authenticated and 
-            request.user.user_role == 'CUSTOMER'
+            (getattr(request.user, 'has_role', lambda r: False)('CUSTOMER') if hasattr(request.user, 'has_role') else getattr(request.user, 'user_role', None) == 'CUSTOMER')
         )
 
 
@@ -33,7 +33,7 @@ class IsSuperAdminUser(BasePermission):
         return (
             request.user and 
             request.user.is_authenticated and 
-            request.user.is_super_admin
+            (getattr(request.user, 'is_super_admin', False) or (hasattr(request.user, 'has_role') and request.user.has_role('SUPER_ADMIN')))
         )
 
 
@@ -45,7 +45,7 @@ class IsManagerOrSuperAdmin(BasePermission):
         return (
             request.user and 
             request.user.is_authenticated and 
-            request.user.user_role in ['MANAGER', 'SUPER_ADMIN']
+            ( (hasattr(request.user, 'has_role') and (request.user.has_role('MANAGER') or request.user.has_role('SUPER_ADMIN'))) or getattr(request.user, 'user_role', None) in ['MANAGER', 'SUPER_ADMIN'] )
         )
 
 
@@ -123,7 +123,7 @@ class IsManagerOrAbove(BasePermission):
         return (
             request.user and 
             request.user.is_authenticated and 
-            request.user.user_role in ['MANAGER', 'SUPER_ADMIN']
+            ( (hasattr(request.user, 'has_role') and (request.user.has_role('MANAGER') or request.user.has_role('SUPER_ADMIN'))) or getattr(request.user, 'user_role', None) in ['MANAGER', 'SUPER_ADMIN'] )
         )
 
 
@@ -133,7 +133,7 @@ class IsOwnerOrAdmin(BasePermission):
     """
     def has_object_permission(self, request, view, obj):
         # Super admins can access anything
-        if request.user.is_super_admin:
+        if getattr(request.user, 'is_super_admin', False) or (hasattr(request.user, 'has_role') and request.user.has_role('SUPER_ADMIN')):
             return True
         
         # Check if object has a user field and user owns it
@@ -145,15 +145,14 @@ class IsOwnerOrAdmin(BasePermission):
             return True
         
         # Check if user is admin and has appropriate permissions
-        if request.user.is_admin_user:
+        if getattr(request.user, 'is_admin_user', False) or getattr(request.user, 'is_staff', False):
             # Managers can modify most things
-            if request.user.user_role == 'MANAGER':
+            if (hasattr(request.user, 'has_role') and request.user.has_role('MANAGER')) or getattr(request.user, 'user_role', None) == 'MANAGER':
                 return True
             
             # Admins can modify customer objects
-            if (request.user.user_role == 'ADMIN' and 
-                hasattr(obj, 'user_role') and 
-                obj.user_role == 'CUSTOMER'):
+            if ((hasattr(request.user, 'has_role') and request.user.has_role('ADMIN')) or getattr(request.user, 'user_role', None) == 'ADMIN') and \
+                hasattr(obj, 'user_role') and obj.user_role == 'CUSTOMER':
                 return True
         
         return False

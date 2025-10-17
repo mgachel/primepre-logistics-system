@@ -33,8 +33,10 @@ export interface LoginCredentials {
 
 export interface LoginResponse {
   user: User;
-  access: string;
-  refresh: string;
+  tokens: {
+    access: string;
+    refresh: string;
+  };
   admin_info?: {
     can_access_admin_panel: boolean;
     permissions: string[];
@@ -62,17 +64,21 @@ export const authService = {
       // Clear any cached authentication data before attempting login
       this.clearAuthCache();
       
-      console.log('📡 AuthService: Making login request to server...');
-      const response = await apiClient.post<LoginResponse>('/api/auth/login/', credentials);
+  console.log('📡 AuthService: Making login request to server...');
+  // If frontend is served from admin subdomain, use admin-login endpoint
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isAdminHost = host === 'admin.primemade.org' || host.endsWith('.admin.primemade.org');
+  const loginEndpoint = isAdminHost ? '/api/auth/admin-login/' : '/api/auth/login/';
+  const response = await apiClient.post<LoginResponse>(loginEndpoint, credentials);
       
       console.log('📥 AuthService: Received response:', response.success ? 'SUCCESS' : 'FAILED');
       
-      if (response.success && response.data.access) {
+      if (response.success && response.data && response.data.tokens && response.data.tokens.access) {
         console.log('💾 AuthService: Storing authentication tokens...');
-        localStorage.setItem('access_token', response.data.access);
-        localStorage.setItem('refresh_token', response.data.refresh);
+        localStorage.setItem('access_token', response.data.tokens.access);
+        localStorage.setItem('refresh_token', response.data.tokens.refresh);
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        
+
         // Store admin info if available
         if (response.data.admin_info) {
           localStorage.setItem('admin_info', JSON.stringify(response.data.admin_info));
@@ -83,17 +89,12 @@ export const authService = {
         console.log('❌ AuthService: Login failed - no access token received');
       }
       
-      // Return the data in the format expected by authStore
+      // Return the ApiResponse<LoginResponse> as expected by callers
       return {
         success: response.success,
         data: response.data,
         message: response.message,
-        tokens: {
-          access: response.data.access,
-          refresh: response.data.refresh
-        },
-        user: response.data.user
-      };
+      } as ApiResponse<LoginResponse>;
     } catch (error) {
       console.error('❌ AuthService: Login error:', error);
       // Clear auth cache on login failure
@@ -116,9 +117,9 @@ export const authService = {
     try {
       const response = await apiClient.post<LoginResponse>('/api/auth/register/', credentials);
       
-      if (response.success && response.data.access) {
-        localStorage.setItem('access_token', response.data.access);
-        localStorage.setItem('refresh_token', response.data.refresh);
+      if (response.success && response.data && response.data.tokens) {
+        localStorage.setItem('access_token', response.data.tokens.access);
+        localStorage.setItem('refresh_token', response.data.tokens.refresh);
         localStorage.setItem('user', JSON.stringify(response.data.user));
       }
       
@@ -145,7 +146,7 @@ export const authService = {
       this.clearAuthCache();
     }
     
-    return { success: true, data: undefined };
+    return { success: true, data: undefined, message: 'Logged out' } as ApiResponse<void>;
   },
 
   // Get current user profile
@@ -174,8 +175,8 @@ export const authService = {
         refresh: refreshToken
       });
       
-      if (response.success && response.data.access) {
-        localStorage.setItem('access_token', response.data.access);
+      if (response.success && response.data && (response.data as any).access) {
+        localStorage.setItem('access_token', (response.data as any).access);
       }
       
       return response;

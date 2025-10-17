@@ -1253,7 +1253,17 @@ class LoginView(APIView):
                 'success': False,
                 'error': 'Your account has been disabled. Please contact support.'
             }, status=status.HTTP_403_FORBIDDEN)
-        
+
+        # Allow admin users to login via regular login endpoint.
+        # The frontend will determine the UI flow based on which login page was used.
+        # Keep admin-specific protections in `AdminLoginView` for admin-only endpoints.
+        is_admin_user = False
+        try:
+            # Use model helper if available (supports multi-role users)
+            is_admin_user = getattr(user, 'is_admin_user', False) or getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False)
+        except Exception:
+            is_admin_user = getattr(user, 'user_role', None) in ['ADMIN', 'MANAGER', 'SUPER_ADMIN']
+
         # For regular users, check verification status
         if hasattr(user, 'is_verified') and not user.is_verified and not user.is_superuser:
             return Response({
@@ -1289,12 +1299,18 @@ class LoginView(APIView):
         
         # Add custom fields if they exist (for CustomerUser)
         if hasattr(user, 'phone'):
+            # Include legacy `user_role` for compatibility, and canonical `roles` list
+            roles = getattr(user, 'roles', None)
+            if not roles:
+                roles = [getattr(user, 'user_role', 'CUSTOMER')]
+
             user_data.update({
                 'phone': user.phone,
                 'company_name': getattr(user, 'company_name', ''),
                 'shipping_mark': getattr(user, 'shipping_mark', ''),
                 'region': getattr(user, 'region', ''),
                 'user_role': getattr(user, 'user_role', 'CUSTOMER'),
+                'roles': roles,
                 'user_type': getattr(user, 'user_type', 'INDIVIDUAL'),
                 'is_verified': getattr(user, 'is_verified', True),
             })
@@ -1362,6 +1378,66 @@ class LoginView(APIView):
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class AdminLoginView(APIView):
+    """
+    Admin-only login endpoint. Uses same credentials as regular login but only
+    permits users with admin roles (is_staff / is_admin_user / is_superuser).
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        phone_or_username = request.data.get('phone')
+        password = request.data.get('password')
+
+        if not phone_or_username or not password:
+            return Response({'success': False, 'error': 'Phone/username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Reuse existing authenticate logic
+        user = authenticate(request, phone=phone_or_username, password=password)
+        if user is None:
+            from django.contrib.auth import authenticate as django_authenticate
+            user = django_authenticate(request, username=phone_or_username, password=password)
+
+        if user is None:
+            return Response({'success': False, 'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Check admin permissions
+        is_admin = getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False) or getattr(user, 'is_admin_user', False)
+        if not is_admin:
+            return Response({'success': False, 'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Check active
+        if not user.is_active:
+            return Response({'success': False, 'error': 'Account disabled'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+
+        user_data = {
+            'id': user.id,
+            'phone': getattr(user, 'phone', ''),
+            'email': getattr(user, 'email', ''),
+            'first_name': getattr(user, 'first_name', ''),
+            'last_name': getattr(user, 'last_name', ''),
+            'is_staff': getattr(user, 'is_staff', False),
+            'is_superuser': getattr(user, 'is_superuser', False),
+            'user_role': getattr(user, 'user_role', 'CUSTOMER'),
+            'roles': getattr(user, 'roles', [getattr(user, 'user_role', 'CUSTOMER')]),
+        }
+
+        return Response({
+            'success': True,
+            'message': 'Admin login successful',
+            'user': user_data,
+            'tokens': {
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+            }
+        }, status=status.HTTP_200_OK)
 
 
 class UserViewSet(viewsets.ModelViewSet):

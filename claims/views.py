@@ -158,7 +158,8 @@ def customer_claims_by_shipping_mark(request, shipping_mark):
     """
     Get claims by shipping mark (for admin use)
     """
-    if not request.user.user_role in ['ADMIN', 'MANAGER', 'STAFF']:
+    # Support multi-role users via has_role helper when available
+    if not ((hasattr(request.user, 'has_role') and (request.user.has_role('ADMIN') or request.user.has_role('MANAGER') or request.user.has_role('STAFF'))) or getattr(request.user, 'user_role', None) in ['ADMIN', 'MANAGER', 'STAFF']):
         return Response(
             {'error': 'Permission denied'}, 
             status=status.HTTP_403_FORBIDDEN
