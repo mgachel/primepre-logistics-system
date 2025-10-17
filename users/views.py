@@ -1254,15 +1254,26 @@ class LoginView(APIView):
                 'error': 'Your account has been disabled. Please contact support.'
             }, status=status.HTTP_403_FORBIDDEN)
 
-        # Allow admin users to login via regular login endpoint.
-        # The frontend will determine the UI flow based on which login page was used.
-        # Keep admin-specific protections in `AdminLoginView` for admin-only endpoints.
-        is_admin_user = False
+        # Enforce that this endpoint is for customer logins only.
+        # Users must have the CUSTOMER role (supports new `roles` list and legacy `user_role`).
+        is_customer = False
         try:
-            # Use model helper if available (supports multi-role users)
-            is_admin_user = getattr(user, 'is_admin_user', False) or getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False)
+            if hasattr(user, 'has_role'):
+                # Multi-role users: allow if they have explicit CUSTOMER role
+                is_customer = user.has_role('CUSTOMER')
+            else:
+                # Legacy single-value field
+                is_customer = getattr(user, 'user_role', 'CUSTOMER') == 'CUSTOMER'
         except Exception:
-            is_admin_user = getattr(user, 'user_role', None) in ['ADMIN', 'MANAGER', 'SUPER_ADMIN']
+            is_customer = getattr(user, 'user_role', 'CUSTOMER') == 'CUSTOMER'
+
+        if not is_customer:
+            # Reject admin-only accounts from signing in on the regular (customer) login endpoint.
+            logger.warning(f"Customer login rejected for non-customer user: {getattr(user, 'phone', getattr(user, 'username', 'unknown'))}")
+            return Response({
+                'success': False,
+                'error': 'Customer access required. This login endpoint only accepts customer accounts.'
+            }, status=status.HTTP_403_FORBIDDEN)
 
         # For regular users, check verification status
         if hasattr(user, 'is_verified') and not user.is_verified and not user.is_superuser:
