@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0003_populate_roles_from_user_role'),
+        ('users', '0009_customerbulkuploadtask'),
         ('users', '0010_populate_roles_from_user_role'),
     ]
 
