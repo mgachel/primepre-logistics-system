@@ -325,7 +325,19 @@ class AuthApiService {
 
   // Authentication endpoints
   async login(credentials: { phone: string; password: string }): Promise<LoginResponse> {
-    const response = await this.api.post<LoginResponse>('/api/auth/login/', credentials);
+    // Decide endpoint based on host: admin subdomain must use admin-login endpoint
+    let loginEndpoint = '/api/auth/login/';
+    try {
+      if (typeof window !== 'undefined') {
+        const host = window.location.hostname || '';
+        const isAdminHost = host === 'admin.primemade.org' || host.endsWith('.admin.primemade.org');
+        if (isAdminHost) loginEndpoint = '/api/auth/admin-login/';
+      }
+    } catch (e) {
+      // If window access fails for any reason, fall back to regular login
+    }
+
+    const response = await this.api.post<LoginResponse>(loginEndpoint, credentials);
     if (response.success && response.data) {
       this.setTokens({
         access: response.data.tokens.access,
