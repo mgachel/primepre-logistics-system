@@ -855,16 +855,20 @@ class GenerateShippingMarksView(APIView):
                     # Default format
                     base_mark = f"PM {name_combo}"
                 
-                # Normalize whitespace and ensure a single space between the PM+prefix
-                # (e.g. PM, PM1, PMGA) and the rest of the shipping mark so we
-                # always produce strings like "PM1 ANGIE" or "PM ANGIE".
+                # Normalize whitespace and ensure the format PM{prefix} + space + rest.
+                # We must not consume the entire name when extracting the prefix, so use
+                # a regex that captures PM, an optional alphanumeric prefix, then the rest.
                 import re
                 base_mark = ' '.join(base_mark.split())
                 m = re.match(r'^(PM)([A-Z0-9]*)(?:\s*)(.*)$', base_mark, re.IGNORECASE)
                 if m:
-                    prefix = m.group(1) + (m.group(2) or '')
+                    pm = m.group(1).upper()
+                    prefix = (m.group(2) or '').upper()
                     rest = (m.group(3) or '').strip()
-                    base_mark = f"{prefix} {rest}" if rest else prefix
+                    if prefix:
+                        base_mark = f"{pm}{prefix} {rest}" if rest else f"{pm}{prefix}"
+                    else:
+                        base_mark = f"{pm} {rest}" if rest else pm
                 original_mark = base_mark
                 
                 # Ensure length constraints (10-20 characters)
@@ -972,15 +976,18 @@ class GenerateShippingMarksView(APIView):
                 else:
                     base_mark = f"PM {extended_combo}"
                 
-                # Normalize whitespace and ensure a single space between the PM+prefix
-                # and the rest of the mark (keeps patterns like "PM1 ANGIE").
+                # Normalize whitespace and ensure the format PM{prefix} + space + rest.
                 import re
                 base_mark = ' '.join(base_mark.split())
                 m = re.match(r'^(PM)([A-Z0-9]*)(?:\s*)(.*)$', base_mark, re.IGNORECASE)
                 if m:
-                    prefix = m.group(1) + (m.group(2) or '')
+                    pm = m.group(1).upper()
+                    prefix = (m.group(2) or '').upper()
                     rest = (m.group(3) or '').strip()
-                    base_mark = f"{prefix} {rest}" if rest else prefix
+                    if prefix:
+                        base_mark = f"{pm}{prefix} {rest}" if rest else f"{pm}{prefix}"
+                    else:
+                        base_mark = f"{pm} {rest}" if rest else pm
                 
                 # Apply length constraints (10-20 characters)
                 current_len = len(base_mark)
