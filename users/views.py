@@ -845,12 +845,14 @@ class GenerateShippingMarksView(APIView):
                     break
                 
                 if rule:
-                    # Use rule format with regional prefix
-                    base_mark = rule.format_template.format(
-                        prefix=rule.prefix_value,
-                        name=name_combo,
-                        counter=""
-                    ).strip()
+                    # Use the explicit rule prefix and name to avoid cases where the
+                    # format_template concatenates prefix and name without a separator.
+                    # This ensures we always produce: PM{prefix} <name>
+                    try:
+                        prefix_val = str(rule.prefix_value).upper()
+                    except Exception:
+                        prefix_val = str(getattr(rule, 'prefix_value', '')).upper()
+                    base_mark = f"PM{prefix_val} {name_combo}".strip()
                 else:
                     # Default format
                     base_mark = f"PM {name_combo}"
@@ -968,11 +970,12 @@ class GenerateShippingMarksView(APIView):
                     extended_combo = random_combo
                 
                 if rule:
-                    base_mark = rule.format_template.format(
-                        prefix=rule.prefix_value,
-                        name=extended_combo,
-                        counter=""
-                    ).strip()
+                    # Use explicit prefix value to ensure 'PM{prefix} <rest>' formatting
+                    try:
+                        prefix_val = str(rule.prefix_value).upper()
+                    except Exception:
+                        prefix_val = str(getattr(rule, 'prefix_value', '')).upper()
+                    base_mark = f"PM{prefix_val} {extended_combo}".strip()
                 else:
                     base_mark = f"PM {extended_combo}"
                 
