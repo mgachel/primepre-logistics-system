@@ -1405,10 +1405,20 @@ class AdminLoginView(APIView):
         if user is None:
             return Response({'success': False, 'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Check admin permissions
-        is_admin = getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False) or getattr(user, 'is_admin_user', False)
+        # Check admin permissions strictly: prefer `has_role` helper for multi-role users
+        is_admin = False
+        try:
+            if hasattr(user, 'has_role'):
+                is_admin = user.has_role('ADMIN') or user.has_role('MANAGER') or user.has_role('SUPER_ADMIN')
+            else:
+                is_admin = getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False) or getattr(user, 'is_admin_user', False)
+        except Exception:
+            # Fall back to legacy checks if any unexpected error occurs
+            is_admin = getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False) or getattr(user, 'is_admin_user', False)
+
         if not is_admin:
-            return Response({'success': False, 'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+            logger.warning(f"Admin login attempt rejected for non-admin user: {getattr(user, 'phone', getattr(user, 'username', 'unknown'))}")
+            return Response({'success': False, 'error': 'Admin access required. This login endpoint only accepts admin accounts.'}, status=status.HTTP_403_FORBIDDEN)
 
         # Check active
         if not user.is_active:
