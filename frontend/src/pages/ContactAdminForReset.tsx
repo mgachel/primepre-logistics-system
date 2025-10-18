@@ -20,9 +20,9 @@ export default function ContactAdminForReset() {
   const adminContacts = [
     {
       name: 'Admin Support',
-      phone: '+233 XX XXX XXXX', // Replace with actual admin contact
-      whatsapp: '+233 XX XXX XXXX', // Replace with actual WhatsApp
-      email: 'admin@primepre.com', // Replace with actual email
+      phone: '0540820596', // Replace with actual admin contact
+      whatsapp: '0540820596', // Replace with actual WhatsApp
+      email: 'Primepreltd@gmail.com', // Replace with actual email
     }
   ];
 
