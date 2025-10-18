@@ -161,7 +161,7 @@ export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" key={open ? 'new-client' : undefined}>
         <DialogHeader>
           <DialogTitle>Add New Client</DialogTitle>
           <DialogDescription>
@@ -312,7 +312,7 @@ export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDial
             </Button>
             <Button type="submit" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-              Save Changes
+              {loading ? 'Adding...' : 'Add Client'}
             </Button>
           </DialogFooter>
         </form>
