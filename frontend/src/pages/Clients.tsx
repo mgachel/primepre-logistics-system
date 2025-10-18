@@ -827,6 +827,10 @@ export default function Clients() {
       <NewClientDialog
         open={showNewClientDialog}
         onOpenChange={setShowNewClientDialog}
+        onCreated={() => {
+          // Refresh clients list after a new client is created
+          handleRefresh();
+        }}
       />
 
       <EditClientDialog
