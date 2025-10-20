@@ -967,23 +967,23 @@ export default function GoodsReceivedContainerDetailsPage() {
                 </div>
 
                 {/* Right Side - compact two-column grid for label/value proximity */}
-                <div className="flex flex-col items-end space-y-2" style={{ justifySelf: 'end', textAlign: 'right', maxWidth: 320 }}>
-                  <h2 className="text-lg font-bold truncate" style={{ maxWidth: '100%' }}>Invoice #{previewInvoiceData.invoiceNumber}</h2>
-                  <div className="grid" style={{ gridTemplateColumns: 'max-content auto', columnGap: '8px', rowGap: '4px', alignItems: 'center', justifyItems: 'end', width: '100%' }}>
+                <div className="flex flex-col items-end space-y-2" style={{ justifySelf: 'end', textAlign: 'right', maxWidth: 320, width: '100%' }}>
+                  <h2 className="text-lg font-bold" style={{ maxWidth: '100%' }}>Invoice #{previewInvoiceData.invoiceNumber}</h2>
+                  <div className="grid" style={{ gridTemplateColumns: '110px 1fr', columnGap: '12px', rowGap: '6px', alignItems: 'center', justifyItems: 'start', width: '100%' }}>
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Date:</div>
-                    <div className="text-sm">{new Date().toLocaleDateString()}</div>
+                    <div className="text-sm text-right">{new Date().toLocaleDateString()}</div>
 
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Total Amount:</div>
-                    <div className="text-lg font-bold text-green-600">GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="text-lg font-bold text-green-600 text-right">GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
 
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>MOMO:</div>
-                    <div className="text-sm">MTN: 054 029 5187</div>
+                    <div className="text-sm text-right">MTN: 054 029 5187</div>
 
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>CODE:</div>
-                    <div className="text-sm">*713*3971#</div>
+                    <div className="text-sm text-right">*713*3971#</div>
 
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>BANK - UBA:</div>
-                    <div className="text-sm">00115148103503</div>
+                    <div className="text-sm text-right">00115148103503</div>
 
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>CBO HEAD OFFICE</div>
                     <div className="text-sm">&nbsp;</div>
