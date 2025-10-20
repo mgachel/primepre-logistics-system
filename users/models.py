@@ -331,13 +331,8 @@ class CustomerUser(AbstractBaseUser, PermissionsMixin):
                 continue
             
             # Add sequential numbers if base exists
-            # Use format: 'PM{n} {NAME}' (e.g., 'PM1 ANGIE') so the number appears directly after PM
-            # and is followed by a space before the rest of the shipping mark.
-            # Extract the name part from the pattern which is expected to be 'PM {NAME}'.
-            name_part = pattern.split(' ', 1)[1] if ' ' in pattern else pattern.replace('PM', '').strip()
             for i in range(1, 100):
-                # Use no zero-padding per UX preference (PM1 ANGIE)
-                candidate = f"PM{i} {name_part}"
+                candidate = f"{pattern}{i:02d}"
                 if not cls.objects.filter(shipping_mark=candidate).exists():
                     suggestions.append(candidate)
                     break

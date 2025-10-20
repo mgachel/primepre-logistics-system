@@ -319,7 +319,7 @@ export default function GoodsReceivedContainerDetailsPage() {
     pdf.setFont('helvetica', 'bold');
     pdf.text('LOCATION:', 14, yPos);
     pdf.setFont('helvetica', 'normal'); 
-    pdf.text('Primemade (on Google Maps)', 50, yPos);
+    pdf.text('Cephas Cargo (on Google Maps), Get a car to Atomic Junction or Haatso, From there Agbogba car and drop at Ahmadiya', 50, yPos);
 
 
     // Invoice details - Right side
@@ -944,6 +944,8 @@ export default function GoodsReceivedContainerDetailsPage() {
 
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>LOCATION:</div>
                     <div className="text-sm">Primemade (on Google Maps)</div>
+                    <div className="text-sm">Get a car to Atomic Junction or Haatso</div>
+                    <div className="text-sm">From there Agbogba car and drop at Ahmadiya</div>
                   </div>
                 </div>
 
