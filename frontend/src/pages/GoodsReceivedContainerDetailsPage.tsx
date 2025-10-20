@@ -902,7 +902,7 @@ export default function GoodsReceivedContainerDetailsPage() {
       {/* Invoice Preview Dialog */}
       {showInvoicePreview && previewInvoiceData && (
         <Dialog open={showInvoicePreview} onOpenChange={setShowInvoicePreview}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <DialogContent className="max-h-[90vh] overflow-y-auto" style={{ width: 'min(95vw, 900px)' }}>
             <DialogHeader>
               <div className="flex items-center justify-between">
                 <DialogTitle>Invoice Preview</DialogTitle>
@@ -923,7 +923,7 @@ export default function GoodsReceivedContainerDetailsPage() {
                 <img 
                   src="/primepre-logo-1.png" 
                   alt="PrimePre Logo" 
-                  className="h-20 w-auto object-contain"
+                  className="h-16 sm:h-20 w-auto object-contain"
                   onError={(e) => {
                     console.error('Logo failed to load in preview');
                     e.currentTarget.style.display = 'none';
@@ -936,8 +936,8 @@ export default function GoodsReceivedContainerDetailsPage() {
 
               {/* Header */}
               <div className="text-center mb-8">
-                <h1 className="text-2xl font-bold mb-2">GOODS IN GHANA INVOICE</h1>
-                <h2 className="text-gray-600">WE DO NOT ACCEPT CASH. ONLY MOMO OR BANK TRANSFER</h2>
+                <h1 className="text-xl sm:text-2xl font-bold mb-2">GOODS IN GHANA INVOICE</h1>
+                <h2 className="text-gray-600 text-sm sm:text-base">WE DO NOT ACCEPT CASH. ONLY MOMO OR BANK TRANSFER</h2>
               </div>
 
               {/* Invoice Details: left flexible column + right fixed column (stable layout) */}
@@ -966,7 +966,7 @@ export default function GoodsReceivedContainerDetailsPage() {
                 </div>
 
                 {/* Right column (fixed width) */}
-                <div className="w-80 flex flex-col items-end space-y-2">
+                <div className="w-72 flex flex-col items-end space-y-2">
                   <h2 className="text-lg font-semibold mb-1" style={{ margin: 0 }}>Invoice #{previewInvoiceData.invoiceNumber}</h2>
                   <div className="w-full space-y-1">
                     <div className="flex justify-between">
