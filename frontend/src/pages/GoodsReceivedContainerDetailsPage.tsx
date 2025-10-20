@@ -350,19 +350,21 @@ export default function GoodsReceivedContainerDetailsPage() {
     pdf.setFont('helvetica', 'normal');
   pdf.text(`GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueRightX, yPos, { align: 'right' });
 
-    // Add new text rows for MOMO and UBA details
+    // Add new text rows for MOMO, CODE, and BANK UBA details (each on its own line)
     yPos += 10;
   pdf.setFont('helvetica', 'bold');
   pdf.text('MOMO:', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
   pdf.text('MTN: 054 029 5187', valueRightX, yPos, { align: 'right' });
-  
-  // Add USSD code line beneath MOMO
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('CODE:', labelX, yPos + 6);
-    pdf.setFont('helvetica', 'normal');
-  pdf.text('*713*3971#', valueRightX, yPos + 6, { align: 'right' });
 
+    // Move down and place CODE between MOMO and BANK
+    yPos += 6;
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('CODE:', labelX, yPos);
+    pdf.setFont('helvetica', 'normal');
+  pdf.text('*713*3971#', valueRightX, yPos, { align: 'right' });
+
+    // Move down to the BANK line
     yPos += 6;
   pdf.setFont('helvetica', 'bold');
   pdf.text('BANK - UBA:', labelX, yPos);
