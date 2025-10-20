@@ -319,7 +319,14 @@ export default function GoodsReceivedContainerDetailsPage() {
     pdf.setFont('helvetica', 'bold');
     pdf.text('LOCATION:', 14, yPos);
     pdf.setFont('helvetica', 'normal'); 
-    pdf.text('Cephas Cargo (on Google Maps), Get a car to Atomic Junction or Haatso, From there Agbogba car and drop at Ahmadiya', 50, yPos);
+  pdf.text('Cephas Cargo (on Google Maps)', 50, yPos);
+  // Instruction lines beneath the location
+  yPos += 6;
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('Get a car to Atomic Junction or Haatso', 50, yPos);
+  yPos += 6;
+  pdf.text('From there Agbogba car and drop at Ahmadiya', 50, yPos);
 
 
     // Invoice details - Right side
@@ -944,8 +951,10 @@ export default function GoodsReceivedContainerDetailsPage() {
 
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>LOCATION:</div>
                     <div className="text-sm">Primemade (on Google Maps)</div>
-                    <div className="text-sm">Get a car to Atomic Junction or Haatso</div>
-                    <div className="text-sm">From there Agbogba car and drop at Ahmadiya</div>
+                    {/* Instruction block placed beneath the LOCATION value, full width */}
+                    <div className="col-span-2 mt-2 text-sm text-gray-700" style={{ gridColumn: '1 / -1' }}>
+                      Get a car to Atomic Junction or Haatso. From there take an Agbogba car and drop at Ahmadiya.
+                    </div>
                   </div>
                 </div>
 
