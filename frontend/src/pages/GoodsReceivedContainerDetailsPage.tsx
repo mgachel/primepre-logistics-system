@@ -356,6 +356,12 @@ export default function GoodsReceivedContainerDetailsPage() {
   pdf.text('MOMO:', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
   pdf.text('MTN: 054 029 5187', valueRightX, yPos, { align: 'right' });
+  
+  // Add USSD code line beneath MOMO
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('CODE:', labelX, yPos + 6);
+    pdf.setFont('helvetica', 'normal');
+  pdf.text('*713*3971#', valueRightX, yPos + 6, { align: 'right' });
 
     yPos += 6;
   pdf.setFont('helvetica', 'bold');
@@ -951,30 +957,33 @@ export default function GoodsReceivedContainerDetailsPage() {
 
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>LOCATION:</div>
                     <div className="text-sm">Primemade (on Google Maps)</div>
-                    {/* Instruction block placed beneath the LOCATION value, full width */}
-                    <div className="col-span-2 mt-2 text-sm text-gray-700" style={{ gridColumn: '1 / -1' }}>
+                    {/* Instruction block placed beneath the LOCATION value; keep it within the left column to avoid layout overlap */}
+                    <div className="mt-2 text-sm text-gray-700" style={{ maxWidth: '100%', lineHeight: 1.4 }}>
                       Get a car to Atomic Junction or Haatso. From there take an Agbogba car and drop at Ahmadiya.
                     </div>
                   </div>
                 </div>
 
                 {/* Right Side - compact two-column grid for label/value proximity */}
-                <div className="space-y-2" style={{ justifySelf: 'end', textAlign: 'right' }}>
-                  <h2 className="text-lg font-bold">Invoice #{previewInvoiceData.invoiceNumber}</h2>
-                  <div className="grid" style={{ gridTemplateColumns: 'max-content auto', columnGap: '2px', rowGap: '2px', alignItems: 'center', justifyItems: 'start', justifySelf: 'end' }}>
-                    <div className="text-sm font-semibold">Date:</div>
+                <div className="flex flex-col items-end space-y-2" style={{ justifySelf: 'end', textAlign: 'right', maxWidth: 320 }}>
+                  <h2 className="text-lg font-bold truncate" style={{ maxWidth: '100%' }}>Invoice #{previewInvoiceData.invoiceNumber}</h2>
+                  <div className="grid" style={{ gridTemplateColumns: 'max-content auto', columnGap: '8px', rowGap: '4px', alignItems: 'center', justifyItems: 'end', width: '100%' }}>
+                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Date:</div>
                     <div className="text-sm">{new Date().toLocaleDateString()}</div>
 
-                    <div className="text-sm font-semibold">Total Amount:</div>
+                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Total Amount:</div>
                     <div className="text-lg font-bold text-green-600">GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
 
-                    <div className="text-sm font-semibold">MOMO:</div>
+                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>MOMO:</div>
                     <div className="text-sm">MTN: 054 029 5187</div>
 
-                    <div className="text-sm font-semibold">BANK - UBA:</div>
+                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>CODE:</div>
+                    <div className="text-sm">*713*3971#</div>
+
+                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>BANK - UBA:</div>
                     <div className="text-sm">00115148103503</div>
 
-                    <div className="text-sm font-semibold">CBO HEAD OFFICE</div>
+                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>CBO HEAD OFFICE</div>
                     <div className="text-sm">&nbsp;</div>
                   </div>
                 </div>
