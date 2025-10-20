@@ -940,11 +940,11 @@ export default function GoodsReceivedContainerDetailsPage() {
                 <h2 className="text-gray-600">WE DO NOT ACCEPT CASH. ONLY MOMO OR BANK TRANSFER</h2>
               </div>
 
-              {/* Invoice Details Grid */}
-              <div className="grid grid-cols-2 gap-8 mb-8">
-                {/* Left Side - compact two-column grid for label/value proximity */}
-                <div className="space-y-2">
-                  <div className="grid" style={{ gridTemplateColumns: 'max-content auto', columnGap: '2px', rowGap: '2px', alignItems: 'center', justifyItems: 'start' }}>
+              {/* Invoice Details: left flexible column + right fixed column (stable layout) */}
+              <div className="flex items-start justify-between mb-8 gap-6">
+                {/* Left column (flexible) */}
+                <div className="flex-1 pr-6">
+                  <div className="grid" style={{ gridTemplateColumns: 'max-content auto', columnGap: '8px', rowGap: '6px', alignItems: 'center', justifyItems: 'start' }}>
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Container:</div>
                     <div className="text-sm">{container?.container_id}</div>
 
@@ -959,34 +959,45 @@ export default function GoodsReceivedContainerDetailsPage() {
 
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>LOCATION:</div>
                     <div className="text-sm">Primemade (on Google Maps)</div>
-                    {/* Instruction block placed beneath the LOCATION value; keep it within the left column to avoid layout overlap */}
                     <div className="mt-2 text-sm text-gray-700" style={{ maxWidth: '100%', lineHeight: 1.4 }}>
                       Get a car to Atomic Junction or Haatso. From there take an Agbogba car and drop at Ahmadiya.
                     </div>
                   </div>
                 </div>
 
-                {/* Right Side - compact two-column grid for label/value proximity */}
-                <div className="flex flex-col items-end space-y-2" style={{ justifySelf: 'end', textAlign: 'right', maxWidth: 320, width: '100%' }}>
-                  <h2 className="text-lg font-bold" style={{ maxWidth: '100%' }}>Invoice #{previewInvoiceData.invoiceNumber}</h2>
-                  <div className="grid" style={{ gridTemplateColumns: '110px 1fr', columnGap: '12px', rowGap: '6px', alignItems: 'center', justifyItems: 'start', width: '100%' }}>
-                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Date:</div>
-                    <div className="text-sm text-right">{new Date().toLocaleDateString()}</div>
+                {/* Right column (fixed width) */}
+                <div className="w-80 flex flex-col items-end space-y-2">
+                  <h2 className="text-lg font-semibold mb-1" style={{ margin: 0 }}>Invoice #{previewInvoiceData.invoiceNumber}</h2>
+                  <div className="w-full space-y-1">
+                    <div className="flex justify-between">
+                      <div className="text-sm font-semibold">Date:</div>
+                      <div className="text-sm text-right">{new Date().toLocaleDateString()}</div>
+                    </div>
 
-                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Total Amount:</div>
-                    <div className="text-lg font-bold text-green-600 text-right">GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="flex justify-between">
+                      <div className="text-sm font-semibold">Total Amount:</div>
+                      <div className="text-lg font-bold text-green-600 text-right">GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
 
-                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>MOMO:</div>
-                    <div className="text-sm text-right">MTN: 054 029 5187</div>
+                    <div className="flex justify-between">
+                      <div className="text-sm font-semibold">MOMO:</div>
+                      <div className="text-sm text-right">MTN: 054 029 5187</div>
+                    </div>
 
-                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>CODE:</div>
-                    <div className="text-sm text-right">*713*3971#</div>
+                    <div className="flex justify-between">
+                      <div className="text-sm font-semibold">CODE:</div>
+                      <div className="text-sm text-right">*713*3971#</div>
+                    </div>
 
-                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>BANK - UBA:</div>
-                    <div className="text-sm text-right">00115148103503</div>
+                    <div className="flex justify-between">
+                      <div className="text-sm font-semibold">BANK - UBA:</div>
+                      <div className="text-sm text-right">00115148103503</div>
+                    </div>
 
-                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>CBO HEAD OFFICE</div>
-                    <div className="text-sm">&nbsp;</div>
+                    <div className="flex justify-between">
+                      <div className="text-sm font-semibold">CBO HEAD OFFICE</div>
+                      <div className="text-sm">&nbsp;</div>
+                    </div>
                   </div>
                 </div>
               </div>
