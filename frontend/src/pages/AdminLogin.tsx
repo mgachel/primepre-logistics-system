@@ -72,7 +72,7 @@ export default function AdminLogin() {
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center mb-6">
-            <img src="/wavemova_copy.png" alt="Prime Pre Logo" className="w-40 h-auto mx-auto mb-4" /> 
+            <img src="/wavemova_copy.png" alt="Cephas cargo" className="w-40 h-auto mx-auto mb-4" /> 
           </div>
 
           <Card className="border-0 shadow-lg">

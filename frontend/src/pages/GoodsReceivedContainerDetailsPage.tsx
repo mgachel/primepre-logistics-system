@@ -267,7 +267,7 @@ export default function GoodsReceivedContainerDetailsPage() {
             resolve(false);
           };
           // Use the actual path from public folder
-          img.src = '/primepre-logo-1.png';
+          img.src = '/CCL_LOGO_TP.png';
         });
       };
       
@@ -319,63 +319,61 @@ export default function GoodsReceivedContainerDetailsPage() {
     pdf.setFont('helvetica', 'bold');
     pdf.text('LOCATION:', 14, yPos);
     pdf.setFont('helvetica', 'normal'); 
-  pdf.text('Cephas Cargo (on Google Maps)', 50, yPos);
-  // Instruction lines beneath the location
-  yPos += 6;
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('Get a car to Atomic Junction or Haatso', 50, yPos);
-  yPos += 6;
-  pdf.text('From there Agbogba car and drop at Ahmadiya', 50, yPos);
+    pdf.text('primemade (on Google Maps)', 50, yPos);
 
 
-    // Invoice details - Right side
+    // Invoice details - Right side (larger, spaced labels to match preview)
     yPos = startY + 20;
-    pdf.setFontSize(12);
+    pdf.setFontSize(20);
     pdf.setFont('helvetica', 'bold');
     pdf.text(`Invoice #${invoiceNumber}`, pageWidth - 14, yPos, { align: 'right' });
 
-  yPos += 8;
-    pdf.setFontSize(9);
+    yPos += 14;
+    const labelX = pageWidth - 120;
+    const valueRightX = pageWidth - 14;
+
+    // Date
+    pdf.setFontSize(11);
     pdf.setFont('helvetica', 'bold');
-  const labelX = pageWidth - 70;
-  const valueRightX = pageWidth - 14;
-  pdf.text('Date:', labelX, yPos);
+    pdf.text('Date:', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
-  pdf.text(new Date().toLocaleDateString(), valueRightX, yPos, { align: 'right' });
-    
-    yPos += 6;
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('Total Amount:', labelX, yPos);
-    pdf.setFont('helvetica', 'normal');
-  pdf.text(`GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueRightX, yPos, { align: 'right' });
+    pdf.text(new Date().toLocaleDateString(), valueRightX, yPos, { align: 'right' });
 
-    // Add new text rows for MOMO, CODE, and BANK UBA details (each on its own line)
+    // Total Amount
     yPos += 10;
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('MOMO:', labelX, yPos);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Total Amount:', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
-  pdf.text('MTN: 054 029 5187', valueRightX, yPos, { align: 'right' });
+    pdf.setTextColor(0, 120, 0);
+    pdf.text(`GHS ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueRightX, yPos, { align: 'right' });
+    pdf.setTextColor(0, 0, 0);
 
-    // Move down and place CODE between MOMO and BANK
-    yPos += 6;
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('CODE:', labelX, yPos);
+    // MOMO
+    yPos += 14;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('MOMO:', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
-  pdf.text('*713*3971#', valueRightX, yPos, { align: 'right' });
+    pdf.text('MTN: 054 029 5187', valueRightX, yPos, { align: 'right' });
 
-    // Move down to the BANK line
-    yPos += 6;
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('BANK - UBA:', labelX, yPos);
+    // CODE (between MOMO and BANK)
+    yPos += 8;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('CODE:', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
-  pdf.text('00115148103503', valueRightX, yPos, { align: 'right' });
+    pdf.text('*713*3971#', valueRightX, yPos, { align: 'right' });
 
-    yPos += 6;
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('CBO HEAD OFFICE', labelX, yPos);
+    // BANK
+    yPos += 10;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('BANK - UBA:', labelX, yPos);
     pdf.setFont('helvetica', 'normal');
-  pdf.text('', valueRightX, yPos, { align: 'right' });
+    pdf.text('00115148103503', valueRightX, yPos, { align: 'right' });
+
+    yPos += 10;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('CBO HEAD OFFICE', labelX, yPos);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('', valueRightX, yPos, { align: 'right' });
 
       // Prepare table data and headers based on container type
       let tableData: any[] = [];
@@ -780,20 +778,18 @@ export default function GoodsReceivedContainerDetailsPage() {
                     View
                   </Button>
                   
-                  {/* Download Invoice Button - Only when dollar rate is set */}
-                  {container?.dollar_rate && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePreviewInvoice(mark, items, totalAmount);
-                      }}
-                      className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
-                    >
-                      Download PDF
-                    </Button>
-                  )}
+                  {/* Download Invoice Button - show always (totalAmount will be 0 if rates not set) */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePreviewInvoice(mark, items, totalAmount);
+                    }}
+                    className="h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
+                  >
+                    Download PDF
+                  </Button>
                 </div>
               </div>
 
@@ -902,28 +898,33 @@ export default function GoodsReceivedContainerDetailsPage() {
       {/* Invoice Preview Dialog */}
       {showInvoicePreview && previewInvoiceData && (
         <Dialog open={showInvoicePreview} onOpenChange={setShowInvoicePreview}>
-    <DialogContent className="max-h-[90vh] overflow-y-auto" style={{ width: 'min(95vw, 900px)' }}>
-            <DialogHeader>
-              <div className="flex items-center justify-between">
+          {/* Reduced width and removed internal overflow so header/buttons remain visible */}
+          <DialogContent className="max-w-3xl w-full mx-4">
+            {/* Make header sticky so action button is always visible when content scrolls */}
+            <DialogHeader className="sticky top-0 z-20 bg-surface-50/80 backdrop-blur-sm">
+              <div className="flex items-center justify-between px-2 py-2">
                 <DialogTitle>Invoice Preview</DialogTitle>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleDownloadPDF}
-                  className="ml-4"
-                >
-                  Download PDF
-                </Button>
+                <div className="flex items-center">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleDownloadPDF}
+                    className="ml-4"
+                  >
+                    Download PDF
+                  </Button>
+                </div>
               </div>
             </DialogHeader>
-            
-            <div className="bg-white p-8 rounded-lg border">
+
+            {/* Keep the content area scrollable if it overflows the viewport */}
+            <div className="bg-white p-6 rounded-lg border max-h-[78vh] overflow-y-auto">
               {/* Logo */}
               <div className="flex justify-center mb-6">
                 <img 
-                  src="/primepre-logo-1.png" 
-                  alt="PrimePre Logo" 
-                  className="h-16 sm:h-20 w-auto object-contain"
+                  src="/prime_new_BLACK.png" 
+                  alt="primemade Logo" 
+                  className="h-20 w-auto object-contain"
                   onError={(e) => {
                     console.error('Logo failed to load in preview');
                     e.currentTarget.style.display = 'none';
@@ -936,68 +937,42 @@ export default function GoodsReceivedContainerDetailsPage() {
 
               {/* Header */}
               <div className="text-center mb-8">
-                <h1 className="text-xl sm:text-2xl font-bold mb-2">GOODS IN GHANA INVOICE</h1>
-                <h2 className="text-gray-600 text-sm sm:text-base">WE DO NOT ACCEPT CASH. ONLY MOMO OR BANK TRANSFER</h2>
+                <h1 className="text-2xl font-bold mb-2">GOODS IN GHANA INVOICE</h1>
+                <h2 className="text-gray-600 text-base font-medium">WE DO NOT ACCEPT CASH. ONLY MOMO OR BANK TRANSFER</h2>
               </div>
 
-              {/* Invoice Details: left flexible column + right fixed column (stable layout) */}
-              <div className="flex items-start justify-between mb-8 gap-6">
-                {/* Left column (flexible) */}
-                <div className="flex-1 pr-6">
-                  <div className="grid" style={{ gridTemplateColumns: 'max-content auto', columnGap: '8px', rowGap: '6px', alignItems: 'center', justifyItems: 'start' }}>
-                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Container:</div>
-                    <div className="text-sm">{container?.container_id}</div>
-
-                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Shipping Mark:</div>
-                    <div className="text-sm">{previewInvoiceData.shippingMark}</div>
-
-                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Container Type:</div>
-                    <div className="text-sm">{container?.container_type?.toUpperCase()}</div>
-
-                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>Offloading Date:</div>
-                    <div className="text-sm">{container?.arrival_date ? new Date(container.arrival_date).toLocaleDateString() : 'N/A'}</div>
-
-                    <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>LOCATION:</div>
-                    <div className="text-sm">Primemade (on Google Maps)</div>
-                    <div className="mt-2 text-sm text-gray-700" style={{ maxWidth: '100%', lineHeight: 1.4 }}>
-                      Get a car to Atomic Junction or Haatso. From there take an Agbogba car and drop at Ahmadiya.
-                    </div>
-                  </div>
+              {/* Invoice Details - three column layout: labels | values | invoice meta */}
+              <div className="mb-8" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 340px', gap: '24px', alignItems: 'start' }}>
+                {/* Left column: labels (right aligned) */}
+                <div style={{ textAlign: 'right' }}>
+                  <div className="text-2xl font-extrabold mb-4">Container ID:</div>
+                  <div className="text-2xl font-extrabold mb-4">Shipping Mark:</div>
+                  <div className="text-2xl font-extrabold mb-4">Container Type:</div>
+                  <div className="text-2xl font-extrabold mb-4">Offloading Date:</div>
+                  <div className="text-2xl font-extrabold mb-2">LOCATION:</div>
                 </div>
 
-                {/* Right column (fixed width) */}
-                <div className="w-72 flex flex-col items-end space-y-2">
-                  <h2 className="text-lg font-semibold mb-1" style={{ margin: 0 }}>Invoice #{previewInvoiceData.invoiceNumber}</h2>
-                  <div className="w-full space-y-1">
-                    <div className="flex justify-between">
-                      <div className="text-sm font-semibold">Date:</div>
-                      <div className="text-sm text-right">{new Date().toLocaleDateString()}</div>
-                    </div>
+                {/* Middle column: values */}
+                <div>
+                  <div className="text-2xl mb-4">{container?.container_id}</div>
+                  <div className="text-2xl mb-4">{previewInvoiceData.shippingMark}</div>
+                  <div className="text-2xl mb-4">{container?.container_type?.toUpperCase()}</div>
+                  <div className="text-2xl mb-4">{container?.arrival_date ? new Date(container.arrival_date).toLocaleDateString() : 'N/A'}</div>
+                  <div className="text-2xl mb-2">Primemade (on Google Maps)</div>
+                  <div className="mt-2 text-xl text-gray-700">Get a car to Atomic Junction or Haatso</div>
+                  <div className="text-xl text-gray-700">From there Agbogba car and drop at Ahmadiya</div>
+                </div>
 
-                    <div className="flex justify-between">
-                      <div className="text-sm font-semibold">Total Amount:</div>
-                      <div className="text-lg font-bold text-green-600 text-right">GH₵ {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <div className="text-sm font-semibold">MOMO:</div>
-                      <div className="text-sm text-right">MTN: 054 029 5187</div>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <div className="text-sm font-semibold">CODE:</div>
-                      <div className="text-sm text-right">*713*3971#</div>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <div className="text-sm font-semibold">BANK - UBA:</div>
-                      <div className="text-sm text-right">00115148103503</div>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <div className="text-sm font-semibold">CBO HEAD OFFICE</div>
-                      <div className="text-sm">&nbsp;</div>
-                    </div>
+                {/* Right column: invoice meta */}
+                <div style={{ width: 340 }}>
+                  <h2 className="text-4xl font-extrabold mb-4" style={{ textAlign: 'right' }}>Invoice #{previewInvoiceData.invoiceNumber}</h2>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="text-xl font-extrabold">Date: <span className="font-normal">{new Date().toLocaleDateString()}</span></div>
+                    <div className="text-xl font-extrabold mt-3">Total Amount: <span className="font-extrabold text-green-600">GHS {previewInvoiceData.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                    <div className="text-xl font-extrabold mt-4">MOMO: <span className="font-normal">MTN: 054 029 5187</span></div>
+                    <div className="text-xl font-extrabold mt-2">CODE: <span className="font-normal">*713*3971#</span></div>
+                    <div className="text-xl font-extrabold mt-2">BANK - UBA: <span className="font-normal">00115148103503</span></div>
+                    <div className="text-xl font-extrabold mt-4">CBO HEAD OFFICE</div>
                   </div>
                 </div>
               </div>

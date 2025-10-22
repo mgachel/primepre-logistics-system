@@ -451,6 +451,7 @@ export default function GoodsReceivedGhanaAir() {
             className="pl-10"
           />
         </div>
+        {/*
         <div className="flex items-center space-x-2">
           {["all", "pending", "processing", "ready_for_delivery", "delivered", "flagged"].map((s) => (
             <Button
@@ -475,6 +476,7 @@ export default function GoodsReceivedGhanaAir() {
             <RefreshCcw className="h-4 w-4 mr-1" /> Reset
           </Button>
         </div>
+        */}
       </div>
 
       {/* Main DataTable matching cargo structure */}
@@ -633,4 +635,4 @@ export default function GoodsReceivedGhanaAir() {
 
     </div>
   );
-}
+} 

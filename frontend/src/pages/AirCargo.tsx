@@ -430,6 +430,7 @@ export default function AirCargo() {
             className="pl-10"
           />
         </div>
+        {/*
         <div className="flex items-center space-x-2">
           {["all", "in-transit", "pending", "delivered"].map((s) => (
             <Button
@@ -456,6 +457,7 @@ export default function AirCargo() {
             <RefreshCcw className="h-4 w-4 mr-1" style={{ color: primaryColor }} /> Reset filters
           </Button>
         </div>
+        */}
       </div>
 
       {/* Cargo Table */}
