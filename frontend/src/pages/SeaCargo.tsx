@@ -479,6 +479,7 @@ export default function SeaCargo() {
             className="pl-9 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm"
           />
         </div>
+        {/*
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
           <Button
             variant={statusFilter === "all" ? "default" : "outline"}
@@ -529,6 +530,7 @@ export default function SeaCargo() {
             <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1" style={{ color: primaryColor }} /> Reset
           </Button>
         </div>
+        */}
       </div>
 
       {/* Cargo Table */}
