@@ -319,7 +319,7 @@ export default function GoodsReceivedContainerDetailsPage() {
     pdf.setFont('helvetica', 'bold');
     pdf.text('LOCATION:', 14, yPos);
     pdf.setFont('helvetica', 'normal'); 
-    pdf.text('Cephas Cargo (on Google Maps)', 50, yPos);
+    pdf.text('primemade (on Google Maps)', 50, yPos);
 
 
     // Invoice details - Right side
@@ -909,8 +909,8 @@ export default function GoodsReceivedContainerDetailsPage() {
               {/* Logo */}
               <div className="flex justify-center mb-6">
                 <img 
-                  src="/CCL_LOGO_TP.png" 
-                  alt="Cephas Cargo and Logistics Logo" 
+                  src="/primepre-logo-1.png" 
+                  alt="primemade Logistics Logo" 
                   className="h-20 w-auto object-contain"
                   onError={(e) => {
                     console.error('Logo failed to load in preview');
@@ -946,7 +946,7 @@ export default function GoodsReceivedContainerDetailsPage() {
                     <div className="text-sm">{container?.arrival_date ? new Date(container.arrival_date).toLocaleDateString() : 'N/A'}</div>
 
                     <div className="text-sm font-semibold" style={{ justifySelf: 'start' }}>LOCATION:</div>
-                    <div className="text-sm">Cephas Cargo (on Google Maps)</div>
+                    <div className="text-sm">primemade (on Google Maps)</div>
                   </div>
                 </div>
 
