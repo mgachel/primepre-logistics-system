@@ -106,6 +106,14 @@ export default function SeaCargo() {
   const [editContainer, setEditContainer] =
     useState<BackendCargoContainer | null>(null);
 
+  // Helper: sort containers by created_at ascending (oldest first)
+  const sortByCreatedAtAsc = (arr: BackendCargoContainer[] = []) =>
+    arr.slice().sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : Infinity;
+      const tb = b.created_at ? new Date(b.created_at).getTime() : Infinity;
+      return ta - tb;
+    });
+
   // Load containers and dashboard
   useEffect(() => {
     let ignore = false;
@@ -123,15 +131,19 @@ export default function SeaCargo() {
         // Use customer endpoints if user is a customer
         if (isCustomer) {
           const [listRes, dashRes] = await Promise.all([
+            // page_size isn't part of CargoFilters; use page/limit instead
             cargoService.getCustomerSeaCargoContainers({
               search: searchTerm || undefined,
               status: statusParam,
-              page_size: 100,
-            }),
+              page: 1,
+              limit: 100,
+            } as any),
             cargoService.getCustomerSeaCargoDashboard(),
           ]);
           if (!ignore) {
-            setContainers(Array.isArray(listRes?.results) ? listRes.results : []);
+            setContainers(
+              sortByCreatedAtAsc(Array.isArray(listRes?.results) ? listRes.results : [])
+            );
             setDashboard(dashRes || null);
           }
         } else {
@@ -145,7 +157,7 @@ export default function SeaCargo() {
             cargoService.getDashboard("sea"),
           ]);
           if (!ignore) {
-            setContainers(listRes.data?.results || []);
+            setContainers(sortByCreatedAtAsc(listRes.data?.results || []));
             setDashboard(dashRes.data || null);
           }
         }
@@ -174,14 +186,16 @@ export default function SeaCargo() {
       
       if (isCustomer) {
         const [listRes, dashRes] = await Promise.all([
+          // page_size is not part of CargoFilters type; pass as page param instead
           cargoService.getCustomerSeaCargoContainers({
             search: searchTerm || undefined,
             status: statusParam,
-            page_size: 100,
-          }),
+            page: 1,
+            limit: 100,
+          } as any),
           cargoService.getCustomerSeaCargoDashboard(),
         ]);
-        setContainers(Array.isArray(listRes?.results) ? listRes.results : []);
+        setContainers(sortByCreatedAtAsc(Array.isArray(listRes?.results) ? listRes.results : []));
         setDashboard(dashRes || null);
       } else {
         const [listRes, dashRes] = await Promise.all([
@@ -192,7 +206,7 @@ export default function SeaCargo() {
           }),
           cargoService.getDashboard("sea"),
         ]);
-        setContainers(listRes.data?.results || []);
+        setContainers(sortByCreatedAtAsc(listRes.data?.results || []));
         setDashboard(dashRes.data || null);
       }
     } catch (e: unknown) {
