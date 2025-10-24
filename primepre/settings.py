@@ -273,9 +273,14 @@ REST_FRAMEWORK = {
 }
 
 # JWT settings
+# Increase token lifetimes so users are not logged out frequently.
+# ACCESS_TOKEN_LIFETIME: how long an access token (short-lived) is valid before needing refresh.
+# REFRESH_TOKEN_LIFETIME: how long a refresh token can be used to obtain new access tokens.
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=600 if DEBUG else 1500),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    # In DEBUG keep a reasonably long access token for convenience; in production use multi-day access tokens
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=7) if not DEBUG else timedelta(days=7),
+    # Allow refresh tokens to be used for 30 days so users remain logged in across longer periods
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
@@ -298,8 +303,8 @@ SIMPLE_JWT = {
     'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
     
     'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
-    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=50),
-    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=3),
+    'SLIDING_TOKEN_LIFETIME': timedelta(hours=12),
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=30),
 }
 
 # CORS configuration
