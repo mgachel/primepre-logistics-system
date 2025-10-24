@@ -228,7 +228,8 @@ export default function AirCargo() {
     }
   };
 
-  const filteredCargo = useMemo(() => containers, [containers]);
+  // Always present containers sorted by creation time (oldest first)
+  const filteredCargo = useMemo(() => sortByCreatedAtAsc(containers), [containers]);
 
   // ✅ Table columns - Filter for customers
   const cols = useMemo(() => {

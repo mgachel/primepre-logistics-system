@@ -249,7 +249,8 @@ export default function SeaCargo() {
     }
   };
 
-  const filteredCargo = useMemo(() => containers, [containers]);
+  // Always present containers sorted by creation time (oldest first)
+  const filteredCargo = useMemo(() => sortByCreatedAtAsc(containers), [containers]);
 
   // Filter columns for customers - hide rate and clients columns
   const cols = useMemo(() => {
