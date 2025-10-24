@@ -93,6 +93,7 @@ export function ShippingMarkMappingDialog({
 }: ShippingMarkMappingDialogProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [resolvedMappings, setResolvedMappings] = useState<ResolvedMapping[]>([]);
+  const [processedIds, setProcessedIds] = useState<string[]>([]);
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [newCustomerData, setNewCustomerData] = useState({
     username: '',
@@ -114,7 +115,7 @@ export function ShippingMarkMappingDialog({
   const { toast } = useToast();
 
   const currentItem = unmatchedItems[currentIndex];
-  const isLastItem = currentIndex === unmatchedItems.length - 1;
+  // processedIds tracks which unmatched rows we've already resolved (supports bulk grouping)
   const suggestions = useMemo(
     () => currentItem?.suggestions ?? [],
     [currentItem]
@@ -229,21 +230,27 @@ export function ShippingMarkMappingDialog({
     if (!currentItem) {
       return;
     }
-
     setSelectedCustomer(customer);
     setCustomerSearchTerm(customer.shipping_mark || '');
-    const mapping: ResolvedMapping = {
-      unmatched_item_id: `row_${currentItem.candidate.source_row_number}`,
+
+    // Find all unmatched items with the same normalized shipping mark
+    const mark = currentItem.candidate.shipping_mark_normalized;
+  const sameItems = unmatchedItems.filter(u => u.candidate.shipping_mark_normalized === mark);
+
+    const newMappings: ResolvedMapping[] = sameItems.map(si => ({
+      unmatched_item_id: `row_${si.candidate.source_row_number}`,
       action: 'map_existing',
       customer_id: customer.id,
-      candidate: currentItem.candidate,
-    };
+      candidate: si.candidate,
+    }));
 
     setResolvedMappings(prev => {
-      const next = [
-        ...prev.filter(m => m.unmatched_item_id !== mapping.unmatched_item_id),
-        mapping
-      ];
+      // remove any existing mappings for these ids and add the new ones
+      const existingFiltered = prev.filter(m => !newMappings.some(nm => nm.unmatched_item_id === m.unmatched_item_id));
+      const next = [...existingFiltered, ...newMappings];
+      // mark processed ids
+      const ids = newMappings.map(nm => nm.unmatched_item_id);
+      setProcessedIds(prevIds => Array.from(new Set([...prevIds, ...ids])));
       proceedToNext(next);
       return next;
     });
@@ -260,19 +267,24 @@ export function ShippingMarkMappingDialog({
       });
       return;
     }
+    // Find all unmatched items with the same normalized shipping mark and apply the same new-customer mapping
+    const mark = currentItem.candidate.shipping_mark_normalized;
+  const sameItems = unmatchedItems.filter(u => u.candidate.shipping_mark_normalized === mark);
 
-    const mapping: ResolvedMapping = {
-      unmatched_item_id: `row_${currentItem.candidate.source_row_number}`,
+    const payload = { ...newCustomerData };
+
+    const newMappings: ResolvedMapping[] = sameItems.map(si => ({
+      unmatched_item_id: `row_${si.candidate.source_row_number}`,
       action: 'create_new',
-      new_customer_data: { ...newCustomerData },
-      candidate: currentItem.candidate,
-    };
+      new_customer_data: { ...payload },
+      candidate: si.candidate,
+    }));
 
     setResolvedMappings(prev => {
-      const next = [
-        ...prev.filter(m => m.unmatched_item_id !== mapping.unmatched_item_id),
-        mapping
-      ];
+      const existingFiltered = prev.filter(m => !newMappings.some(nm => nm.unmatched_item_id === m.unmatched_item_id));
+      const next = [...existingFiltered, ...newMappings];
+      const ids = newMappings.map(nm => nm.unmatched_item_id);
+      setProcessedIds(prevIds => Array.from(new Set([...prevIds, ...ids])));
       proceedToNext(next);
       return next;
     });
@@ -291,17 +303,21 @@ export function ShippingMarkMappingDialog({
   };
 
   const resolveAsSkip = () => {
-    const mapping: ResolvedMapping = {
-      unmatched_item_id: `row_${currentItem.candidate.source_row_number}`,
+    // Apply skip to all items with same normalized mark
+    const mark = currentItem.candidate.shipping_mark_normalized;
+  const sameItems = unmatchedItems.filter(u => u.candidate.shipping_mark_normalized === mark);
+
+    const newMappings: ResolvedMapping[] = sameItems.map(si => ({
+      unmatched_item_id: `row_${si.candidate.source_row_number}`,
       action: 'skip',
-      candidate: currentItem.candidate,
-    };
+      candidate: si.candidate,
+    }));
 
     setResolvedMappings(prev => {
-      const next = [
-        ...prev.filter(m => m.unmatched_item_id !== mapping.unmatched_item_id),
-        mapping
-      ];
+      const existingFiltered = prev.filter(m => !newMappings.some(nm => nm.unmatched_item_id === m.unmatched_item_id));
+      const next = [...existingFiltered, ...newMappings];
+      const ids = newMappings.map(nm => nm.unmatched_item_id);
+      setProcessedIds(prevIds => Array.from(new Set([...prevIds, ...ids])));
       proceedToNext(next);
       return next;
     });
@@ -311,16 +327,33 @@ export function ShippingMarkMappingDialog({
 
   const proceedToNext = (nextMappings?: ResolvedMapping[]) => {
     const mappingsToUse = nextMappings ?? resolvedMappings;
-    if (isLastItem) {
+    // If all items have been processed or there are no unprocessed items left, finish
+    const total = unmatchedItems.length;
+    const processedSet = new Set(processedIds);
+    // Include any ids from mappingsToUse
+    mappingsToUse.forEach(m => processedSet.add(m.unmatched_item_id));
+
+    if (processedSet.size >= total) {
       onMappingComplete(mappingsToUse);
-    } else {
-      setCurrentIndex(prev => prev + 1);
-      setShowNewCustomerForm(false);
-      setCustomerSearchTerm('');
-      setCustomerSearchResults([]);
-      setCustomerSearchOpen(false);
-      setSelectedCustomer(null);
+      return;
     }
+
+    // Find next index that is not yet processed
+    let nextIndex = 0;
+    for (let i = 0; i < unmatchedItems.length; i++) {
+      const id = `row_${unmatchedItems[i].candidate.source_row_number}`;
+      if (!processedSet.has(id)) {
+        nextIndex = i;
+        break;
+      }
+    }
+
+    setCurrentIndex(nextIndex);
+    setShowNewCustomerForm(false);
+    setCustomerSearchTerm('');
+    setCustomerSearchResults([]);
+    setCustomerSearchOpen(false);
+    setSelectedCustomer(null);
   };
 
   const goToPrevious = () => {
