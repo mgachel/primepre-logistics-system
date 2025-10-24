@@ -284,7 +284,9 @@ def process_excel_upload(container_id: str, candidates: List[Dict[str, Any]]) ->
     matcher = ShippingMarkMatcher(container_id)
     match_results = matcher.match_candidates(candidates)
     
-    # Add similarity suggestions for unmatched items
+    # Add similarity suggestions for unmatched items (flat) and also
+    # group unmatched items by their normalized shipping mark so the
+    # frontend/UI can present groups for bulk resolution.
     unmatched_with_suggestions = []
     for unmatched_item in match_results['unmatched_items']:
         suggestions = matcher.suggest_similar_customers(
@@ -294,12 +296,41 @@ def process_excel_upload(container_id: str, candidates: List[Dict[str, Any]]) ->
             'candidate': unmatched_item,
             'suggestions': suggestions
         })
-    
+
+    # Group unmatched items by normalized shipping mark
+    groups: Dict[str, Dict[str, Any]] = {}
+    for uw in unmatched_with_suggestions:
+        candidate = uw['candidate']
+        key = candidate.get('shipping_mark_normalized') or candidate.get('shipping_mark') or ''
+
+        if key not in groups:
+            # Use a human-friendly display mark from the first candidate
+            display_mark = candidate.get('shipping_mark') or key
+            groups[key] = {
+                'shipping_mark_normalized': key,
+                'display_mark': display_mark,
+                'count': 0,
+                'candidates': [],
+                # Compute suggestions once per group (could be empty list)
+                'suggestions': matcher.suggest_similar_customers(key)
+            }
+
+        groups[key]['candidates'].append(candidate)
+        groups[key]['count'] += 1
+
+    # Convert groups dict to list sorted by descending count (largest groups first)
+    grouped_unmatched = sorted(groups.values(), key=lambda g: g['count'], reverse=True)
+
+    # Extend statistics to include grouped unmatched info (non-breaking)
+    stats = dict(match_results['statistics']) if match_results.get('statistics') else {}
+    stats['grouped_unmatched_count'] = len(grouped_unmatched)
+
     return {
         'matched_items': match_results['matched_items'],
+        # Flat list (backwards compatible) - each item has 'candidate' and 'suggestions'
         'unmatched_items': unmatched_with_suggestions,
-        # Duplicate tracking numbers are permitted; return empty list for
-        # backward compatibility with callers that expect this key.
+        # Grouped unmatched items for bulk resolution in the UI
+        'unmatched_groups': grouped_unmatched,
         'duplicate_tracking_numbers': [],
-        'statistics': match_results['statistics']
+        'statistics': stats
     }

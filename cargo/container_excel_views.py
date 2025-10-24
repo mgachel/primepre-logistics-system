@@ -23,6 +23,7 @@ from .shipping_mark_matcher import process_excel_upload
 from users.customer_excel_utils import create_customer_from_data
 from excel_config import validate_file_size, validate_row_count, get_batch_size
 import logging
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 CustomerUser = get_user_model()
@@ -199,10 +200,85 @@ class ContainerExcelUploadView(APIView):
     
     def _store_unmatched_items(self, upload_id: str, unmatched_items: list):
         """Store unmatched items temporarily for later resolution"""
-        from django.core.cache import cache
-        
         # Store for 1 hour
         cache.set(f"unmatched_items_{upload_id}", unmatched_items, 3600)
+
+
+class UnmatchedGroupResolveSerializer(serializers.Serializer):
+    """Serializer for expanding a group-level resolution into per-candidate mappings"""
+    upload_id = serializers.CharField(help_text="Upload session id returned by the upload endpoint")
+    shipping_mark_normalized = serializers.CharField(help_text="Normalized shipping mark (group key)")
+    action = serializers.ChoiceField(choices=['map_existing', 'create_new', 'skip'])
+    customer_id = serializers.IntegerField(required=False)
+    new_customer_data = serializers.DictField(required=False)
+
+    def validate(self, data):
+        action = data.get('action')
+        if action == 'map_existing' and not data.get('customer_id'):
+            raise serializers.ValidationError({'customer_id': 'Required when action is map_existing'})
+        if action == 'create_new' and not data.get('new_customer_data'):
+            raise serializers.ValidationError({'new_customer_data': 'Required when action is create_new'})
+        return data
+
+
+class ExpandUnmatchedGroupView(APIView):
+    """Expand a grouped unmatched shipping mark into per-candidate resolved mappings.
+
+    This endpoint does NOT create cargo items. It returns an expanded `resolved_mappings`
+    list which can then be submitted to `ContainerItemsCreateView` to persist items.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = UnmatchedGroupResolveSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        upload_id = serializer.validated_data['upload_id']
+        key = serializer.validated_data['shipping_mark_normalized']
+        action = serializer.validated_data['action']
+        customer_id = serializer.validated_data.get('customer_id')
+        new_customer_data = serializer.validated_data.get('new_customer_data')
+
+        cached = cache.get(f"unmatched_items_{upload_id}")
+        if not cached:
+            return Response({'success': False, 'error': 'No unmatched items found for this upload_id (expired or invalid).'}, status=status.HTTP_404_NOT_FOUND)
+
+        # cached is expected to be a list of {'candidate': {...}, 'suggestions': [...]}
+        group_candidates = []
+        for item in cached:
+            candidate = item.get('candidate')
+            if not candidate:
+                continue
+            if (candidate.get('shipping_mark_normalized') or candidate.get('shipping_mark') or '') == key:
+                group_candidates.append(candidate)
+
+        if not group_candidates:
+            return Response({'success': False, 'error': 'No candidates found for the provided shipping_mark_normalized'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Build resolved mappings for each candidate
+        resolved_mappings = []
+        for candidate in group_candidates:
+            mapping = {
+                'candidate': candidate,
+                'action': action
+            }
+            if action == 'map_existing':
+                mapping['customer_id'] = customer_id
+            elif action == 'create_new':
+                # Ensure shipping mark is present in new customer data
+                payload = dict(new_customer_data)
+                if candidate.get('shipping_mark_normalized') and not payload.get('shipping_mark'):
+                    payload['shipping_mark'] = candidate['shipping_mark_normalized']
+                mapping['new_customer_data'] = payload
+
+            resolved_mappings.append(mapping)
+
+        return Response({
+            'success': True,
+            'count': len(resolved_mappings),
+            'resolved_mappings': resolved_mappings
+        }, status=status.HTTP_200_OK)
 
 
 class ContainerItemsCreateView(APIView):

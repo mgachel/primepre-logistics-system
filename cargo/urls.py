@@ -3,7 +3,12 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .customer_shipments_views import CustomerShipmentsView, CustomerShipmentStatsView, customer_shipment_tracking
 from .excel_upload_views import ExcelUploadView, ExcelTemplateView, ContainerExcelUploadView, ContainerExcelTemplateView
-from .container_excel_views import ContainerExcelUploadView as NewContainerExcelUploadView, ContainerItemsCreateView, CustomerSearchView
+from .container_excel_views import (
+    ContainerExcelUploadView as NewContainerExcelUploadView,
+    ContainerItemsCreateView,
+    CustomerSearchView,
+    ExpandUnmatchedGroupView,
+)
 
 # Create router for ViewSets (Admin/Staff)
 router = DefaultRouter()
@@ -48,6 +53,7 @@ urlpatterns = [
     # Container-specific excel upload endpoints (NEW)
     path('containers/<str:container_id>/excel/upload-new/', NewContainerExcelUploadView.as_view(), name='container-excel-upload-new'),
     path('containers/items/create/', ContainerItemsCreateView.as_view(), name='container-items-create'),
+    path('containers/unmatched-group/expand/', ExpandUnmatchedGroupView.as_view(), name='expand-unmatched-group'),
     
     # Container-specific excel upload endpoints (EXISTING)
     path('containers/<str:container_id>/excel/upload/', ContainerExcelUploadView.as_view(), name='container-excel-upload'),

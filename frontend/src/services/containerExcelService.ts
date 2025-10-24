@@ -25,6 +25,14 @@ export interface ContainerExcelUploadResponse {
         similarity_score?: number;
       }>;
     }>;
+      // Groups of unmatched items (added server-side) for bulk resolution
+      unmatched_groups?: Array<{
+        shipping_mark_normalized: string;
+        display_mark: string;
+        count: number;
+        candidates: any[];
+        suggestions?: any[];
+      }>;
     duplicate_tracking_numbers: Array<{
       candidate: any;
       reason: string;
@@ -113,6 +121,26 @@ class ContainerExcelService {
     } else {
       throw new Error(response.message || 'Failed to create items');
     }
+  }
+
+  async expandUnmatchedGroup(
+    uploadId: string,
+    shippingMarkNormalized: string,
+    action: 'map_existing' | 'create_new' | 'skip',
+    payload: { customer_id?: number; new_customer_data?: any } = {}
+  ): Promise<{ success: boolean; count: number; resolved_mappings: any[] }> {
+    const body: any = {
+      upload_id: uploadId,
+      shipping_mark_normalized: shippingMarkNormalized,
+      action,
+      ...payload,
+    };
+
+    const response = await apiClient.post('/api/cargo/containers/unmatched-group/expand/', body);
+    if (response.success && response.data) {
+      return response.data as { success: boolean; count: number; resolved_mappings: any[] };
+    }
+    throw new Error(response.message || 'Failed to expand unmatched group');
   }
 
   async searchCustomers(query: string, limit: number = 20, page: number = 1): Promise<CustomerSearchResponse> {

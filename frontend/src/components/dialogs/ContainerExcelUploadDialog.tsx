@@ -26,6 +26,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { containerExcelService, ContainerExcelUploadResponse } from '@/services/containerExcelService';
 import { ShippingMarkMappingDialog } from './ShippingMarkMappingDialog';
+import { UnmatchedGroupsDialog } from './UnmatchedGroupsDialog';
 
 interface ContainerExcelUploadDialogProps {
   open: boolean;
@@ -49,6 +50,7 @@ export function ContainerExcelUploadDialog({
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMappingDialog, setShowMappingDialog] = useState(false);
+  const [showGroupsDialog, setShowGroupsDialog] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -172,6 +174,12 @@ export function ContainerExcelUploadDialog({
 
   const handleResolveUnmatched = () => {
     if (!uploadResults) return;
+    // If backend returned grouped unmatched items, open the groups dialog first
+    const groups = uploadResults.matching_results?.unmatched_groups;
+    if (groups && groups.length > 0) {
+      setShowGroupsDialog(true);
+      return;
+    }
     setShowMappingDialog(true);
   };
 
@@ -470,6 +478,24 @@ export function ContainerExcelUploadDialog({
           onOpenChange={setShowMappingDialog}
           unmatchedItems={uploadResults.matching_results.unmatched_items || []}
           onMappingComplete={handleMappingComplete}
+        />
+      )}
+
+      {uploadResults && uploadResults.matching_results && (
+        <UnmatchedGroupsDialog
+          open={showGroupsDialog}
+          onOpenChange={setShowGroupsDialog}
+          uploadId={uploadResults.upload_id}
+          unmatchedGroups={uploadResults.matching_results.unmatched_groups || []}
+          matchedItems={uploadResults.matching_results.matched_items || []}
+          containerId={containerId}
+          onComplete={() => {
+            // After bulk create, close dialog and finish
+            setShowGroupsDialog(false);
+            onUploadComplete?.(uploadResults);
+            onOpenChange(false);
+            resetState();
+          }}
         />
       )}
     </>
