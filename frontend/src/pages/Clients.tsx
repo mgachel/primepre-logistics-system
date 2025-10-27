@@ -635,19 +635,19 @@ export default function Clients() {
                   
                   if (
                     !confirm(
-                      `Reset password for ${clientName}?\n\nThe password will be reset to: PrimeMade`
+                      `Reset password for ${clientName}?\n\nThe password will be reset to: PrimeMade1`
                     )
                   )
                     return;
 
                   try {
                     await adminService.resetUserPassword(row._raw.id, {
-                      new_password: "PrimeMade",
+                      new_password: "PrimeMade1",
                     });
                     
                     toast({
                       title: "Password Reset",
-                      description: `Password for ${clientName} has been reset to "PrimeMade"`,
+                      description: `Password for ${clientName} has been reset to "PrimeMade1"`,
                     });
                   } catch (e: unknown) {
                     toast({
@@ -663,6 +663,35 @@ export default function Clients() {
               >
                 <KeyRound className="h-4 w-4 mr-2" />
                 Reset Password
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={async () => {
+                  const clientName = row._raw.full_name || row._raw.email || `Client #${row._raw.id}`;
+
+                  if (!confirm(`Delete account for ${clientName}? This will remove the user from the system permanently.`)) return;
+
+                  try {
+                    await adminService.deleteAdminUser(row._raw.id);
+
+                    toast({
+                      title: "Client Deleted",
+                      description: `${clientName} has been removed from the system.`,
+                    });
+
+                    // Refresh list by re-fetching current page
+                    loadClients();
+                  } catch (e: unknown) {
+                    toast({
+                      title: "Delete Failed",
+                      description: e instanceof Error ? e.message : "Unable to delete user",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Client
               </DropdownMenuItem>
             </>
           )}

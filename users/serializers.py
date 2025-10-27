@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from .models import CustomerUser
+from django.conf import settings
 
 class RegisterSerializer(serializers.ModelSerializer):
     confirm_password = serializers.CharField(write_only=True)
@@ -57,7 +58,7 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         model = CustomerUser
         fields = [
             'first_name', 'last_name', 'company_name', 'email', 'phone', 
-            'region', 'user_role', 'user_type', 'accessible_warehouses',
+            'region', 'shipping_mark', 'user_role', 'user_type', 'accessible_warehouses',
             'can_create_users', 'can_manage_inventory', 'can_view_analytics',
             'can_manage_admins', 'password', 'confirm_password'
         ]
@@ -70,14 +71,17 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         # Validate role permissions
         requesting_user = self.context['request'].user
         requested_role = data.get('user_role', 'CUSTOMER')
-        
-        if not requesting_user.can_create_admin_user():
+        # Allow admins to create CUSTOMER users without requiring full admin-create permission.
+        # Only enforce can_create_admin_user() when creating admin/staff roles (ADMIN, MANAGER, SUPER_ADMIN, STAFF).
+        admin_roles = ['ADMIN', 'MANAGER', 'SUPER_ADMIN', 'STAFF']
+        if requested_role in admin_roles and not requesting_user.can_create_admin_user():
             raise serializers.ValidationError("You don't have permission to create admin users.")
-        
-        # Super admins can create anyone, managers can create admins and below
+
+        # Super admins can create anyone. Managers cannot create Super Admins.
         if requesting_user.user_role == 'MANAGER' and requested_role == 'SUPER_ADMIN':
             raise serializers.ValidationError("Managers cannot create Super Admins.")
-        
+
+        # Admins cannot create Managers or Super Admins unless they have explicit permission
         if requesting_user.user_role == 'ADMIN' and requested_role in ['SUPER_ADMIN', 'MANAGER']:
             raise serializers.ValidationError("Admins cannot create Managers or Super Admins.")
         
@@ -85,6 +89,13 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
     
     def validate_password(self, value):
         validate_password(value)
+        return value
+
+    def validate_shipping_mark(self, value):
+        """Validate shipping mark uniqueness for creation."""
+        # Ensure shipping mark is not already taken
+        if CustomerUser.objects.filter(shipping_mark=value).exists():
+            raise serializers.ValidationError("This shipping mark is already in use.")
         return value
     
     def create(self, validated_data):
@@ -95,11 +106,11 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         if validated_data.get('user_role') in ['ADMIN', 'STAFF', 'MANAGER', 'SUPER_ADMIN']:
             validated_data['is_verified'] = True
         
-        # Auto-verify customers created by admin and set default password to "PrimeMade"
+        # Auto-verify customers created by admin and set default password
         elif validated_data.get('user_role') == 'CUSTOMER':
             validated_data['is_verified'] = True
-            # Set password to "PrimeMade" if not provided or if provided, override it
-            validated_data['password'] = 'PrimeMade'
+            # Set password to configured default if not provided or override it
+            validated_data['password'] = getattr(settings, 'DEFAULT_USER_PASSWORD', 'PrimeMade1')
             
         return CustomerUser.objects.create_user(**validated_data)
 

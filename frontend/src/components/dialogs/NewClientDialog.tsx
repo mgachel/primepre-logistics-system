@@ -27,6 +27,7 @@ interface NewClientDialogProps {
 export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const { user: currentUser } = useAuthStore();
   const [formData, setFormData] = useState<{
     first_name: string;
     last_name: string;
@@ -56,9 +57,11 @@ export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDial
       user_type: 'INDIVIDUAL',
       user_role: 'CUSTOMER',
       is_active: true,
-      is_verified: false,
-      password: "",
-      confirm_password: "",
+  // If the current user is an admin, default to verified and a known default password
+  is_verified: currentUser?.is_admin_user ? true : false,
+  // Use a default password that meets backend validators (uppercase, number, special char, min length)
+  password: currentUser?.is_admin_user ? "PrimeMade1" : "",
+  confirm_password: currentUser?.is_admin_user ? "PrimeMade1" : "",
       notes: "",
     }
   );
@@ -73,39 +76,104 @@ export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDial
 
   setLoading(true);
   try {
-      // Prepare payload for API
-      const payload: CreateClientRequest = {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        company_name: formData.company_name,
-        email: formData.email,
-        phone: formData.phone,
-        region: formData.region,
-        user_type: formData.user_type,
-        password: formData.password,
-        confirm_password: formData.confirm_password,
-      };
-
-      // include additional fields (shipping_mark, user_role, is_active, is_verified)
-      const extendedPayload = {
-        ...payload,
-        shipping_mark: formData.shipping_mark,
-        user_role: formData.user_role,
-        is_active: formData.is_active,
-        is_verified: formData.is_verified,
-      };
-
-      // Choose service depending on whether current user is an admin
-      const currentUser = useAuthStore.getState().user;
-      let res;
-      if (currentUser?.is_admin_user) {
-        // Admins use the admin create endpoint
-        res = await adminService.createAdminUser(extendedPayload as any);
-      } else {
-        res = await clientService.createClient(extendedPayload as any);
+      // Basic client-side normalization & validation
+      const firstName = (formData.first_name || "").trim();
+      const lastName = (formData.last_name || "").trim();
+  // Preserve the exact shipping mark the admin typed. Do not alter casing or internal spacing.
+  const shippingMarkRaw = formData.shipping_mark || "";
+      const phoneRaw = (formData.phone || "").trim();
+      const phoneDigits = phoneRaw.replace(/[^0-9]/g, "");
+      if (phoneDigits.length < 10) {
+        toast({ title: 'Invalid phone', description: 'Please enter a valid phone number with at least 10 digits', variant: 'destructive' });
+        setLoading(false);
+        return;
       }
 
-      toast({ title: "Client Created", description: `New client ${payload.first_name} ${payload.last_name} has been added successfully.` });
+      // If password fields are empty (for example the form hides them for admins or auth isn't loaded),
+      // always fall back to a secure default so the backend does not receive blank values.
+      const defaultAdminPassword = "PrimeMade1";
+      const passwordToSend = (formData.password && formData.password.length > 0)
+        ? formData.password
+        : defaultAdminPassword;
+      const confirmToSend = (formData.confirm_password && formData.confirm_password.length > 0)
+        ? formData.confirm_password
+        : defaultAdminPassword;
+
+      // Prepare payload for API
+      // Ensure required registration fields are present even for the simplified admin form
+      const payload: CreateClientRequest = {
+  first_name: firstName,
+  last_name: lastName,
+        company_name: formData.company_name,
+        email: formData.email,
+  phone: phoneRaw,
+        // Register endpoint requires region and user_type; provide sensible defaults if empty
+        region: formData.region || "GREATER_ACCRA",
+        user_type: (formData.user_type as 'INDIVIDUAL' | 'BUSINESS') || 'INDIVIDUAL',
+        password: passwordToSend,
+        confirm_password: confirmToSend,
+      };
+
+      // We will set admin-only fields (shipping_mark, user_role, is_verified, is_active)
+      // in a follow-up PATCH after successful registration.
+
+  // Use the client registration endpoint to create customers.
+  // Send only the fields accepted by RegisterSerializer to avoid validation errors
+  // caused by unexpected fields. We'll set admin-only fields with a follow-up PATCH.
+      console.debug('Register payload', payload);
+
+      let res;
+      // If the current user is admin, use admin create endpoint which can create customers
+      // and will auto-verify them. Provide admin serializer fields with sensible defaults.
+      if (currentUser?.is_admin_user) {
+        const adminPayload = {
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+          company_name: payload.company_name,
+          email: payload.email,
+          phone: payload.phone,
+          region: payload.region,
+          // Send the raw value so the backend stores exactly what the admin entered
+          shipping_mark: shippingMarkRaw,
+          user_role: 'CUSTOMER',
+          user_type: payload.user_type || 'INDIVIDUAL',
+          accessible_warehouses: [],
+          can_create_users: false,
+          can_manage_inventory: false,
+          can_view_analytics: false,
+          can_manage_admins: false,
+          password: payload.password,
+          confirm_password: payload.confirm_password,
+        };
+
+        console.debug('Admin create payload', adminPayload);
+        res = await adminService.createAdminUser(adminPayload as any);
+      } else {
+        res = await clientService.createClient(payload as any);
+      }
+
+      // If admin provided a shipping_mark (and the register endpoint doesn't accept it),
+      // update the created user via the admin PATCH endpoint so the shipping_mark is stored
+      // and the user is marked verified immediately.
+      try {
+        const createdUser = (res as any)?.data?.user || (res as any)?.data;
+        const createdId = createdUser?.id;
+        if (createdId && formData.shipping_mark) {
+          await adminService.updateClient(createdId, {
+            // Use the raw shipping mark for the update as well
+            shipping_mark: shippingMarkRaw,
+            is_verified: true,
+            user_role: formData.user_role,
+            is_active: formData.is_active,
+          } as any);
+        }
+      } catch (updateErr) {
+        // Non-fatal: show a toast but don't fail the whole flow
+        console.warn('Failed to set shipping_mark via admin update', updateErr);
+        toast({ title: 'Partial Success', description: 'Client created but failed to set shipping mark automatically.', variant: 'warning' });
+      }
+
+  toast({ title: "Client Created", description: `New client ${payload.first_name} ${payload.last_name} has been added successfully.` });
 
       // Reset form
       setFormData({
@@ -128,30 +196,39 @@ export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDial
 
       onOpenChange(false);
 
-      if ((res as unknown as { data?: unknown })?.data && typeof onCreated === 'function') {
-        onCreated((res as unknown as { data: unknown }).data);
+      // Always call onCreated so parent refreshes its list even if the response shape is unexpected
+      try {
+        if (typeof onCreated === 'function') onCreated((res as any)?.data || null);
+      } catch (e) {
+        console.warn('onCreated callback failed', e);
       }
     } catch (error: unknown) {
+      // Log full error to console for debugging
       console.error('CreateClient failed', error);
 
-      // Extract detailed error message similar to EditClientDialog
+      // Try to extract response body if available
       let errorMessage = 'Failed to create client';
-      if ((error as any)?.response?.data) {
-        const errorData = (error as any).response.data;
-        if (typeof errorData === 'object' && !errorData.message) {
-          const fieldErrors = Object.entries(errorData)
-            .map(([field, errors]) => {
-              const errorArray = Array.isArray(errors) ? errors : [errors];
-              return `${field}: ${errorArray.join(', ')}`;
-            })
-            .join('; ');
-          errorMessage = fieldErrors || errorMessage;
-        } else {
-          errorMessage = errorData.message || errorData.error || errorData.detail || errorMessage;
+      const respData = (error as any)?.response?.data;
+      if (respData) {
+        try {
+          if (typeof respData === 'object') {
+            // Build readable field: errors
+            const fieldErrors = Object.entries(respData)
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+              .join('; ');
+            errorMessage = fieldErrors || JSON.stringify(respData);
+          } else {
+            errorMessage = String(respData);
+          }
+        } catch (e) {
+          errorMessage = JSON.stringify(respData);
         }
-      } else if ((error as any).message) {
+      } else if ((error as any)?.message) {
         errorMessage = (error as any).message;
       }
+
+      // Also show raw response in console to help debugging
+      if ((error as any)?.response) console.debug('Register response', (error as any).response);
 
       toast({ title: 'Create Failed', description: errorMessage, variant: 'destructive' });
     } finally {
@@ -170,140 +247,32 @@ export function NewClientDialog({ open, onOpenChange, onCreated }: NewClientDial
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Simplified form (admin-only UI): show only the requested fields */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Personal Information</h3>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="first_name">First Name <span className="text-destructive">*</span></Label>
-                <Input id="first_name" value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} required />
-              </div>
-              <div>
-                <Label htmlFor="last_name">Last Name <span className="text-destructive">*</span></Label>
-                <Input id="last_name" value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} required />
-              </div>
-              <div>
-                <Label htmlFor="nickname">Nickname</Label>
-                <Input id="nickname" value={formData.nickname} onChange={(e) => setFormData({...formData, nickname: e.target.value})} placeholder="Optional display name" />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Contact Information</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="phone">Phone <span className="text-destructive">*</span></Label>
-                <Input id="phone" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+233 XX XXX XXXX" required />
-              </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="client@example.com" />
-              </div>
+            <div>
+              <Label htmlFor="first_name">First Name <span className="text-destructive">*</span></Label>
+              <Input id="first_name" value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} required />
             </div>
             <div>
-              <Label htmlFor="region">Region <span className="text-destructive">*</span></Label>
-              <Select value={formData.region} onValueChange={(value) => setFormData({...formData, region: value})}>
-                <SelectTrigger id="region"><SelectValue placeholder="Select region"/></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GREATER_ACCRA">Greater Accra</SelectItem>
-                  <SelectItem value="ASHANTI">Ashanti</SelectItem>
-                  <SelectItem value="WESTERN">Western</SelectItem>
-                  <SelectItem value="EASTERN">Eastern</SelectItem>
-                  <SelectItem value="CENTRAL">Central</SelectItem>
-                  <SelectItem value="NORTHERN">Northern</SelectItem>
-                  <SelectItem value="UPPER_EAST">Upper East</SelectItem>
-                  <SelectItem value="UPPER_WEST">Upper West</SelectItem>
-                  <SelectItem value="VOLTA">Volta</SelectItem>
-                  <SelectItem value="BONO">Bono</SelectItem>
-                  <SelectItem value="BONO_EAST">Bono East</SelectItem>
-                  <SelectItem value="AHAFO">Ahafo</SelectItem>
-                  <SelectItem value="BRONG_AHAFO">Brong Ahafo</SelectItem>
-                  <SelectItem value="SAVANNAH">Savannah</SelectItem>
-                  <SelectItem value="NORTH_EAST">North East</SelectItem>
-                  <SelectItem value="OTI">Oti</SelectItem>
-                  <SelectItem value="WESTERN_NORTH">Western North</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Business Information</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="company_name">Company Name</Label>
-                <Input id="company_name" value={formData.company_name} onChange={(e) => setFormData({...formData, company_name: e.target.value})} placeholder="Optional" />
-              </div>
-              <div>
-                <Label htmlFor="shipping_mark">Shipping Mark <span className="text-destructive">*</span></Label>
-                <Input id="shipping_mark" value={formData.shipping_mark} onChange={(e) => setFormData({...formData, shipping_mark: e.target.value})} required className="font-mono uppercase" placeholder="UNIQUE-MARK" />
-              </div>
+              <Label htmlFor="last_name">Last Name <span className="text-destructive">*</span></Label>
+              <Input id="last_name" value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} required />
             </div>
             <div>
-              <Label htmlFor="user_type">User Type <span className="text-destructive">*</span></Label>
-              <Select value={formData.user_type} onValueChange={(value) => setFormData({...formData, user_type: value as 'INDIVIDUAL' | 'BUSINESS'})}>
-                <SelectTrigger id="user_type"><SelectValue placeholder="Select user type"/></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="INDIVIDUAL">Individual</SelectItem>
-                  <SelectItem value="BUSINESS">Business</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Account Settings</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="user_role">User Role <span className="text-destructive">*</span></Label>
-                <Select value={formData.user_role} onValueChange={(value) => setFormData({...formData, user_role: value})}>
-                  <SelectTrigger id="user_role"><SelectValue placeholder="Select role"/></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CUSTOMER">Customer</SelectItem>
-                    <SelectItem value="STAFF">Staff</SelectItem>
-                    <SelectItem value="ADMIN">Admin</SelectItem>
-                    <SelectItem value="MANAGER">Manager</SelectItem>
-                    <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="is_active">Account Status</Label>
-                <Select value={formData.is_active ? 'active' : 'inactive'} onValueChange={(value) => setFormData({...formData, is_active: value === 'active'})}>
-                  <SelectTrigger id="is_active"><SelectValue/></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Label htmlFor="shipping_mark">Shipping Mark <span className="text-destructive">*</span></Label>
+              {/* Preserve exact input (no automatic uppercase) so datatable shows what admin entered */}
+              <Input id="shipping_mark" value={formData.shipping_mark} onChange={(e) => setFormData({...formData, shipping_mark: e.target.value})} required className="font-mono" placeholder="UNIQUE-MARK" />
             </div>
             <div>
-              <Label htmlFor="is_verified">Verification Status</Label>
-              <Select value={formData.is_verified ? 'verified' : 'unverified'} onValueChange={(value) => setFormData({...formData, is_verified: value === 'verified'})}>
-                <SelectTrigger id="is_verified"><SelectValue/></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="verified">Verified</SelectItem>
-                  <SelectItem value="unverified">Unverified</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
-              <Input id="password" type="password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="client@example.com" />
             </div>
             <div>
-              <Label htmlFor="confirm_password">Confirm Password <span className="text-destructive">*</span></Label>
-              <Input id="confirm_password" type="password" value={formData.confirm_password} onChange={(e) => setFormData({...formData, confirm_password: e.target.value})} required />
+              <Label htmlFor="phone">Phone <span className="text-destructive">*</span></Label>
+              <Input id="phone" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+233 XX XXX XXXX" required />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value || ''})} rows={3} />
+            <div className="text-xs text-muted-foreground">
+              Password will be set to <strong>PrimeMade1</strong> and the account will be marked as verified automatically.
+            </div>
           </div>
 
           <DialogFooter>
