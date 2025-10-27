@@ -231,6 +231,20 @@ export default function AirCargo() {
   // Always present containers sorted by creation time (oldest first)
   const filteredCargo = useMemo(() => sortByCreatedAtAsc(containers), [containers]);
 
+  // Count containers created in the current month for the "This Month" card
+  const thisMonthCount = useMemo(() => {
+    try {
+      const now = new Date();
+      return filteredCargo.filter((c) => {
+        if (!c.created_at) return false;
+        const d = new Date(c.created_at);
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      }).length;
+    } catch (err) {
+      return 0;
+    }
+  }, [filteredCargo]);
+
   // ✅ Table columns - Filter for customers
   const cols = useMemo(() => {
     const allCols: Column<BackendCargoContainer>[] = [
@@ -358,18 +372,6 @@ export default function AirCargo() {
               <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" style={{ color: "#FFFFFF" }} />
               Add Air Container
             </Button>
-            <ExcelUploadButton
-              uploadType="sea_cargo"
-              variant="outline"
-              className="h-9 sm:h-10 text-xs sm:text-sm"
-              onUploadComplete={(response) => {
-                toast({
-                  title: "Excel upload completed",
-                  description: `Processed ${response.summary.created || 0} air cargo items`,
-                });
-                window.location.reload();
-              }}
-            />
           </div>
         )}
       </div>
@@ -422,7 +424,7 @@ export default function AirCargo() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-muted-foreground">This Month</div>
-                <div className="text-2xl font-semibold mt-1">8</div>
+                <div className="text-2xl font-semibold mt-1">{thisMonthCount}</div>
               </div>
               <Calendar className="h-8 w-8" style={{ color: primaryColor }} />
             </div>

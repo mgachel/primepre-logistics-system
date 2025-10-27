@@ -252,6 +252,20 @@ export default function SeaCargo() {
   // Always present containers sorted by creation time (oldest first)
   const filteredCargo = useMemo(() => sortByCreatedAtAsc(containers), [containers]);
 
+  // Count containers created in the current month for the "This Month" card
+  const thisMonthCount = useMemo(() => {
+    try {
+      const now = new Date();
+      return filteredCargo.filter((c) => {
+        if (!c.created_at) return false;
+        const d = new Date(c.created_at);
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      }).length;
+    } catch (err) {
+      return 0;
+    }
+  }, [filteredCargo]);
+
   // Filter columns for customers - hide rate and clients columns
   const cols = useMemo(() => {
     const allCols: Column<BackendCargoContainer>[] = [
@@ -410,20 +424,6 @@ export default function SeaCargo() {
             >
               <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" style={{ color: "#FFFFFF" }} /> Add Cargo
             </Button>
-            <ExcelUploadButton
-              uploadType="sea_cargo"
-              variant="outline"
-              className="h-9 sm:h-10 text-xs sm:text-sm"
-              onUploadComplete={(response) => {
-                toast({
-                  title: "Excel upload completed",
-                  description: `Successfully processed ${response.summary.created || 0} sea cargo items`,
-                });
-                // Refresh the data
-                window.location.reload();
-              }}
-              style={{ borderColor: primaryColor, color: primaryColor }}
-            />
           </div>
         )}
       </div>
@@ -475,7 +475,7 @@ export default function SeaCargo() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">This Month</div>
-                <div className="text-lg sm:text-xl md:text-2xl font-semibold mt-0.5 sm:mt-1">12</div>
+                <div className="text-lg sm:text-xl md:text-2xl font-semibold mt-0.5 sm:mt-1">{thisMonthCount}</div>
               </div>
               <Calendar className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8" style={{ color: primaryColor }} />
             </div>
