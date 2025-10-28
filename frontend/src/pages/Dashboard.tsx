@@ -28,17 +28,7 @@ import { claimsService } from "@/services/claimsService";
 import { useAuthStore } from "@/stores/authStore";
 
 type GoodsStats = { total_cbm?: number };
-type CargoContainer = {
-  container_id: string;
-  status?: string;
-  route?: string;
-  eta?: string;
-  client_summaries?: Array<{ client_name?: string }>;
-  cargo_type?: string;
-  container_number?: string;
-  client_name?: string;
-  customer_name?: string;
-};
+// ...existing code...
 
 export default function Dashboard() {
   const [showNewCargoDialog, setShowNewCargoDialog] = useState(false);
@@ -120,24 +110,25 @@ export default function Dashboard() {
         // Customers only see their own containers
         const containers = await cargoService.getCustomerContainers({ 
           status: "in_transit",
-          page_size: 10 // Limit to first 10 for performance
+          limit: 10 // Limit to first 10 for performance (mapped to page_size by service)
         });
+        const results: any[] = containers.data?.results || [];
         return {
-          inTransit: containers.data?.results || [],
-          seaCount: containers.data?.results?.filter((c: CargoContainer) => c.cargo_type === 'sea').length || 0,
-          airCount: containers.data?.results?.filter((c: CargoContainer) => c.cargo_type === 'air').length || 0,
+          inTransit: results,
+          seaCount: results.filter((c: any) => c.cargo_type === 'sea').length || 0,
+          airCount: results.filter((c: any) => c.cargo_type === 'air').length || 0,
           total: containers.data?.count || 0
         };
       } else {
         // Admin/staff get actual transit containers with limited count
         const [sea, air] = await Promise.all([
-          cargoService.getContainers({ cargo_type: "sea", status: "in_transit", page_size: 10 }),
-          cargoService.getContainers({ cargo_type: "air", status: "in_transit", page_size: 10 })
+          cargoService.getContainers({ cargo_type: "sea", status: "in_transit" }),
+          cargoService.getContainers({ cargo_type: "air", status: "in_transit" })
         ]);
         
         // Combine the actual container data for display
-        const seaContainers = sea.data?.results || [];
-        const airContainers = air.data?.results || [];
+  const seaContainers: any[] = sea.data?.results || [];
+  const airContainers: any[] = air.data?.results || [];
         const allTransitContainers = [...seaContainers, ...airContainers];
         
         return {
@@ -163,12 +154,21 @@ export default function Dashboard() {
     const activeShipments = containerData?.total || 0;
     
     // For customers, get items from dashboard data; for admins, use separate query if needed
-    const totalCargoItems = dashboardData?.data?.cargo_items_count || 0;
+    // dashboardData may be shaped differently for customer vs admin
+    let totalCargoItems = 0;
+    if (dashboardData?.data) {
+      // Customer dashboard returns .stats while admin returns top-level totals — handle both
+      if ("stats" in dashboardData.data && (dashboardData.data as any).stats) {
+        totalCargoItems = (dashboardData.data as any).stats.total_cargo_items ?? 0;
+      } else {
+        totalCargoItems = (dashboardData.data as any).total_cargo_items ?? 0;
+      }
+    }
     
     const activeClients = userStats?.data?.active_users ?? 0;
 
     // Delayed/Demurrage containers from the limited container data
-    const delayedContainers = containerData?.inTransit?.filter(c => {
+    const delayedContainers = (containerData?.inTransit || []).filter((c: any) => {
       if (!c.eta) return false;
       const etaDate = new Date(c.eta);
       return isOverdue(etaDate);
@@ -198,10 +198,10 @@ export default function Dashboard() {
   // Combine container data for the transiting cargo table
   const transitingCargo = useMemo(() => {
     if (!containerData?.inTransit) return [];
-    return containerData.inTransit.map((container: CargoContainer) => ({
-      type: container.cargo_type || 'sea',
+    return (containerData.inTransit as any[]).map((container: any) => ({
+      type: (container.cargo_type === 'air' ? 'air' : 'sea') as "sea" | "air",
       container: container.container_number || container.container_id || 'N/A',
-      client: container.client_name || '-',
+      client: container.client_name || container.customer_name || '-',
       route: container.route || '-',
       eta: container.eta || null,
     }));
@@ -334,27 +334,27 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         <MetricCard
           title="CBM in Warehouse"
-          value="100"
-          icon={() => <Package style={{ color: primaryColor }} />}
-          style={{ color: primaryColor }}
+          value={loadingStats ? <Skeleton className="h-6 w-20" /> : String(stats.cbmInWarehouse ?? 0)}
+          icon={Package}
+          iconColor={primaryColor}
         />
         <MetricCard
           title="Active Shipments"
-          value="50"
-          icon={() => <Truck style={{ color: primaryColor }} />}
-          style={{ color: primaryColor }}
+          value={loadingStats ? <Skeleton className="h-6 w-12" /> : String(stats.activeShipments ?? 0)}
+          icon={Truck}
+          iconColor={primaryColor}
         />
         <MetricCard
           title="Total Cargo Items"
-          value="200"
-          icon={() => <TrendingUp style={{ color: primaryColor }} />}
-          style={{ color: primaryColor }}
+          value={loadingStats ? <Skeleton className="h-6 w-16" /> : String(stats.totalCargoItems ?? 0)}
+          icon={TrendingUp}
+          iconColor={primaryColor}
         />
         <MetricCard
           title="Pending Claims"
-          value="5"
-          icon={() => <AlertTriangle style={{ color: primaryColor }} />}
-          style={{ color: primaryColor }}
+          value={loadingStats ? <Skeleton className="h-6 w-8" /> : String(stats.pendingClaims ?? 0)}
+          icon={AlertTriangle}
+          iconColor={primaryColor}
         />
       </div>
 

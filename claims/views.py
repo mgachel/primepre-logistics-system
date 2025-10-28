@@ -10,7 +10,8 @@ from .serializers import (
     ClaimSerializer, 
     ClaimCreateSerializer,
     AdminClaimSerializer,
-    ClaimStatusUpdateSerializer
+    ClaimStatusUpdateSerializer,
+    AdminClaimCreateSerializer
 )
 from users.permissions import IsCustomer, IsAdminUser
 
@@ -62,13 +63,12 @@ class CustomerClaimDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Claim.objects.filter(customer=self.request.user)
 
 
-class AdminClaimListView(generics.ListAPIView):
+class AdminClaimListView(generics.ListCreateAPIView):
     """
-    Admin view to see all claims from all customers
+    Admin view to list and create claims for any customer (admins only)
     """
-    serializer_class = AdminClaimSerializer
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
-    
+
     def get_queryset(self):
         """Return all claims, with optional filters for admin users."""
         queryset = Claim.objects.select_related('customer').all()
@@ -101,6 +101,30 @@ class AdminClaimListView(generics.ListAPIView):
         for claim in queryset[:5]:  # Show first 5 claims
             logger.debug(f"  - Claim {claim.id}: {claim.tracking_id} by {claim.customer}")
         return queryset
+
+    def get_serializer_class(self):
+        # Use admin list serializer for GET, and admin create serializer for POST
+        if self.request.method == 'POST':
+            return AdminClaimCreateSerializer
+        return AdminClaimSerializer
+
+    def create(self, request, *args, **kwargs):
+        # Use AdminClaimCreateSerializer to allow admin to create claim for any customer via shipping_mark
+        serializer = None
+        try:
+            serializer = AdminClaimCreateSerializer(data=request.data, context={'request': request})
+        except Exception:
+            serializer = None
+
+        if serializer is None:
+            return Response({'detail': 'Invalid serializer setup'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            claim = serializer.save()
+
+        output_serializer = AdminClaimSerializer(claim, context={'request': request})
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
 
 class AdminClaimDetailView(generics.RetrieveUpdateAPIView):

@@ -273,6 +273,28 @@ class ClaimsService {
     }
   }
 
+  // Admin create claim for a specific customer by shipping_mark
+  async createAdminClaim(claimData: CreateClaimData & { shipping_mark: string }): Promise<{ success: boolean; data: AdminClaim }> {
+    try {
+      const formData = new FormData();
+      formData.append('tracking_id', claimData.tracking_id);
+      formData.append('item_name', claimData.item_name);
+      formData.append('item_description', claimData.item_description);
+      formData.append('shipping_mark', claimData.shipping_mark);
+      if (claimData.image_1) formData.append('image_1', claimData.image_1);
+      if (claimData.image_2) formData.append('image_2', claimData.image_2);
+      if (claimData.image_3) formData.append('image_3', claimData.image_3);
+
+      const response = await apiClient.post<AdminClaim>('/api/claims/admin/claims/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return { success: response.success, data: response.data };
+    } catch (error) {
+      console.error('Failed to create admin claim:', error);
+      throw error;
+    }
+  }
+
   // Utility methods
   getStatusBadgeColor(status: string): string {
     switch (status) {

@@ -119,3 +119,28 @@ class ClaimStatusUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Claim
         fields = ['status', 'admin_notes']
+
+
+class AdminClaimCreateSerializer(serializers.ModelSerializer):
+    """Serializer used by admins to create a claim for a given customer via shipping_mark."""
+    shipping_mark = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = Claim
+        fields = ['tracking_id', 'item_name', 'item_description', 'image_1', 'image_2', 'image_3', 'shipping_mark']
+
+    def validate_shipping_mark(self, value):
+        try:
+            customer = CustomerUser.objects.get(shipping_mark=value)
+        except CustomerUser.DoesNotExist:
+            raise serializers.ValidationError("No customer found with that shipping mark.")
+        return value
+
+    def create(self, validated_data):
+        # Resolve customer by shipping_mark and attach to claim
+        shipping_mark = validated_data.pop('shipping_mark', None)
+        if shipping_mark:
+            customer = CustomerUser.objects.get(shipping_mark=shipping_mark)
+            validated_data['customer'] = customer
+            validated_data['shipping_mark'] = shipping_mark
+        return super().create(validated_data)

@@ -51,11 +51,15 @@ import {
 } from '@/components/ui/table';
 import { claimsService, AdminClaim, ClaimStatusUpdate, ClaimsSummary } from '@/services/claimsService';
 import { formatDate, formatRelative } from '@/lib/date';
+import { useAuthStore } from '@/stores/authStore';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Claims() {
   const [claims, setClaims] = useState<AdminClaim[]>([]);
   const [summary, setSummary] = useState<ClaimsSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuthStore();
+  const { toast } = useToast();
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -64,6 +68,18 @@ export default function Claims() {
   const [shippingMarkFilter, setShippingMarkFilter] = useState('');
   const [selectedClaim, setSelectedClaim] = useState<AdminClaim | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const [newClaim, setNewClaim] = useState<{
+    shipping_mark: string;
+    tracking_id: string;
+    item_name: string;
+    item_description: string;
+    image_1?: File | null;
+    image_2?: File | null;
+    image_3?: File | null;
+  }>({ shipping_mark: '', tracking_id: '', item_name: '', item_description: '' });
+  const [creating, setCreating] = useState(false);
 
   // Status update state
   const [statusUpdate, setStatusUpdate] = useState<ClaimStatusUpdate>({
@@ -265,10 +281,19 @@ export default function Claims() {
             Review and manage customer claims for lost or damaged items
           </p>
         </div>
-        <Button variant="outline" onClick={loadData} disabled={loading}>
+        <div className="flex items-center gap-2">
+          {user?.is_admin_user && (
+            <Button onClick={() => setShowAddModal(true)}>
+              <FileText className="h-4 w-4 mr-2" />
+              Add Claim
+            </Button>
+          )}
+
+          <Button variant="outline" onClick={loadData} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
-        </Button>
+          </Button>
+        </div>
       </div>
 
       {/* Status Messages */}
@@ -727,6 +752,86 @@ export default function Claims() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Add Claim Modal (admin) */}
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Claim for Client</DialogTitle>
+            <DialogDescription>
+              Create a claim on behalf of a client using their Shipping Mark
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pr-2">
+            <div>
+              <Label>Shipping Mark</Label>
+              <Input value={newClaim.shipping_mark} onChange={(e) => setNewClaim(prev => ({ ...prev, shipping_mark: e.target.value }))} placeholder="Enter client's shipping mark" />
+            </div>
+            <div>
+              <Label>Tracking ID</Label>
+              <Input value={newClaim.tracking_id} onChange={(e) => setNewClaim(prev => ({ ...prev, tracking_id: e.target.value }))} placeholder="Container or tracking id" />
+            </div>
+            <div>
+              <Label>Item Name</Label>
+              <Input value={newClaim.item_name} onChange={(e) => setNewClaim(prev => ({ ...prev, item_name: e.target.value }))} placeholder="Item name" />
+            </div>
+            <div>
+              <Label>Item Description</Label>
+              <Textarea value={newClaim.item_description} onChange={(e) => setNewClaim(prev => ({ ...prev, item_description: e.target.value }))} rows={4} />
+            </div>
+            <div>
+              <Label>Images (optional)</Label>
+              <div className="flex gap-2">
+                <Input type="file" onChange={(e) => setNewClaim(prev => ({ ...prev, image_1: e.target.files ? e.target.files[0] : null }))} />
+                <Input type="file" onChange={(e) => setNewClaim(prev => ({ ...prev, image_2: e.target.files ? e.target.files[0] : null }))} />
+                <Input type="file" onChange={(e) => setNewClaim(prev => ({ ...prev, image_3: e.target.files ? e.target.files[0] : null }))} />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowAddModal(false)} disabled={creating}>Cancel</Button>
+              <Button onClick={async () => {
+                // Create admin claim
+                if (!newClaim.shipping_mark || !newClaim.tracking_id || !newClaim.item_name) {
+                  toast({ title: 'Missing fields', description: 'Please provide shipping mark, tracking id and item name', variant: 'destructive' });
+                  return;
+                }
+                try {
+                  setCreating(true);
+                  const payload = new FormData();
+                  payload.append('shipping_mark', newClaim.shipping_mark);
+                  payload.append('tracking_id', newClaim.tracking_id);
+                  payload.append('item_name', newClaim.item_name);
+                  payload.append('item_description', newClaim.item_description || '');
+                  if (newClaim.image_1) payload.append('image_1', newClaim.image_1);
+                  if (newClaim.image_2) payload.append('image_2', newClaim.image_2);
+                  if (newClaim.image_3) payload.append('image_3', newClaim.image_3);
+
+                  await claimsService.createAdminClaim({
+                    shipping_mark: newClaim.shipping_mark,
+                    tracking_id: newClaim.tracking_id,
+                    item_name: newClaim.item_name,
+                    item_description: newClaim.item_description || '',
+                    image_1: newClaim.image_1 as File | undefined,
+                    image_2: newClaim.image_2 as File | undefined,
+                    image_3: newClaim.image_3 as File | undefined,
+                  } as any);
+
+                  toast({ title: 'Claim created', description: 'Claim successfully created for client', variant: 'success' });
+                  setShowAddModal(false);
+                  setNewClaim({ shipping_mark: '', tracking_id: '', item_name: '', item_description: '' });
+                  await loadData();
+                } catch (err: unknown) {
+                  console.error('Failed to create admin claim', err);
+                  toast({ title: 'Create failed', description: err instanceof Error ? err.message : 'Failed to create claim', variant: 'destructive' });
+                } finally {
+                  setCreating(false);
+                }
+              }} disabled={creating}>{creating ? 'Creating...' : 'Create Claim'}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-} 
+}
