@@ -34,6 +34,7 @@ export default function GoodsReceivedChinaSea() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeSearchTerm, setActiveSearchTerm] = useState(''); // The actual search term used for API calls
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [stats, setStats] = useState<SeaCargoStats | null>(null);
   const [showNewGoodsDialog, setShowNewGoodsDialog] = useState(false);
@@ -53,7 +54,7 @@ export default function GoodsReceivedChinaSea() {
 
       // Use dedicated China Sea service method with pagination
       const response = await warehouseService.getChinaSeaGoods({
-        search: searchTerm || undefined,
+        search: activeSearchTerm || undefined,
         status: statusFilter === 'all' ? undefined : statusFilter,
         page,
         page_size: pageSize,
@@ -94,7 +95,7 @@ export default function GoodsReceivedChinaSea() {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, statusFilter, page, pageSize]);
+  }, [activeSearchTerm, statusFilter, page, pageSize]);
 
   // Edit functions
   const handleEditStart = (item: WarehouseItem) => {
@@ -216,19 +217,18 @@ export default function GoodsReceivedChinaSea() {
     initData();
   }, [loadData, fetchStats]);
 
+  // Handler for search on Enter key press
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setActiveSearchTerm(searchTerm);
+      setPage(1);
+    }
+  };
+
   // Filter items based on search and status
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
-      const matchesSearch = searchTerm === '' || 
-        item.shipping_mark.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.supply_tracking.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
-      
-      return matchesSearch && matchesStatus;
-    });
-  }, [items, searchTerm, statusFilter]);
+    return items;
+  }, [items]);
 
   // Role-aware coloring using auth store
   const { user } = useAuthStore();
@@ -578,12 +578,10 @@ export default function GoodsReceivedChinaSea() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Search by shipping mark, tracking ID, or description..."
+                  placeholder="Search by shipping mark, tracking ID, or description... (Press Enter to search)"
                   value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setPage(1);
-                  }}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
                   className="pl-10"
                 />
               </div>

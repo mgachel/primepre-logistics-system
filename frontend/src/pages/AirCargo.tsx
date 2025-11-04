@@ -93,12 +93,12 @@ export default function AirCargo() {
   const [editContainer, setEditContainer] =
     useState<BackendCargoContainer | null>(null);
 
-  // Helper: sort containers by created_at ascending (oldest first)
-  const sortByCreatedAtAsc = (arr: BackendCargoContainer[] = []) =>
+  // Helper: sort containers by loading date descending (newest first)
+  const sortByLoadingDateDesc = (arr: BackendCargoContainer[] = []) =>
     arr.slice().sort((a, b) => {
-      const ta = a.created_at ? new Date(a.created_at).getTime() : Infinity;
-      const tb = b.created_at ? new Date(b.created_at).getTime() : Infinity;
-      return ta - tb;
+      const ta = a.load_date ? new Date(a.load_date).getTime() : 0;
+      const tb = b.load_date ? new Date(b.load_date).getTime() : 0;
+      return tb - ta; // Descending order (newest first)
     });
 
   // Define primary color based on user role
@@ -130,7 +130,7 @@ export default function AirCargo() {
             cargoService.getCustomerAirCargoDashboard(),
           ]);
           if (!ignore) {
-            setContainers(sortByCreatedAtAsc(Array.isArray(listRes?.results) ? listRes.results : []));
+            setContainers(sortByLoadingDateDesc(Array.isArray(listRes?.results) ? listRes.results : []));
             setDashboard(dashRes || null);
           }
         } else {
@@ -144,7 +144,7 @@ export default function AirCargo() {
             cargoService.getDashboard("air"),
           ]);
           if (!ignore) {
-            setContainers(sortByCreatedAtAsc(listRes.data?.results || []));
+            setContainers(sortByLoadingDateDesc(listRes.data?.results || []));
             setDashboard(dashRes.data || null);
           }
         }
@@ -181,7 +181,7 @@ export default function AirCargo() {
         } as any),
         cargoService.getCustomerAirCargoDashboard(),
       ]);
-      setContainers(sortByCreatedAtAsc(Array.isArray(listRes?.results) ? listRes.results : []));
+      setContainers(sortByLoadingDateDesc(Array.isArray(listRes?.results) ? listRes.results : []));
       setDashboard(dashRes || null);
     } else {
       const [listRes, dashRes] = await Promise.all([
@@ -192,7 +192,7 @@ export default function AirCargo() {
         }),
         cargoService.getDashboard("air"),
       ]);
-      setContainers(sortByCreatedAtAsc(listRes.data?.results || []));
+      setContainers(sortByLoadingDateDesc(listRes.data?.results || []));
       setDashboard(dashRes.data || null);
     }
   };
@@ -228,8 +228,8 @@ export default function AirCargo() {
     }
   };
 
-  // Always present containers sorted by creation time (oldest first)
-  const filteredCargo = useMemo(() => sortByCreatedAtAsc(containers), [containers]);
+  // Always present containers sorted by loading date (newest first)
+  const filteredCargo = useMemo(() => containers, [containers]);
 
   // Count containers created in the current month for the "This Month" card
   const thisMonthCount = useMemo(() => {
@@ -240,7 +240,7 @@ export default function AirCargo() {
         const d = new Date(c.created_at);
         return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
       }).length;
-    } catch (err) {
+    } catch {
       return 0;
     }
   }, [filteredCargo]);

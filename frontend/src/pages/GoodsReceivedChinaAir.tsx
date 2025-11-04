@@ -57,6 +57,7 @@ export default function GoodsReceivedChinaAir() {
 
   const [showNewGoodsDialog, setShowNewGoodsDialog] = useState(false);
   const [search, setSearch] = useState("");
+  const [activeSearch, setActiveSearch] = useState(""); // The actual search term used for API calls
   const [status, setStatus] = useState<
     "all" | "PENDING" | "READY_FOR_SHIPPING" | "FLAGGED" | "SHIPPED" | "CANCELLED"
   >("all");
@@ -78,7 +79,7 @@ export default function GoodsReceivedChinaAir() {
       const params: any = {
         page: currentPage,
         page_size: PAGE_SIZE,
-        search: search || undefined,
+        search: activeSearch || undefined,
         status: status === "all" ? undefined : status,
       };
       const response = await warehouseService.getChinaAirGoods(params);
@@ -169,10 +170,19 @@ export default function GoodsReceivedChinaAir() {
     }));
   };
 
+  // Handler for search on Enter key press
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setActiveSearch(search);
+      setPage(1);
+    }
+  };
+
   useEffect(() => {
     fetchData(1, true);
     fetchStats();
-  }, [search, status]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSearch, status]);
 
   const loadMore = () => {
     if (hasMore && !loading) {
@@ -438,9 +448,15 @@ export default function GoodsReceivedChinaAir() {
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by tracking, mark, or description..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+          <Input 
+            placeholder="Search by tracking, mark, or description... (Press Enter to search)" 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            className="pl-10" 
+          />
         </div>
-        <Select value={status} onValueChange={(value: any) => setStatus(value)}>
+        <Select value={status} onValueChange={(value) => setStatus(value as typeof status)}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
