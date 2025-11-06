@@ -1267,27 +1267,10 @@ class LoginView(APIView):
             }, status=status.HTTP_403_FORBIDDEN)
 
         # Enforce that this endpoint is for customer logins only.
-        # Users must have the CUSTOMER role (supports new `roles` list and legacy `user_role`).
-        is_customer = False
-        try:
-            if hasattr(user, 'has_role'):
-                # Multi-role users: allow if they have explicit CUSTOMER role
-                is_customer = user.has_role('CUSTOMER')
-            else:
-                # Legacy single-value field
-                is_customer = getattr(user, 'user_role', 'CUSTOMER') == 'CUSTOMER'
-        except Exception:
-            is_customer = getattr(user, 'user_role', 'CUSTOMER') == 'CUSTOMER'
-
-        if not is_customer:
-            # Reject admin-only accounts from signing in on the regular (customer) login endpoint.
-            logger.warning(f"Customer login rejected for non-customer user: {getattr(user, 'phone', getattr(user, 'username', 'unknown'))}")
-            return Response({
-                'success': False,
-                'error': 'Customer access required. This login endpoint only accepts customer accounts.'
-            }, status=status.HTTP_403_FORBIDDEN)
-
-        # For regular users, check verification status
+        # Allow all users (both admin and customer) to log in through this endpoint
+        # Role-based routing is handled on the frontend
+        
+        # For regular customer users, check verification status
         if hasattr(user, 'is_verified') and not user.is_verified and not user.is_superuser:
             return Response({
                 'success': False,
