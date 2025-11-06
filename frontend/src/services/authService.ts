@@ -64,12 +64,9 @@ export const authService = {
       // Clear any cached authentication data before attempting login
       this.clearAuthCache();
       
-  console.log('📡 AuthService: Making login request to server...');
-  // If frontend is served from admin subdomain, use admin-login endpoint
-  const host = typeof window !== 'undefined' ? window.location.hostname : '';
-  const isAdminHost = host === 'admin.primemade.org' || host.endsWith('.admin.primemade.org');
-  const loginEndpoint = isAdminHost ? '/api/auth/admin-login/' : '/api/auth/login/';
-  const response = await apiClient.post<LoginResponse>(loginEndpoint, credentials);
+      console.log('📡 AuthService: Making login request to server...');
+      // Always use the standard login endpoint - role-based redirect happens on frontend
+      const response = await apiClient.post<LoginResponse>('/api/auth/login/', credentials);
       
       console.log('📥 AuthService: Received response:', response.success ? 'SUCCESS' : 'FAILED');
       

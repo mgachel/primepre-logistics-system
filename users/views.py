@@ -1406,6 +1406,11 @@ class LoginView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class AdminLoginView(APIView):
     """
+    DEPRECATED: This endpoint is deprecated. Use /api/auth/login/ instead.
+    Role-based redirects now happen on the frontend after successful login.
+    
+    This endpoint remains for backwards compatibility but may be removed in a future version.
+    
     Admin-only login endpoint. Uses same credentials as regular login but only
     permits users with admin roles (is_staff / is_admin_user / is_superuser).
     """
@@ -1413,6 +1418,9 @@ class AdminLoginView(APIView):
     authentication_classes = []
 
     def post(self, request):
+        # Log deprecation warning
+        logger.warning("DEPRECATED: AdminLoginView is deprecated. Please use LoginView instead. Role-based redirects should happen on the frontend.")
+        
         phone_or_username = request.data.get('phone')
         password = request.data.get('password')
 

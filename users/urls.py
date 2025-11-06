@@ -116,7 +116,8 @@ urlpatterns = [
     
     # Legacy authentication endpoints (keep for backward compatibility)
     path('register/', RegisterView.as_view(), name='register'),
-    path('admin-login/', AdminLoginView.as_view(), name='admin_login'),
+    # DEPRECATED: admin-login endpoint - use login/ instead, role-based redirect happens on frontend
+    path('admin-login/', AdminLoginView.as_view(), name='admin_login'),  # Deprecated
     path('login/', LoginView.as_view(), name='login'),
     path('test/', TestView.as_view(), name='test'),
     

@@ -43,7 +43,6 @@ ALLOWED_HOSTS = [
     "primepre-logistics-backend.herokuapp.com",
     "primepre-logistics-backend-fb2561752d16.herokuapp.com", 
     "primepre-backend.onrender.com",  # New Render backend URL
-    "admin.primemade.org",
     "primemade.org",
     "www.primemade.org",
     "localhost",
@@ -326,7 +325,6 @@ CORS_ALLOWED_ORIGINS = csv_list(config(
             'https://primepre-frontend.onrender.com,'
             'https://primepre-logistics-system.onrender.com,'
             "https://primemade.org,"
-            "https://admin.primemade.org,"
             "https://www.primemade.org,"
             'http://localhost:3000,'
             'http://127.0.0.1:3000,'
@@ -382,7 +380,6 @@ CSRF_TRUSTED_ORIGINS = csv_list(config(
             'https://primepre-backend.onrender.com,'
             'https://primepre-frontend.onrender.com,'
             'https://primepre-logistics-system.onrender.com,'
-            'https://admin.primemade.org,'
             'https://primemade.org,'
             'https://www.primemade.org,'
             'https://*.herokuapp.com,'
@@ -397,10 +394,6 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SAMESITE = "None"
     CSRF_COOKIE_SAMESITE = "None"
-    # Allow cookies to be shared across subdomains (primemade.org and admin.primemade.org)
-    # NOTE: Only enable if you intentionally want session/csrf cookies shared across subdomains.
-    SESSION_COOKIE_DOMAIN = ".primemade.org"
-    CSRF_COOKIE_DOMAIN = ".primemade.org"
 
 # Logging configuration
 LOGGING = {

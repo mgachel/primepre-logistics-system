@@ -14,63 +14,9 @@
     <meta name="twitter:card" content="summary_large_image" />
   </head>
     <link rel="icon" href="/sidebar.png" type="image/png" />
-    <script>
-      // If served on the admin subdomain, change tab title and favicon
-      (function() {
-        try {
-          var host = window.location.hostname;
-          if (host === 'admin.primemade.org') {
-            // Change title
-            document.title = 'Powered by wavemova';
-
-            // Prefer a 32x32 favicon if present, otherwise fall back to the full-size PNG
-            var prefer32 = '/wavemova_copy-32.png';
-            var fallback = '/wavemova_copy.png';
-
-            function setFavicon(url) {
-              var link = document.querySelector("link[rel~='icon']");
-              if (link) {
-                link.href = url;
-                link.type = 'image/png';
-              } else {
-                link = document.createElement('link');
-                link.rel = 'icon';
-                link.href = url;
-                link.type = 'image/png';
-                document.getElementsByTagName('head')[0].appendChild(link);
-              }
-            }
-
-            // Try loading the 32px image first. If it fails, use the fallback.
-            var testImg = new Image();
-            testImg.onload = function() { setFavicon(prefer32); };
-            testImg.onerror = function() { setFavicon(fallback); };
-            testImg.src = prefer32;
-          }
-        } catch (e) {
-          console.error('admin-branding error', e);
-        }
-      })();
-    </script>
 
   <body>
     <div id="root"></div>
-    <script>
-      // If this site is served on the admin subdomain, always redirect root and /login to /admin/login
-      (function() {
-        try {
-          var host = window.location.hostname;
-          if (host === 'admin.primemade.org') {
-            if (window.location.pathname === '/' || window.location.pathname === '/login') {
-              window.location.replace('/admin/login' + window.location.search + window.location.hash);
-            }
-          }
-        } catch (e) {
-          // Fail silently - don't block app from loading
-          console.error('admin-redirect error', e);
-        }
-      })();
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

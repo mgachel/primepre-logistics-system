@@ -12,7 +12,6 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuthStore } from "@/stores/authStore";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
-import AdminLogin from "./pages/AdminLogin";
 import Signup from "./pages/Signup";
 import SimplifiedSignup from "./pages/SimplifiedSignup";
 import ShippingMarkSelection from "./pages/ShippingMarkSelection";
@@ -89,8 +88,6 @@ const App = () => (
           <Routes>
             {/* Public auth routes */}
             <Route path="/login" element={<Login />} />
-            {/* Admin login (served on admin.primemade.org) */}
-            <Route path="/admin/login" element={<AdminLogin />} />
             {/* New simplified signup */}
             <Route path="/signup" element={<SimplifiedSignup />} />
             <Route path="/signup/select-shipping-mark" element={<ShippingMarkSelection />} />

@@ -213,34 +213,11 @@ class ApiClient {
   private handleLogout() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
-    const storedUser = localStorage.getItem("user");
     localStorage.removeItem("user");
     localStorage.removeItem("admin_info");
 
-    // Decide where to redirect after logout: admin login if user was admin or we're on admin host
-    let redirectTo = '/login';
-    try {
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser as string);
-        const role = (parsed.user_role || parsed.userRole || '').toString().toUpperCase();
-        if (['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(role)) {
-          redirectTo = '/admin/login';
-        }
-      }
-    } catch (e) {
-      // ignore parse errors
-    }
-
-    try {
-      const host = typeof window !== 'undefined' ? window.location.hostname : '';
-      if (host === 'admin.primemade.org' || host.endsWith('.admin.primemade.org')) {
-        redirectTo = '/admin/login';
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    window.location.href = redirectTo;
+    // All users redirect to the same login page
+    window.location.href = '/login';
   }
 
   private extractErrorMessage(errorData: unknown, status: number): string {
@@ -350,19 +327,8 @@ class AuthApiService {
 
   // Authentication endpoints
   async login(credentials: { phone: string; password: string }): Promise<LoginResponse> {
-    // Decide endpoint based on host: admin subdomain must use admin-login endpoint
-    let loginEndpoint = '/api/auth/login/';
-    try {
-      if (typeof window !== 'undefined') {
-        const host = window.location.hostname || '';
-        const isAdminHost = host === 'admin.primemade.org' || host.endsWith('.admin.primemade.org');
-        if (isAdminHost) loginEndpoint = '/api/auth/admin-login/';
-      }
-    } catch (e) {
-      // If window access fails for any reason, fall back to regular login
-    }
-
-    const response = await this.api.post<LoginResponse>(loginEndpoint, credentials);
+    // Always use the standard login endpoint - role-based redirect happens on frontend
+    const response = await this.api.post<LoginResponse>('/api/auth/login/', credentials);
     if (response.success && response.data) {
       this.setTokens({
         access: response.data.tokens.access,

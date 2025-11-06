@@ -29,21 +29,9 @@ export function AppHeader({ sidebarCollapsed, onToggle, isMobile, mobileMenuOpen
   const primaryColor = user?.user_role?.toUpperCase() === "CUSTOMER" ? "#4FC3F7" : "#00703D"; // Light blue for customers, green for others
 
   const handleLogout = async () => {
-    // Determine redirect target from the currently signed-in user BEFORE logout
-    let redirectTo = '/login';
-    try {
-  const currentRole = user?.user_role || '';
-      const role = (currentRole || '').toString().toUpperCase();
-      if (['ADMIN', 'MANAGER', 'STAFF', 'SUPER_ADMIN'].includes(role)) {
-        redirectTo = '/admin/login';
-      }
-    } catch (e) {
-      // ignore and fallback to /login
-    }
-
-    // Perform logout (clears auth state/storage), then navigate to the correct login page
+    // Perform logout (clears auth state/storage), then navigate to login page
     await logout();
-    navigate(redirectTo);
+    navigate('/login');
   };
 
   return (
