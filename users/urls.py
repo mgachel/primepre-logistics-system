@@ -31,6 +31,9 @@ from .views import (
     # Admin utilities
     DeleteUnverifiedUsersView,
     
+    # Initial setup for Render free tier
+    InitialSetupView,
+    
     # Development helpers
     DevelopmentPinsView
 )
@@ -113,6 +116,9 @@ urlpatterns = [
     # ============================================================================
     # EXISTING API ENDPOINTS (PRESERVED)
     # ============================================================================
+    
+    # Initial setup endpoint (for Render free tier without shell access)
+    path('initial-setup/', InitialSetupView.as_view(), name='initial_setup'),
     
     # Legacy authentication endpoints (keep for backward compatibility)
     path('register/', RegisterView.as_view(), name='register'),

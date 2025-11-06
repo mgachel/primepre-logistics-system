@@ -2433,3 +2433,141 @@ class DeleteUnverifiedUsersView(APIView):
                 'error': 'Failed to count unverified users',
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================================================
+# ONE-TIME SETUP ENDPOINT FOR CREATING SUPERUSER (RENDER FREE TIER)
+# ============================================================================
+
+@method_decorator(csrf_exempt, name='dispatch')
+class InitialSetupView(APIView):
+    """
+    One-time setup endpoint to create initial superuser.
+    Requires SETUP_SECRET_KEY from environment variables.
+    This is useful for Render free tier where you don't have shell access.
+    
+    Usage:
+    POST /api/auth/initial-setup/
+    {
+        "secret_key": "your-secret-key-from-env",
+        "phone": "1234567890",
+        "password": "secure-password",
+        "email": "admin@example.com",
+        "first_name": "Super",
+        "last_name": "Admin"
+    }
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        import os
+        
+        # Get the secret key from environment
+        setup_secret = os.environ.get('SETUP_SECRET_KEY')
+        
+        if not setup_secret:
+            logger.warning("Initial setup attempted but SETUP_SECRET_KEY is not set in environment")
+            return Response({
+                'success': False,
+                'error': 'Setup endpoint is not configured. Set SETUP_SECRET_KEY environment variable.'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
+        # Verify the secret key
+        provided_secret = request.data.get('secret_key')
+        if not provided_secret or provided_secret != setup_secret:
+            logger.warning(f"Invalid setup secret key attempt from IP: {request.META.get('REMOTE_ADDR')}")
+            return Response({
+                'success': False,
+                'error': 'Invalid secret key'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get superuser details
+        phone = request.data.get('phone')
+        password = request.data.get('password')
+        email = request.data.get('email', '')
+        first_name = request.data.get('first_name', 'Super')
+        last_name = request.data.get('last_name', 'Admin')
+        
+        if not phone or not password:
+            return Response({
+                'success': False,
+                'error': 'Phone and password are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if superuser already exists
+        if CustomerUser.objects.filter(phone=phone).exists():
+            user = CustomerUser.objects.get(phone=phone)
+            
+            # If user exists but is not a superuser, upgrade them
+            if not user.is_superuser:
+                user.is_superuser = True
+                user.is_staff = True
+                user.user_role = 'SUPER_ADMIN'
+                user.set_password(password)
+                if email:
+                    user.email = email
+                if first_name:
+                    user.first_name = first_name
+                if last_name:
+                    user.last_name = last_name
+                user.is_active = True
+                user.is_verified = True
+                user.save()
+                
+                logger.info(f"Upgraded existing user {phone} to superuser via initial setup")
+                return Response({
+                    'success': True,
+                    'message': f'User {phone} upgraded to superuser',
+                    'user': {
+                        'phone': user.phone,
+                        'email': user.email,
+                        'name': f'{user.first_name} {user.last_name}',
+                        'role': user.user_role
+                    }
+                }, status=status.HTTP_200_OK)
+            else:
+                logger.info(f"Superuser {phone} already exists - setup skipped")
+                return Response({
+                    'success': True,
+                    'message': f'Superuser {phone} already exists',
+                    'user': {
+                        'phone': user.phone,
+                        'email': user.email,
+                        'name': f'{user.first_name} {user.last_name}',
+                        'role': user.user_role
+                    }
+                }, status=status.HTTP_200_OK)
+        
+        # Create new superuser
+        try:
+            user = CustomerUser.objects.create_superuser(
+                phone=phone,
+                password=password,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                is_active=True,
+                is_verified=True
+            )
+            
+            logger.info(f"Created initial superuser: {phone} via setup endpoint")
+            
+            return Response({
+                'success': True,
+                'message': 'Superuser created successfully',
+                'user': {
+                    'phone': user.phone,
+                    'email': user.email,
+                    'name': f'{user.first_name} {user.last_name}',
+                    'role': user.user_role
+                }
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error creating superuser via setup: {str(e)}")
+            return Response({
+                'success': False,
+                'error': 'Failed to create superuser',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
